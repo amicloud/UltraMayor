@@ -217,7 +217,7 @@ impl MeshRenderer {
             // Initialize textures
             let displayed_texture = RenderTexture::new(&gl, width, height);
             let next_texture = RenderTexture::new(&gl, width, height);
-            let mut me = Self {
+            let me = Self {
                 gl,
                 program: shader_program,
                 view_proj_location,

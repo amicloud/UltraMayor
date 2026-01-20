@@ -2,8 +2,8 @@
 // See accompanying file LICENSE or https://www.gnu.org/licenses/agpl-3.0.html for details.
 use approx::relative_eq;
 use bytemuck::{Pod, Zeroable};
-use nalgebra::{Quaternion, UnitQuaternion, Vector3};
-use std::{collections::HashMap, ffi::OsStr, hash::Hash, hash::Hasher};
+use nalgebra::{UnitQuaternion, Vector3};
+use std::{collections::HashMap, hash::Hash, hash::Hasher};
 use stl_io::Triangle;
 
 #[repr(C)]

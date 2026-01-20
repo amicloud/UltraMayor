@@ -10,26 +10,19 @@ use action_manager::ActionManager;
 use body::Body;
 use glow::Context as GlowContext;
 use glow::HasContext;
-use image::{ImageBuffer, Luma};
 use log::debug;
 use mesh_renderer::MeshRenderer;
-use nalgebra::Vector3;
-use rfd::AsyncFileDialog;
 use settings::Settings;
 use slint::platform::PointerEventButton;
-use slint::SharedString;
 use std::cell::RefCell;
 use std::num::NonZeroU32;
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
-use tokio::sync::mpsc::error;
-use tokio::task;
 slint::include_modules!();
 mod action;
 mod action_manager;
 mod material;
 mod settings;
-use crate::action::{SetPositionAction, SetRotationAction, SetScaleAction};
 use log::error;
 #[derive(Default)]
 struct MouseState {

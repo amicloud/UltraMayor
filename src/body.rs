@@ -2,8 +2,6 @@
 // Distributed under the GNU Affero General Public License v3.0 or later.
 // See accompanying file LICENSE or https://www.gnu.org/licenses/agpl-3.0.html for details.
 
-use std::ffi::OsStr;
-use std::path::Path;
 
 use crate::{material::Material, mesh::Mesh};
 use nalgebra::{Matrix4, Quaternion, UnitQuaternion, Vector3};
