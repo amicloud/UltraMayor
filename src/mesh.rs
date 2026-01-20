@@ -3,12 +3,12 @@
 use approx::relative_eq;
 use bytemuck::{Pod, Zeroable};
 use nalgebra::{UnitQuaternion, Vector3};
-use std::{collections::HashMap, hash::Hash, hash::Hasher};
-use stl_io::Triangle;
-use std::fs::File;
-use std::io::BufReader;
 use obj::{load_obj, Obj};
 use std::ffi::OsStr;
+use std::fs::File;
+use std::io::BufReader;
+use std::{collections::HashMap, hash::Hash, hash::Hasher};
+use stl_io::Triangle;
 
 #[repr(C)]
 #[derive(Default, Clone, Pod, Copy, Debug)]
@@ -85,7 +85,6 @@ impl Vertex {
     }
 }
 
-
 #[derive(Default, Clone)]
 pub struct Mesh {
     pub vertices: Vec<Vertex>,
@@ -95,13 +94,17 @@ pub struct Mesh {
 impl Mesh {
     pub fn from_obj(path: &OsStr) -> Result<Self, Box<dyn std::error::Error>> {
         let input = BufReader::new(File::open(path)?);
-        let dome: Obj = load_obj(input)?;   
+        let dome: Obj = load_obj(input)?;
         let mut mesh = Mesh::default();
-        mesh.vertices = dome.vertices.into_iter().map(|pos| Vertex {
-            position: pos.position,
-            normal: pos.normal,
-            barycentric: [0.0, 0.0, 0.0],
-        }).collect();
+        mesh.vertices = dome
+            .vertices
+            .into_iter()
+            .map(|pos| Vertex {
+                position: pos.position,
+                normal: pos.normal,
+                barycentric: [0.0, 0.0, 0.0],
+            })
+            .collect();
         mesh.indices = dome.indices.iter().map(|&i| i as u32).collect();
         Ok(mesh)
     }
@@ -110,7 +113,6 @@ impl Mesh {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
 
     #[test]
     fn test_default() {

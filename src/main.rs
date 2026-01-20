@@ -282,43 +282,41 @@ fn main() {
             }
         });
 
-
-
         async fn open_files_from_dialog(bodies_clone: &SharedBodies) {
-        // Handling the option prevents crashes
-        if let Some(paths) = AsyncFileDialog::new()
-            .add_filter("stl", &["stl", "STL"])
-            .set_directory("~")
-            .pick_files()
-            .await
-        {
-            let mut bodies_vec: Vec<Rc<RefCell<Body>>> = Vec::new();
+            // Handling the option prevents crashes
+            if let Some(paths) = AsyncFileDialog::new()
+                .add_filter("stl", &["stl", "STL"])
+                .set_directory("~")
+                .pick_files()
+                .await
+            {
+                let mut bodies_vec: Vec<Rc<RefCell<Body>>> = Vec::new();
 
-            for path in paths {
-                let body = Rc::new(RefCell::new(Body::new_from_obj(
-                    path.path().as_os_str(),
-                    Vector3::new(0.0, 0.0, 0.0)
-                )));
-                bodies_vec.push(Rc::clone(&body));
-                println!("Loaded body: {}", path.file_name());
+                for path in paths {
+                    let body = Rc::new(RefCell::new(Body::new_from_obj(
+                        path.path().as_os_str(),
+                        Vector3::new(0.0, 0.0, 0.0),
+                    )));
+                    bodies_vec.push(Rc::clone(&body));
+                    println!("Loaded body: {}", path.file_name());
+                }
+                bodies_clone.borrow_mut().append(&mut bodies_vec);
+            } else {
+                println!("File picker returned no files");
             }
-            bodies_clone.borrow_mut().append(&mut bodies_vec);
-        } else {
-            println!("File picker returned no files");
         }
-    }
 
-    // Handler for opening STL importer file picker
-    {
-        let bodies_clone = Rc::clone(&state.shared_bodies);
-        app.on_click_import_obj(move || {
-            let bc_clone = Rc::clone(&bodies_clone);
-            let slint_future = async move {
-                open_files_from_dialog(&bc_clone).await;
-            };
-            slint::spawn_local(async_compat::Compat::new(slint_future)).unwrap();
-        });
-    }
+        // Handler for opening STL importer file picker
+        {
+            let bodies_clone = Rc::clone(&state.shared_bodies);
+            app.on_click_import_obj(move || {
+                let bc_clone = Rc::clone(&bodies_clone);
+                let slint_future = async move {
+                    open_files_from_dialog(&bc_clone).await;
+                };
+                slint::spawn_local(async_compat::Compat::new(slint_future)).unwrap();
+            });
+        }
     }
 
     // Run the Slint application
