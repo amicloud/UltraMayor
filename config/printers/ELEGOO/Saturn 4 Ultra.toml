@@ -1,0 +1,9 @@
+name = "Saturn 4 Ultra Example"
+model = "Saturn 4 Ultra"
+brand = "ELEGOO"
+physical_x = 218.880
+physical_y = 122.880
+physical_z = 220.000
+pixel_x = 11520
+pixel_y = 5120
+

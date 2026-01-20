@@ -1,0 +1,40 @@
+# Rust build artifacts
+/target/
+target/
+Cargo.lock
+
+# IDE and Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+*.sublime-project
+*.sublime-workspace
+
+# Rust
+*.rlib
+*.rmeta
+*.so
+*.dylib
+
+# Debug files
+*.pdb
+
+# Build outputs
+*.o
+*.a
+
+# OS-specific files
+.DS_Store
+Thumbs.db
+
+# Local environment files
+.env
+.env.local
+
+# Any local testing or temporary files
+tmp/
+temp/
+*.tmp

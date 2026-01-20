@@ -1,0 +1,9 @@
+name = "debug printer"
+model = "debug model"
+brand = "debug brand"
+physical_x = 218.880
+physical_y = 122.880
+physical_z = 220.000
+pixel_x = 1920
+pixel_y = 1080
+

@@ -1,0 +1,13 @@
+[general]
+username = "Default"
+theme = "system"
+auto_save = true
+
+[editor]
+render_scale = 1.0
+visualize_edges = true
+visualize_normals = false
+
+[network]
+timeout = 30
+use_https = true

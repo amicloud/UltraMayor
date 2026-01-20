@@ -1,0 +1,186 @@
+// Distributed under the GNU Affero General Public License v3.0 or later.
+// See accompanying file LICENSE or https://www.gnu.org/licenses/agpl-3.0.html for details.
+import { Slider, GroupBox, HorizontalBox, VerticalBox, GridBox, Button, ScrollView, TextEdit, LineEdit, ListView } from "std-widgets.slint";
+import {ObjectListItem} from "object_list_item.slint";
+import {Styles} from "styles.slint";
+import { RendererTopBar } from "renderer_top_bar.slint";
+import { RendererVisualizatonsBar } from "renderer_visualizations_bar.slint";
+struct BodyUI {
+    name: string,
+    enabled: bool,
+    visible: bool,
+    uuid: string,
+    selected: bool,
+    p_x: string,
+    p_y: string,
+    p_z: string,
+    r_x: string,
+    r_y: string,
+    r_z: string,
+    s_x: string,
+    s_y: string,
+    s_z: string,
+}
+
+export component App inherits Window {
+    in property <image> texture <=> image.source;
+    in property <[BodyUI]> bodies;
+    in property <int> num_bodies;
+    in property <bool> visualize_edges;
+    in property <bool> visualize_normals;
+    out property <int> requested-texture-width: image.width / 1phx;
+    out property <int> requested-texture-height: image.height / 1phx;
+    // Define the callback that will be implemented in Rust
+    callback mouse_down_renderer(PointerEventButton);
+    callback mouse_up_renderer(PointerEventButton);
+    callback click_import_stl();
+    callback body_position_edited_single_axis(/* uuid: */string, float, int);
+    callback body_rotation_edited_single_axis(/* uuid: */string, float, int);
+    callback body_scale_edited_single_axis(/* uuid: */string, float, int);
+    callback toggle_body_selected(string); //uuid
+    callback slice_all();
+    callback slice_selected();
+    callback analyze_vertex_islands();
+    callback delete_item_by_uuid(string); //uuid
+    callback undo();
+    callback redo();
+    callback toggle_edge_visualization();
+    callback toggle_normal_visualization();
+
+    callback zoom(length);
+    callback mouse_move_renderer(length, length);
+
+    title: "SealSlicer";
+    preferred-height: 900px;
+    preferred-width: 1600px;
+    HorizontalBox {
+        VerticalBox {
+            width: 200px;
+            alignment: space-between;
+            HorizontalBox {
+                height: 100px;
+                Button {
+                    text: @tr("UNDO");
+                    clicked => {
+                        undo();
+                    }
+                }
+
+                Button {
+                    text: @tr("REDO");
+                    clicked => {
+                        redo();
+                    }
+                }
+            }
+
+            Button {
+                text: "Import STL";
+                height: 200px;
+                clicked => {
+                    click_import_stl();
+                }
+            }
+        }
+
+        VerticalBox {
+            preferred-width: 700px;
+            image := Image {
+                height: 100%;
+                TouchArea {
+                    scroll-event(e) => {
+                        if e.delta-y > 0 {
+                            root.zoom(e.delta-y);
+                            return accept;
+                        } else if e.delta-y < 0 {
+                            root.zoom(e.delta-y);
+                            return accept;
+                        }
+                        return reject;
+                    }
+                    pointer-event(event) => {
+                        if (event.kind == PointerEventKind.move) {
+                            mouse_move_renderer(self.mouse_x, self.mouse-y);
+                        } else if (event.kind == PointerEventKind.down) {
+                            mouse_down_renderer(event.button);
+                        } else if (event.kind == PointerEventKind.up) {
+                            mouse_up_renderer(event.button);
+                        }
+                    }
+                }
+
+                RendererTopBar { }
+                RendererVisualizatonsBar { 
+                    visualize_edges: visualize_edges;
+                    visualize_normals: visualize_normals;
+                    toggle_edge_visualization() =>{toggle_edge_visualization()}
+                    toggle_normal_visualization() =>{toggle_normal_visualization()}
+                }
+            }
+        }
+
+        VerticalBox {
+            width: 300px;
+            // Contains a list of all of the objects in the scene and their spatial values
+            // Because slint iterates values by copy we have to use indices to refer back to the original data in rust
+
+            ListView {
+                for i in num_bodies: ObjectListItem {
+                    name: bodies[i].name;
+                    uuid: bodies[i].uuid;
+                    enabled: bodies[i].enabled;
+                    is_visible: bodies[i].visible;
+                    selected: bodies[i].selected;
+                    p_x: bodies[i].p_x;
+                    p_y: bodies[i].p_y;
+                    p_z: bodies[i].p_z;
+                    r_x: bodies[i].r_x;
+                    r_y: bodies[i].r_y;
+                    r_z: bodies[i].r_z;
+                    s_x: bodies[i].s_x;
+                    s_y: bodies[i].s_y;
+                    s_z: bodies[i].s_z;
+                    body_position_edited_single_axis(string, float, int) => {
+                        body_position_edited_single_axis(string, float, int);
+                    }
+                    body_rotation_edited_single_axis(string, float, int) => {
+                        body_rotation_edited_single_axis(string, float, int);
+                    }
+                    body_scale_edited_single_axis(string, float, int) => {
+                        body_scale_edited_single_axis(string, float, int);
+                    }
+                    toggle_body_selected(string) => {
+                        toggle_body_selected(string);
+                    }
+                    delete_item_by_uuid(string) => {
+                        delete_item_by_uuid(string);
+                    }
+                }
+            }
+
+            Button {
+                height: 50px;
+                text: @tr("ANALYZE VERTEX ISLANDS");
+                clicked => {
+                    analyze_vertex_islands();
+                }
+            }
+
+            Button {
+                height: 50px;
+                text: @tr("SLICE SELECTED");
+                clicked => {
+                    slice_selected();
+                }
+            }
+
+            Button {
+                height: 50px;
+                text: @tr("SLICE ALL");
+                clicked => {
+                    slice_all();
+                }
+            }
+        }
+    }
+}

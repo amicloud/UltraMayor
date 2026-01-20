@@ -1,0 +1,87 @@
+[package]
+name = "SealSlicer"
+version = "0.0.1"
+edition = "2021"
+build = "build.rs"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+log = "0.4.22"
+plexus = "=0.0.11" # Require exact version with = because unstable
+stl_io = "0.3"
+nalgebra = "0.32"
+rayon = "1.5"
+geo = "0.27"
+geo-types = "0.4.3"
+slint = "1.8.0"
+glow = "0.14.2"
+web-time = { version = "1.0" }
+bytemuck = "1.18.0"
+rfd = "0.15.0"
+uuid = {version = "1.10.0", features = ["v4"]}
+tokio = { version = "1", features = ["full"] }
+async-compat = "0.2.4"
+image = "0.25.2"
+imageproc = "0.25.0"
+webp = "0.3.0"
+ordered-float = "4.4.0"
+zip = "2.2.0"
+toml = "0.8.19" # TOML in a TOML... pretty meta
+serde = "1.0.213"
+thiserror = "1.0.65"
+approx = "0.5.1"
+dirs-next = "2.0.0"
+
+[dev-dependencies]
+criterion = "0.4"
+approx = "0.5"
+tempfile = "3.13.0"
+serial_test = "3.1.1"
+
+[build-dependencies]
+slint-build = "1.8.0"
+
+# native:
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+tracing-subscriber = "0.3"
+futures = "0.3.28"
+
+# web:
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+wasm-bindgen-futures = "0.4"
+
+[[bin]]
+path = "src/main.rs"
+name = "SealSlicer"
+
+[profile.dev]
+opt-level = 0          # Optimization level (0-3, s, z)
+debug = true          # Include debug information
+split-debuginfo = '...' # Controls split debug info (platform-specific)
+
+[profile.release]
+opt-level = 3          # Optimization level (0-3, s, z)
+debug = false          # Include debug information
+split-debuginfo = '...' # Controls split debug info (platform-specific)
+lto = true             # Enable Link Time Optimization
+
+
+[profile.release0]
+inherits = "release"
+opt-level = 0          # Optimization level (0-3, s, z)
+
+
+[profile.release1]
+inherits = "release"
+opt-level = 1          # Optimization level (0-3, s, z)
+
+
+[profile.release2]
+inherits = "release"
+opt-level = 2          # Optimization level (0-3, s, z)
+
+
+[profile.release3]
+inherits = "release"
+opt-level = 3          # Optimization level (0-3, s, z)

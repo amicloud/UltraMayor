@@ -1,0 +1,275 @@
+// Distributed under the GNU Affero General Public License v3.0 or later.
+// See accompanying file LICENSE or https://www.gnu.org/licenses/agpl-3.0.html for details.
+import { VerticalBox, Button, HorizontalBox, LineEdit } from "std-widgets.slint";
+import {Styles} from "styles.slint";
+export component ObjectListItem inherits Rectangle {
+    in-out property <string> name;
+    in property <string> uuid;
+    in-out property <bool> enabled;
+    in-out property <bool> is_visible;
+    in-out property <bool> selected;
+    in-out property <string> p_x;
+    in-out property <string> p_y;
+    in-out property <string> p_z;
+    in-out property <string> r_x;
+    in-out property <string> r_y;
+    in-out property <string> r_z;
+    in-out property <string> s_x;
+    in-out property <string> s_y;
+    in-out property <string> s_z;
+    property <length> line_edit_font_size: 12px;
+    property <length> line_edit_height: Styles.line_edit_height_to_font_size_ratio * line_edit_font_size;
+    property <length> label_width: 20px;
+    property <length> label_font_size: 14px;
+    property <bool> expanded: false;
+    property <bool> fire_on_edit: false;
+    callback body_position_edited_single_axis(/* uuid: */string, float, int); // uuid, x, y, z
+    callback body_rotation_edited_single_axis(/* uuid: */string, float, int);
+    callback body_scale_edited_single_axis(/* uuid: */string, float, int);
+    callback toggle_body_selected(string); //uuid
+    callback delete_item_by_uuid(string); //uuid
+
+    container := Rectangle {
+        background: selected ? lightblue : white;
+        width: 300px;
+        TouchArea {
+            clicked => {
+                toggle_body_selected(uuid);
+            }
+        }
+
+        VerticalBox {
+            width: 300px;
+            HorizontalBox {
+                width: 300px;
+                Text {
+                    text: name;
+                    font-size: 14px;
+                    height: 30px;
+                    width: 150px;
+                    overflow: clip;
+                }
+
+                HorizontalBox {
+                    width: 50%;
+                    enabled_indicator := Rectangle {
+                        background: enabled ? container.background.mix(green,0.25) : container.background.mix(red,0.25);
+                        width: 30px;
+                    }
+    
+                    Text {
+                        text: expanded ? "↑" : "↓";
+                        height: 30px;
+                        width: 30px;
+                        TouchArea {
+                            clicked() => {
+                                expanded = !expanded;
+                            }
+                        }
+                    }
+    
+                    Text {
+                        text: "D";
+                        height: 30px;
+                        width: 30px;
+                        TouchArea {
+                            clicked() => {
+                                delete_item_by_uuid(uuid);
+                            }
+                        }
+                    }
+                }
+                
+                
+            }
+
+            if expanded:  VerticalBox {
+                HorizontalBox {
+                    Text {
+                        width: label_width;
+                        font-size: label_font_size;
+                        text: "P";
+                    }
+
+                    pos_x := LineEdit {
+                        height: line_edit_height;
+                        width: (parent.width - label_font_size) / 4;
+                        font-size: line_edit_font_size;
+                        text <=> p_x;
+                        input-type: text;
+                        placeholder-text: "X";
+                        edited(e) => {
+                            if fire_on_edit{
+                            body_position_edited_single_axis(uuid, p_x.to-float(),0)
+                        }
+                        }
+                        accepted(e) => {
+                            body_position_edited_single_axis(uuid, p_x.to-float(),0);
+                            self.clear-focus();
+                        }
+                    }
+
+                    pos_y := LineEdit {
+                        height: line_edit_height;
+                        width: (parent.width - label_font_size) / 4;
+                        font-size: line_edit_font_size;
+                        text <=> p_y;
+                        input-type: text;
+                        placeholder-text: "Y";
+                        edited(e) => {
+                            if fire_on_edit{
+                            body_position_edited_single_axis(uuid, p_y.to-float(), 1)
+                        }
+                        }
+                        accepted(e) => {
+                            body_position_edited_single_axis(uuid, p_y.to-float(), 1);
+                            self.clear-focus();
+                        }
+                    }
+
+                    pos_z := LineEdit {
+                        height: line_edit_height;
+                        width: (parent.width - label_font_size) / 4;
+                        font-size: line_edit_font_size;
+                        text <=> p_z;
+                        input-type: text;
+                        placeholder-text: "Z";
+                        edited(e) => {
+                            if fire_on_edit{
+                            body_position_edited_single_axis(uuid, p_z.to-float(), 2)
+                        }
+                        }
+                        accepted(e) => {
+                            body_position_edited_single_axis(uuid, p_z.to-float(), 2);
+                            self.clear-focus();
+                        }
+                    }
+                }
+
+                HorizontalBox {
+                    Text {
+                        width: label_width;
+                        font-size: label_font_size;
+                        text: "R";
+                    }
+
+                    rot_x := LineEdit {
+                        height: line_edit_height;
+                        width: (parent.width - label_font_size) / 4;
+                        font-size: line_edit_font_size;
+                        text <=> r_x;
+                        input-type: text;
+                        placeholder-text: "X";
+                        edited(e) => {
+                            if fire_on_edit{
+                            body_rotation_edited_single_axis(uuid, r_x.to-float(),0)
+                        }
+                        }
+                        accepted(e) => {
+                            body_rotation_edited_single_axis(uuid, r_x.to-float(),0);
+                            self.clear-focus();
+                        }
+                    }
+
+                    rot_y := LineEdit {
+                        height: line_edit_height;
+                        width: (parent.width - label_font_size) / 4;
+                        font-size: line_edit_font_size;
+                        text <=> r_y;
+                        input-type: text;
+                        placeholder-text: "Y";
+                        edited(e) => {
+                            if fire_on_edit{
+                            body_rotation_edited_single_axis(uuid, r_y.to-float(), 1)
+                        }
+                        }
+                        accepted(e) => {
+                            body_rotation_edited_single_axis(uuid, r_y.to-float(), 1);
+                            self.clear-focus();
+                        }
+                    }
+
+                    rot_z := LineEdit {
+                        height: line_edit_height;
+                        width: (parent.width - label_font_size) / 4;
+                        font-size: line_edit_font_size;
+                        text <=> r_z;
+                        input-type: text;
+                        placeholder-text: "Z";
+                        edited(e) => {
+                            if fire_on_edit{
+                            body_rotation_edited_single_axis(uuid, r_z.to-float(), 2)
+                        }
+                        }
+                        accepted(e) => {
+                            body_rotation_edited_single_axis(uuid, r_z.to-float(), 2);
+                            self.clear-focus();
+                        }
+                    }
+                }
+
+                HorizontalBox {
+                    Text {
+                        width: label_width;
+                        font-size: label_font_size;
+                        text: "S";
+                    }
+
+                    scale_x := LineEdit {
+                        height: line_edit_height;
+                        width: (parent.width - label_font_size) / 4;
+                        font-size: line_edit_font_size;
+                        text <=> s_x;
+                        input-type: text;
+                        placeholder-text: "X";
+                        edited(e) => {
+                            if fire_on_edit{
+                            body_scale_edited_single_axis(uuid, s_x.to-float(),0)
+                        }
+                        }
+                        accepted(e) => {
+                            body_scale_edited_single_axis(uuid, s_x.to-float(),0);
+                            self.clear-focus();
+                        }
+                    }
+
+                    scale_y := LineEdit {
+                        height: line_edit_height;
+                        width: (parent.width - label_font_size) / 4;
+                        font-size: line_edit_font_size;
+                        text <=> s_y;
+                        input-type: text;
+                        placeholder-text: "Y";
+                        edited(e) => {
+                            if fire_on_edit{
+                            body_scale_edited_single_axis(uuid, s_y.to-float(), 1)
+                        }
+                        }
+                        accepted(e) => {
+                            body_scale_edited_single_axis(uuid, s_y.to-float(), 1);
+                            self.clear-focus();
+                        }
+                    }
+
+                    scale_z := LineEdit {
+                        height: line_edit_height;
+                        width: (parent.width - label_font_size) / 4;
+                        font-size: line_edit_font_size;
+                        text <=> s_z;
+                        input-type: text;
+                        placeholder-text: "Z";
+                        edited(e) => {
+                            if fire_on_edit{
+                            body_scale_edited_single_axis(uuid, s_z.to-float(), 2)
+                        }
+                        }
+                        accepted(e) => {
+                            body_scale_edited_single_axis(uuid, s_z.to-float(), 2);
+                            self.clear-focus();
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

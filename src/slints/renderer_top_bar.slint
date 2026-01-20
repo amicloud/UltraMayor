@@ -1,0 +1,30 @@
+// Distributed under the GNU Affero General Public License v3.0 or later.
+// See accompanying file LICENSE or https://www.gnu.org/licenses/agpl-3.0.html for details.
+import { VerticalBox, Button, HorizontalBox, LineEdit } from "std-widgets.slint";
+import {Styles} from "styles.slint";
+export component RendererTopBar inherits Rectangle {
+    HorizontalLayout {
+        height: Styles.renderer_square_button_size;
+        width: Styles.renderer_square_button_size*3.25;
+        alignment: space-between;
+        y: 5px;
+        Rectangle {
+            width: Styles.renderer_square_button_size;
+            height: Styles.renderer_square_button_size;
+            background: Styles.renderer_square_button_background;
+            Text{text: "F1";}
+        }
+        Rectangle {
+            width: Styles.renderer_square_button_size;
+            height: Styles.renderer_square_button_size;
+            background: Styles.renderer_square_button_background;
+            Text{text: "F2";}
+        }
+        Rectangle {
+            width: Styles.renderer_square_button_size;
+            height: Styles.renderer_square_button_size;
+            background: Styles.renderer_square_button_background;
+            Text{text: "F3";}
+        }
+    }
+}
