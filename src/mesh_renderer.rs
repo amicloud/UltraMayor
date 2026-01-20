@@ -428,60 +428,6 @@ impl MeshRenderer {
     pub(crate) fn zoom(&mut self, amt: f32) {
         self.camera.zoom(amt);
     }
-
-    fn create_xy_plane_mesh() -> Mesh {
-        let vertices = vec![
-            Vertex {
-                position: [-1.0, -1.0, 0.0],
-                normal: [0.0, 0.0, 1.0],
-                barycentric: [1.0, 0.0, 0.0],
-            },
-            Vertex {
-                position: [1.0, -1.0, 0.0],
-                normal: [0.0, 0.0, 1.0],
-                barycentric: [0.0, 1.0, 0.0],
-            },
-            Vertex {
-                position: [1.0, 1.0, 0.0],
-                normal: [0.0, 0.0, 1.0],
-                barycentric: [0.0, 0.0, 1.0],
-            },
-            Vertex {
-                position: [-1.0, 1.0, 0.0],
-                normal: [0.0, 0.0, 1.0],
-                barycentric: [0.0, 1.0, 0.0],
-            },
-        ];
-
-        let indices: Vec<u32> = vec![
-            0, 1, 2, // First triangle
-            0, 2, 3, // Second triangle
-        ];
-
-        Mesh {
-            vertices,
-            indices,
-            simple_indices: Vec::new(),
-            simple_vertices: Vec::new(),
-        }
-    }
-
-    fn create_plane_body(x: f32, y: f32) -> Rc<RefCell<Body>> {
-        let plane_mesh = Self::create_xy_plane_mesh();
-        let mut body = Body::new(plane_mesh);
-        body.set_position(Vector3::new(0.0, 0.0, 0.0));
-        body.material = Material::build_plate();
-        body.set_scale(Vector3::new(x / 2.0, y / 2.0, 1.0)); //Divide by two because the starting plane is 2x2
-        body.display_in_ui_list = false;
-        body.selected = false;
-        body.selectable = false;
-        Rc::new(RefCell::new(body))
-    }
-
-    pub fn add_printer_plate_plane(&mut self, x: f32, y: f32) {
-        let plane_body = Self::create_plane_body(x, y);
-        self.bodies.borrow_mut().push(Rc::clone(&plane_body))
-    }
 }
 
 impl Drop for MeshRenderer {

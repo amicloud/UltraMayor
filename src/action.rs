@@ -4,6 +4,7 @@ use nalgebra::{Quaternion, Vector3};
 
 use crate::body::Body;
 
+
 pub trait Action {
     fn execute(&mut self);
     fn undo(&mut self);

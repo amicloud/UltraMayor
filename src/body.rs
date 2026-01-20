@@ -6,6 +6,7 @@
 use crate::{material::Material, mesh::Mesh};
 use nalgebra::{Matrix4, Quaternion, UnitQuaternion, Vector3};
 use slint::SharedString;
+use std::ffi::OsStr;
 use uuid::Uuid;
 #[allow(dead_code)]
 #[derive(Default, Clone)]
@@ -102,6 +103,13 @@ impl Body {
     pub fn new(mesh: Mesh) -> Self {
         let mut b = Body::default();
         b.mesh = mesh;
+        b
+    }
+
+    pub fn new_from_obj(path: &OsStr, position: Vector3<f32>) -> Self {
+        let mut b = Body::default();
+        b.mesh = Mesh::from_obj(path).unwrap();
+        b.position = position;
         b
     }
 

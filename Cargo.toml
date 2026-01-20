@@ -32,6 +32,7 @@ serde = "1.0.213"
 thiserror = "1.0.65"
 approx = "0.5.1"
 dirs-next = "2.0.0"
+obj-rs = "0.7.4"
 
 [dev-dependencies]
 criterion = "0.4"

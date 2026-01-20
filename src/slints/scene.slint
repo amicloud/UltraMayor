@@ -13,6 +13,7 @@ export component App inherits Window {
     out property <int> requested-texture-width: image.width / 1phx;
     out property <int> requested-texture-height: image.height / 1phx;
     // Define the callback that will be implemented in Rust
+    callback click_import_obj();
     callback mouse_down_renderer(PointerEventButton);
     callback mouse_up_renderer(PointerEventButton);
     callback delete_item_by_uuid(string); //uuid
@@ -45,6 +46,14 @@ export component App inherits Window {
                     clicked => {
                         redo();
                     }
+                }
+
+                
+            }
+            Button {
+                text: @tr("IMPORT OBJ");
+                clicked => {
+                    click_import_obj();
                 }
             }
 
