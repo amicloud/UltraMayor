@@ -144,7 +144,7 @@ impl Body {
     pub fn rotate(&mut self, _val: Vector3<f32>) {
         todo!("Implement");
     }
-    
+
     #[allow(dead_code)]
     pub fn scale(&mut self, _val: Vector3<f32>) {
         todo!("Implement");

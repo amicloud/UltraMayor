@@ -3,29 +3,40 @@
 
 mod action;
 mod action_manager;
+mod basic_physics_system;
 mod body;
 mod camera;
 mod material;
 mod mesh;
-mod mesh_renderer;
 mod render_texture;
+mod renderer;
 mod settings;
+mod transform_component;
+mod velocity_component;
 use action_manager::ActionManager;
+use bevy_ecs::prelude::*;
 use body::Body;
 use glow::Context as GlowContext;
 use glow::HasContext;
 use log::debug;
-use mesh_renderer::MeshRenderer;
+use log::log;
+use nalgebra::Transform;
 use nalgebra::Vector3;
+use renderer::Renderer;
 use rfd::AsyncFileDialog;
 use settings::Settings;
 use slint::platform::PointerEventButton;
+use slint::Timer;
 use std::cell::RefCell;
 use std::num::NonZeroU32;
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 slint::include_modules!();
 use log::error;
+
+use crate::basic_physics_system::BasicPhysicsSystem;
+use crate::transform_component::TransformComponent;
+use crate::velocity_component::VelocityComponent;
 #[derive(Default)]
 struct MouseState {
     x: f32,
@@ -41,7 +52,7 @@ struct MouseState {
 }
 
 type SharedBodies = Rc<RefCell<Vec<Rc<RefCell<Body>>>>>;
-type SharedMeshRenderer = Rc<RefCell<Option<MeshRenderer>>>;
+type SharedMeshRenderer = Rc<RefCell<Option<Renderer>>>;
 type SharedMouseState = Rc<RefCell<MouseState>>;
 type SharedSettings = Arc<Mutex<Settings>>;
 type SharedActionManager = Arc<Mutex<ActionManager>>;
@@ -106,7 +117,7 @@ fn main() {
                         );
                         let render_scale = shared_settings.lock().unwrap().renderer.render_scale;
                         // Initialize renderer and slicers with cloned Rc
-                        let renderer = MeshRenderer::new(
+                        let renderer = Renderer::new(
                             gl.clone(),
                             (1000.0 * render_scale) as u32,
                             (1000.0 * render_scale) as u32,
@@ -141,6 +152,7 @@ fn main() {
                         // Optional: Perform any post-rendering tasks
                     }
                     slint::RenderingState::RenderingTeardown => {
+                        println!["Rendering teardown"];
                         // Clean up the renderer
                         *mesh_renderer_clone.borrow_mut() = None;
                     }
@@ -307,7 +319,7 @@ fn main() {
             }
         }
 
-        // Handler for opening STL importer file picker
+        // Handler for opening OBJ importer file picker
         {
             let bodies_clone = Rc::clone(&state.shared_bodies);
             app.on_click_import_obj(move || {
@@ -319,6 +331,34 @@ fn main() {
             });
         }
     }
+
+    let world = Rc::new(RefCell::new(World::new()));
+    let schedule = Rc::new(RefCell::new({
+        let mut s = Schedule::default();
+        s.add_systems(BasicPhysicsSystem::update);
+        s
+    }));
+
+    let ecs_timer = Timer::default();
+    {
+        let world = world.clone();
+        let schedule = schedule.clone();
+
+        ecs_timer.start(
+            slint::TimerMode::Repeated,
+            std::time::Duration::from_millis(16), // ~60 Hz
+            move || {
+                schedule.borrow_mut().run(&mut world.borrow_mut());
+            },
+        );
+    }
+
+    let forward_slow = VelocityComponent {
+        translational: Vector3::new(1.0,2.0,3.0),
+        angular: Vector3::new(0.01,0.02,0.03)
+    };
+
+    world.borrow_mut().spawn((TransformComponent::default(),forward_slow));
 
     // Run the Slint application
     app.run().unwrap();
