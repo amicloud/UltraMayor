@@ -1,4 +1,4 @@
-# SealSlicer Todo
+# UltraMayor Todo
 
 ## 💻 UI
 - Determine how the various modules should appear in the UI

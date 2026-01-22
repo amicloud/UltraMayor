@@ -77,7 +77,7 @@ impl Settings {
     fn user_settings_path() -> Result<PathBuf, SettingsError> {
         let config_dir = config_dir().ok_or(SettingsError::ConfigDirNotFound)?;
         Ok(config_dir
-            .join("SealSlicer")
+            .join("UltraMayor")
             .join("settings")
             .join("user_settings.toml"))
     }
@@ -86,7 +86,7 @@ impl Settings {
     fn default_settings_path() -> Result<PathBuf, SettingsError> {
         let config_dir = config_dir().ok_or(SettingsError::ConfigDirNotFound)?;
         Ok(config_dir
-            .join("SealSlicer")
+            .join("UltraMayor")
             .join("settings")
             .join("default_settings.toml"))
     }
@@ -211,7 +211,7 @@ mod tests {
         override_config_dir(&config_dir);
 
         let expected_path = config_dir
-            .join("SealSlicer")
+            .join("UltraMayor")
             .join("settings")
             .join("user_settings.toml");
         let actual_path = Settings::user_settings_path().expect("Failed to get user settings path");
@@ -232,7 +232,7 @@ mod tests {
         override_config_dir(&config_dir);
 
         let expected_path = config_dir
-            .join("SealSlicer")
+            .join("UltraMayor")
             .join("settings")
             .join("default_settings.toml");
         let actual_path =
@@ -619,7 +619,7 @@ mod tests {
 
         // Define a non-existent directory path within the config directory
         let custom_settings_path = config_dir
-            .join("SealSlicer")
+            .join("UltraMayor")
             .join("settings")
             .join("custom_settings.toml");
 
@@ -656,7 +656,7 @@ mod tests {
             override_config_dir(&config_dir);
 
             // Create a directory with no write permissions
-            let no_write_dir = config_dir.join("SealSlicer").join("no_write_dir");
+            let no_write_dir = config_dir.join("UltraMayor").join("no_write_dir");
             fs::create_dir_all(&no_write_dir).unwrap();
 
             // Set the directory permissions to read-only
@@ -1010,20 +1010,20 @@ use_https = false
         override_config_dir(&config_dir);
 
         // Attempt to load settings from a non-existent path
-        let non_existent_path = config_dir.join("SealSlicer").join("non_existent.toml");
+        let non_existent_path = config_dir.join("UltraMayor").join("non_existent.toml");
         let result = Settings::load_from_file(&non_existent_path);
         assert!(matches!(result, Err(SettingsError::Io(_))));
 
         // Attempt to deserialize invalid TOML
         let invalid_toml = "invalid = toml:::";
-        let invalid_path = config_dir.join("SealSlicer").join("invalid.toml");
+        let invalid_path = config_dir.join("UltraMayor").join("invalid.toml");
         fs::create_dir_all(invalid_path.parent().unwrap()).unwrap();
         fs::write(&invalid_path, invalid_toml).unwrap();
         let result = Settings::load_from_file(&invalid_path);
         assert!(matches!(result, Err(SettingsError::Serde(_))));
 
         // Attempt to serialize to an invalid path (e.g., directory instead of file)
-        let invalid_save_path = config_dir.join("SealSlicer").join("settings");
+        let invalid_save_path = config_dir.join("UltraMayor").join("settings");
         fs::create_dir_all(&invalid_save_path).unwrap();
         let settings = Settings::default();
         let save_result = settings.save_to_file(&invalid_save_path);

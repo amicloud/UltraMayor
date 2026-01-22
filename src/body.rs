@@ -134,14 +134,17 @@ impl Body {
         model *= Matrix4::new_nonuniform_scaling(&self.scale);
         model
     }
+
     #[allow(dead_code)]
     pub fn translate(&mut self, val: Vector3<f32>) {
         self.position += val;
     }
+
     #[allow(dead_code)]
     pub fn rotate(&mut self, _val: Vector3<f32>) {
         todo!("Implement");
     }
+    
     #[allow(dead_code)]
     pub fn scale(&mut self, _val: Vector3<f32>) {
         todo!("Implement");
