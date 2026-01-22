@@ -10,8 +10,6 @@ mod camera;
 mod mesh;
 mod mesh_renderer;
 mod render_texture;
-mod entity_manager;
-mod entity;
 use action_manager::ActionManager;
 use body::Body;
 use glow::Context as GlowContext;
