@@ -86,6 +86,7 @@ impl Vertex {
 
 #[derive(Default, Clone)]
 pub struct Mesh {
+    pub id: u32,
     pub vertices: Vec<Vertex>,
     pub indices: Vec<u32>,
 }
@@ -93,9 +94,9 @@ pub struct Mesh {
 impl Mesh {
     pub fn from_obj(path: &OsStr) -> Result<Self, Box<dyn std::error::Error>> {
         let input = BufReader::new(File::open(path)?);
-        let dome: Obj = load_obj(input)?;
+        let obj: Obj = load_obj(input)?;
         let mut mesh = Mesh::default();
-        mesh.vertices = dome
+        mesh.vertices = obj
             .vertices
             .into_iter()
             .map(|pos| Vertex {
@@ -104,7 +105,12 @@ impl Mesh {
                 barycentric: [0.0, 0.0, 0.0],
             })
             .collect();
-        mesh.indices = dome.indices.iter().map(|&i| i as u32).collect();
+        mesh.indices = obj.indices.iter().map(|&i| i as u32).collect();
+        mesh.id = {
+            let mut hasher = std::collections::hash_map::DefaultHasher::new();
+            path.hash(&mut hasher);
+            hasher.finish() as u32
+        };
         Ok(mesh)
     }
 }

@@ -13,6 +13,8 @@ mod renderer;
 mod settings;
 mod transform_component;
 mod velocity_component;
+mod mesh_component;
+mod mesh_resource_manager;
 use action_manager::ActionManager;
 use bevy_ecs::prelude::*;
 use body::Body;
@@ -28,6 +30,7 @@ use settings::Settings;
 use slint::platform::PointerEventButton;
 use slint::Timer;
 use std::cell::RefCell;
+use std::ffi::OsStr;
 use std::num::NonZeroU32;
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
@@ -35,6 +38,9 @@ slint::include_modules!();
 use log::error;
 
 use crate::basic_physics_system::BasicPhysicsSystem;
+use crate::mesh::Mesh;
+use crate::mesh_component::MeshComponent;
+use crate::mesh_resource_manager::MeshResourceManager;
 use crate::transform_component::TransformComponent;
 use crate::velocity_component::VelocityComponent;
 #[derive(Default)]
@@ -71,6 +77,46 @@ fn main() {
     let app = App::new().unwrap();
     let app_weak = app.as_weak();
     let settings = Settings::load_user_settings();
+
+    let world = Rc::new(RefCell::new(World::new()));
+    world.borrow_mut().insert_resource(MeshResourceManager::default());
+
+    let teapot_mesh_id = world.borrow_mut().get_resource_mut::<MeshResourceManager>().unwrap().add_mesh(
+        Mesh::from_obj(OsStr::new("resources/models/utah_teapot.obj")).unwrap(),
+    );
+
+    let teapot_mesh_component = MeshComponent {
+        mesh_id: teapot_mesh_id,
+    };
+
+    let schedule = Rc::new(RefCell::new({
+        let mut s = Schedule::default();
+        s.add_systems(BasicPhysicsSystem::update);
+        s
+    }));
+
+    let ecs_timer = Timer::default();
+    {
+        let world = world.clone();
+        let schedule = schedule.clone();
+
+        ecs_timer.start(
+            slint::TimerMode::Repeated,
+            std::time::Duration::from_millis(16), // ~60 Hz
+            move || {
+                schedule.borrow_mut().run(&mut world.borrow_mut());
+            },
+        );
+    }
+
+    let forward_slow = VelocityComponent {
+        translational: Vector3::new(1.0, 2.0, 3.0),
+        angular: Vector3::new(0.01, 0.02, 0.03),
+    };
+
+    world
+        .borrow_mut()
+        .spawn((TransformComponent::default(), forward_slow, teapot_mesh_component));
 
     let state = AppState {
         mouse_state: Rc::new(RefCell::new(MouseState::default())),
@@ -129,6 +175,7 @@ fn main() {
                         // Access the renderer
                         if let Some(renderer) = mesh_renderer_clone.borrow_mut().as_mut() {
                             if let Some(app) = app_weak_clone.upgrade() {
+                                // Get the requested texture size for current window size
                                 let height = app.get_requested_texture_height() as f32;
                                 let width = app.get_requested_texture_width() as f32;
                                 let renderer_settings = &shared_settings.lock().unwrap().renderer;
@@ -156,7 +203,7 @@ fn main() {
                         // Clean up the renderer
                         *mesh_renderer_clone.borrow_mut() = None;
                     }
-                    _ => {}
+                    _ => {},
                 }
             }
         }) {
@@ -295,76 +342,47 @@ fn main() {
             }
         });
 
-        async fn open_files_from_dialog(bodies_clone: &SharedBodies) {
-            // Handling the option prevents crashes
-            if let Some(paths) = AsyncFileDialog::new()
-                .add_filter("obj", &["obj", "OBJ"])
-                .set_directory("~")
-                .pick_files()
-                .await
-            {
-                let mut bodies_vec: Vec<Rc<RefCell<Body>>> = Vec::new();
+        // async fn open_files_from_dialog(mesh_manager: &mut MeshResourceManager) {
+        //     // Handling the option prevents crashes
+        //     if let Some(paths) = AsyncFileDialog::new()
+        //         .add_filter("obj", &["obj", "OBJ"])
+        //         .set_directory("~")
+        //         .pick_files()
+        //         .await
+        //     {
+        //         for path in paths {
+        //             let mesh = Mesh::from_obj(path.path().as_os_str()).unwrap();
+        //             mesh_manager.add_mesh(mesh);
+        //         }
+        //     } else {
+        //         println!("File picker returned no files");
+        //     }
+        // }
 
-                for path in paths {
-                    let body = Rc::new(RefCell::new(Body::new_from_obj(
-                        path.path().as_os_str(),
-                        Vector3::new(0.0, 0.0, 0.0),
-                    )));
-                    bodies_vec.push(Rc::clone(&body));
-                    println!("Loaded body: {}", path.file_name());
-                }
-                bodies_clone.borrow_mut().append(&mut bodies_vec);
-            } else {
-                println!("File picker returned no files");
-            }
-        }
-
-        // Handler for opening OBJ importer file picker
-        {
-            let bodies_clone = Rc::clone(&state.shared_bodies);
-            app.on_click_import_obj(move || {
-                let bc_clone = Rc::clone(&bodies_clone);
-                let slint_future = async move {
-                    open_files_from_dialog(&bc_clone).await;
-                };
-                slint::spawn_local(async_compat::Compat::new(slint_future)).unwrap();
-            });
-        }
+        // // Handler for opening OBJ importer file picker
+        // {
+        //     //let bodies_clone = Rc::clone(&state.shared_bodies);
+        //     let world_clone = Rc::clone(&world);
+        //     app.on_click_import_obj(move || {
+        //         let slint_future = async move {
+        //             let binding = world_clone
+        //                 .borrow_mut();
+        //             let mut mesh_manager = binding
+        //                 .get_resource::<MeshResourceManager>()
+        //                 .unwrap();
+        //             open_files_from_dialog(&mut mesh_manager).await;
+        //         };
+        //         slint::spawn_local(async_compat::Compat::new(slint_future)).unwrap();
+        //     });
+        // }
     }
 
-    let world = Rc::new(RefCell::new(World::new()));
-    let schedule = Rc::new(RefCell::new({
-        let mut s = Schedule::default();
-        s.add_systems(BasicPhysicsSystem::update);
-        s
-    }));
-
-    let ecs_timer = Timer::default();
-    {
-        let world = world.clone();
-        let schedule = schedule.clone();
-
-        ecs_timer.start(
-            slint::TimerMode::Repeated,
-            std::time::Duration::from_millis(16), // ~60 Hz
-            move || {
-                schedule.borrow_mut().run(&mut world.borrow_mut());
-            },
-        );
-    }
-
-    let forward_slow = VelocityComponent {
-        translational: Vector3::new(1.0, 2.0, 3.0),
-        angular: Vector3::new(0.01, 0.02, 0.03),
-    };
-
-    world
-        .borrow_mut()
-        .spawn((TransformComponent::default(), forward_slow));
+    
 
     // Run the Slint application
     app.run().unwrap();
 }
+
 macro_rules! define_scoped_binding {
     (struct $binding_ty_name:ident => $obj_name:path, $param_name:path, $binding_fn:ident, $target_name:path) => {
         struct $binding_ty_name {
