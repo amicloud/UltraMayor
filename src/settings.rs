@@ -857,7 +857,8 @@ mod tests {
             [network]
             timeout = 100
             use_https = false
-        "#.trim();
+        "#
+        .trim();
 
         assert_eq!(serialized.trim(), expected);
     }

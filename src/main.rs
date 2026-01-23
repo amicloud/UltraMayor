@@ -354,11 +354,13 @@ fn main() {
     }
 
     let forward_slow = VelocityComponent {
-        translational: Vector3::new(1.0,2.0,3.0),
-        angular: Vector3::new(0.01,0.02,0.03)
+        translational: Vector3::new(1.0, 2.0, 3.0),
+        angular: Vector3::new(0.01, 0.02, 0.03),
     };
 
-    world.borrow_mut().spawn((TransformComponent::default(),forward_slow));
+    world
+        .borrow_mut()
+        .spawn((TransformComponent::default(), forward_slow));
 
     // Run the Slint application
     app.run().unwrap();
