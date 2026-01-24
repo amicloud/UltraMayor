@@ -96,12 +96,18 @@ impl Mesh {
         let input = BufReader::new(File::open(path)?);
         let obj: Obj = load_obj(input)?;
         let mut mesh = Mesh::default();
+
+        #[inline]
+        pub fn f32x3_to_f32x3(v: [f32; 3]) -> [f32; 3] {
+            [v[0] as f32, v[1] as f32, v[2] as f32]
+        }
+
         mesh.vertices = obj
             .vertices
             .into_iter()
             .map(|pos| Vertex {
-                position: pos.position,
-                normal: pos.normal,
+                position: f32x3_to_f32x3(pos.position),
+                normal: f32x3_to_f32x3(pos.normal),
                 barycentric: [0.0, 0.0, 0.0],
             })
             .collect();

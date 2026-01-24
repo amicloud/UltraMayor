@@ -5,16 +5,18 @@ mod action;
 mod action_manager;
 mod basic_physics_system;
 mod body;
+mod body_builder_system;
+mod body_resource_manager;
 mod camera;
 mod material;
 mod mesh;
+mod mesh_component;
+mod mesh_resource_manager;
 mod render_texture;
 mod renderer;
 mod settings;
 mod transform_component;
 mod velocity_component;
-mod mesh_component;
-mod mesh_resource_manager;
 use action_manager::ActionManager;
 use bevy_ecs::prelude::*;
 use body::Body;
@@ -38,6 +40,8 @@ slint::include_modules!();
 use log::error;
 
 use crate::basic_physics_system::BasicPhysicsSystem;
+use crate::body_builder_system::BodyBuilderSystem;
+use crate::body_resource_manager::BodyResourceManager;
 use crate::mesh::Mesh;
 use crate::mesh_component::MeshComponent;
 use crate::mesh_resource_manager::MeshResourceManager;
@@ -79,11 +83,18 @@ fn main() {
     let settings = Settings::load_user_settings();
 
     let world = Rc::new(RefCell::new(World::new()));
-    world.borrow_mut().insert_resource(MeshResourceManager::default());
+    world
+        .borrow_mut()
+        .insert_resource(MeshResourceManager::default());
+    world
+        .borrow_mut()
+        .insert_resource(BodyResourceManager::default());
 
-    let teapot_mesh_id = world.borrow_mut().get_resource_mut::<MeshResourceManager>().unwrap().add_mesh(
-        Mesh::from_obj(OsStr::new("resources/models/utah_teapot.obj")).unwrap(),
-    );
+    let teapot_mesh_id = world
+        .borrow_mut()
+        .get_resource_mut::<MeshResourceManager>()
+        .unwrap()
+        .add_mesh(Mesh::from_obj(OsStr::new("resources/models/utah_teapot.obj")).unwrap());
 
     let teapot_mesh_component = MeshComponent {
         mesh_id: teapot_mesh_id,
@@ -91,7 +102,7 @@ fn main() {
 
     let schedule = Rc::new(RefCell::new({
         let mut s = Schedule::default();
-        s.add_systems(BasicPhysicsSystem::update);
+        s.add_systems((BasicPhysicsSystem::update, BodyBuilderSystem::build_bodies));
         s
     }));
 
@@ -114,9 +125,11 @@ fn main() {
         angular: Vector3::new(0.01, 0.02, 0.03),
     };
 
-    world
-        .borrow_mut()
-        .spawn((TransformComponent::default(), forward_slow, teapot_mesh_component));
+    world.borrow_mut().spawn((
+        TransformComponent::default(),
+        forward_slow,
+        teapot_mesh_component,
+    ));
 
     let state = AppState {
         mouse_state: Rc::new(RefCell::new(MouseState::default())),
@@ -134,7 +147,6 @@ fn main() {
         let bodies_clone = Rc::clone(&state.shared_bodies);
         let shared_settings = Arc::clone(&state.shared_settings);
         if let Err(error) = app.window().set_rendering_notifier({
-            // Move clones into the closure
             move |rendering_state, graphics_api| {
                 match rendering_state {
                     slint::RenderingState::RenderingSetup => {
@@ -145,9 +157,7 @@ fn main() {
                             },
                             _ => panic!("Unsupported Graphics API"),
                         };
-                        let gl = Rc::new(gl); // Wrap in Rc
-
-                        // Use 'gl' to get OpenGL version strings etc.
+                        let gl = Rc::new(gl); // Wrap in Rc for shared ownership
                         let version = unsafe { gl.get_parameter_string(glow::VERSION) };
                         println!("OpenGL Version: {}", version);
 
@@ -162,7 +172,7 @@ fn main() {
                             major_version, minor_version
                         );
                         let render_scale = shared_settings.lock().unwrap().renderer.render_scale;
-                        // Initialize renderer and slicers with cloned Rc
+                        // Initialize renderer
                         let renderer = Renderer::new(
                             gl.clone(),
                             (1000.0 * render_scale) as u32,
@@ -203,7 +213,7 @@ fn main() {
                         // Clean up the renderer
                         *mesh_renderer_clone.borrow_mut() = None;
                     }
-                    _ => {},
+                    _ => {}
                 }
             }
         }) {
@@ -376,8 +386,6 @@ fn main() {
         //     });
         // }
     }
-
-    
 
     // Run the Slint application
     app.run().unwrap();

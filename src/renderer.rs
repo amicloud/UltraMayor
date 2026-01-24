@@ -1,13 +1,8 @@
-// Distributed under the GNU Affero General Public License v3.0 or later.
-// See accompanying file LICENSE or https://www.gnu.org/licenses/agpl-3.0.html for details.
-use std::cell::RefCell;
 use std::fs;
 use std::rc::Rc;
 slint::include_modules!();
-use crate::body::Body;
 use crate::camera::Camera;
-use crate::material::Material;
-use crate::mesh::{Mesh, Vertex};
+use crate::mesh::Vertex;
 use crate::render_texture::RenderTexture;
 use crate::ScopedVAOBinding;
 use crate::ScopedVBOBinding;

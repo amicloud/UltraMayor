@@ -26,10 +26,10 @@ impl BasicPhysicsSystem {
     }
 
     fn apply_rotation(
-        rotation: &Quaternion<f64>,
-        angular_velocity: &Vector3<f64>,
-        delta_time: f64,
-    ) -> Quaternion<f64> {
+        rotation: &Quaternion<f32>,
+        angular_velocity: &Vector3<f32>,
+        delta_time: f32,
+    ) -> Quaternion<f32> {
         let angular_velocity_magnitude = angular_velocity.norm();
         if angular_velocity_magnitude == 0.0 {
             return *rotation;
@@ -45,10 +45,10 @@ impl BasicPhysicsSystem {
     }
 
     fn apply_translation(
-        position: &Vector3<f64>,
-        translational_velocity: &Vector3<f64>,
-        delta_time: f64,
-    ) -> Vector3<f64> {
+        position: &Vector3<f32>,
+        translational_velocity: &Vector3<f32>,
+        delta_time: f32,
+    ) -> Vector3<f32> {
         *position + translational_velocity * delta_time
     }
 }
@@ -58,9 +58,9 @@ mod tests {
 
     use super::*;
     use assert_approx_eq::assert_approx_eq;
-    use std::f64::consts::PI;
+    use std::f32::consts::PI;
 
-    const DELTA_TIME: f64 = 1.0;
+    const DELTA_TIME: f32 = 1.0;
 
     #[test]
     fn test_apply_translation() {
