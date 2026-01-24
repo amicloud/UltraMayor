@@ -322,7 +322,6 @@ impl Renderer {
                 gl.bind_buffer(glow::ELEMENT_ARRAY_BUFFER, Some(self.ebo));
                 // Rendering Loop
                 for instance in instances.iter() {
-                    println!("Rendering mesh: {}", instance.mesh_id);
                     let mesh = meshes.get_mesh(instance.mesh_id).unwrap();
                     // PBR Uniforms
                     let material = Material::default();
