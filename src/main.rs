@@ -92,6 +92,14 @@ fn main() {
             .add_mesh(Mesh::from_obj(OsStr::new("resources/models/utah_teapot.obj")).unwrap()),
     };
 
+    let cube_mesh_component = MeshComponent {
+        mesh_id: world
+            .borrow_mut()
+            .get_resource_mut::<MeshResourceManager>()
+            .unwrap()
+            .add_mesh(Mesh::from_obj(OsStr::new("resources/models/cube.obj")).unwrap()),
+    };
+
     let schedule = Rc::new(RefCell::new({
         let mut s = Schedule::default();
         s.add_systems((
@@ -120,10 +128,21 @@ fn main() {
         angular: Vector3::new(0.11, 0.22, 0.13),
     };
 
+    let vel2 = VelocityComponent {
+        translational: Vector3::new(1.0, 1.0, 2.0),
+        angular: Vector3::new(0.31, 0.22, 0.43),
+    };
+
     world.borrow_mut().spawn((
         TransformComponent::default(),
         forward_slow,
         teapot_mesh_component,
+    ));
+
+    world.borrow_mut().spawn((
+        TransformComponent::default(),
+        vel2,
+        cube_mesh_component,
     ));
 
     let state = AppState {
