@@ -14,6 +14,7 @@ pub struct AABB {
     max: Vector3<f32>,
 }
 
+#[allow(dead_code)]
 impl AABB {
     #[allow(dead_code)]
     fn intersect_ray(&self, ray_origin: Vector3<f32>, ray_dir: Vector3<f32>) -> bool {
@@ -32,6 +33,7 @@ impl AABB {
         tmax >= tmin.max(0.0)
     }
 
+    #[allow(dead_code)]
     fn from_vertices(vertices: &Vec<crate::mesh::Vertex>) -> Self {
         // Initialize min and max with the first vertex
         let mut min = vertices[0];
@@ -61,15 +63,8 @@ pub struct Body {
     pub rotation: Quaternion<f32>,
     pub scale: Vector3<f32>,
     pub mesh: Mesh,
-    pub enabled: bool,
-    pub selected: bool,
-    pub name: String,
-    pub visible: bool,
     pub uuid: Uuid,
-    pub aabb: AABB,
     pub material: Material,
-    pub display_in_ui_list: bool,
-    pub selectable: bool,
 }
 
 impl Default for Body {
@@ -79,15 +74,8 @@ impl Default for Body {
             rotation: Quaternion::identity(),
             scale: Vector3::new(1.0, 1.0, 1.0),
             mesh: Mesh::default(),
-            enabled: true,
-            selected: true,
-            name: "".to_string(),
-            visible: true,
             uuid: Uuid::new_v4(),
-            aabb: AABB::default(),
             material: Material::default_resin(),
-            display_in_ui_list: true,
-            selectable: true,
         }
     }
 }
@@ -99,12 +87,7 @@ impl PartialEq for Body {
 }
 
 impl Body {
-    pub fn new(mesh: Mesh) -> Self {
-        let mut b = Body::default();
-        b.mesh = mesh;
-        b
-    }
-
+    #[allow(dead_code)]
     pub fn new_from_obj(path: &OsStr, position: Vector3<f32>) -> Self {
         let mut b = Body::default();
         b.mesh = Mesh::from_obj(path).unwrap();
@@ -117,6 +100,7 @@ impl Body {
         self.uuid == *other
     }
 
+    #[allow(dead_code)]
     pub fn eq_uuid_ss(&self, other: &SharedString) -> bool {
         self.uuid.to_string() == *other.to_string()
     }
@@ -133,90 +117,6 @@ impl Body {
         model *= rotation_quat.to_homogeneous();
         model *= Matrix4::new_nonuniform_scaling(&self.scale);
         model
-    }
-
-    #[allow(dead_code)]
-    pub fn translate(&mut self, val: Vector3<f32>) {
-        self.position += val;
-    }
-
-    #[allow(dead_code)]
-    pub fn rotate(&mut self, _val: Vector3<f32>) {
-        todo!("Implement");
-    }
-
-    #[allow(dead_code)]
-    pub fn scale(&mut self, _val: Vector3<f32>) {
-        todo!("Implement");
-    }
-
-    pub fn set_position(&mut self, position: Vector3<f32>) {
-        self.position = position;
-    }
-
-    pub fn set_rotation(&mut self, rotation: Vector3<f32>) {
-        self.rotation = Self::euler_to_quaternion(rotation);
-    }
-
-    pub fn set_rotation_quat(&mut self, rotation: Quaternion<f32>) {
-        self.rotation = rotation;
-    }
-
-    pub fn set_scale(&mut self, scale: Vector3<f32>) {
-        self.scale = scale;
-    }
-    pub fn euler_to_quaternion(euler: Vector3<f32>) -> Quaternion<f32> {
-        // Convert Euler angles (in degrees) to radians
-        // convert to f64 for more accuracy during calculations, hopefully
-        let roll = (euler.x as f64).to_radians();
-        let pitch = (euler.y as f64).to_radians();
-        let yaw = (euler.z as f64).to_radians();
-
-        // Compute half angles
-        let (sin_roll, cos_roll) = (roll / 2.0).sin_cos();
-        let (sin_pitch, cos_pitch) = (pitch / 2.0).sin_cos();
-        let (sin_yaw, cos_yaw) = (yaw / 2.0).sin_cos();
-
-        // Compute the quaternion from the Euler angles
-        let w = cos_roll * cos_pitch * cos_yaw + sin_roll * sin_pitch * sin_yaw;
-        let x = sin_roll * cos_pitch * cos_yaw - cos_roll * sin_pitch * sin_yaw;
-        let y = cos_roll * sin_pitch * cos_yaw + sin_roll * cos_pitch * sin_yaw;
-        let z = cos_roll * cos_pitch * sin_yaw - sin_roll * sin_pitch * cos_yaw;
-        Quaternion::new(
-            w as f32, // w component
-            x as f32, // x component
-            y as f32, // y component
-            z as f32, // z component
-        )
-    }
-
-    pub fn quaternion_to_euler(quat: &Quaternion<f32>) -> Vector3<f32> {
-        let w = quat.w;
-        let x = quat.i;
-        let y = quat.j;
-        let z = quat.k;
-
-        // Calculate the roll (x-axis rotation)
-        let sinr_cosp = 2.0 * (w * x + y * z);
-        let cosr_cosp = 1.0 - 2.0 * (x * x + y * y);
-        let roll = sinr_cosp.atan2(cosr_cosp);
-
-        // Calculate the pitch (y-axis rotation)
-        let sinp = 2.0 * (w * y - z * x);
-        let pitch = if sinp.abs() >= 1.0 {
-            // Use 90 degrees if out of range
-            sinp.signum() * std::f32::consts::FRAC_PI_2
-        } else {
-            sinp.asin()
-        };
-
-        // Calculate the yaw (z-axis rotation)
-        let siny_cosp = 2.0 * (w * z + x * y);
-        let cosy_cosp = 1.0 - 2.0 * (y * y + z * z);
-        let yaw = siny_cosp.atan2(cosy_cosp);
-
-        // Convert from radians to degrees
-        Vector3::new(roll.to_degrees(), pitch.to_degrees(), yaw.to_degrees())
     }
 }
 
@@ -276,15 +176,8 @@ mod tests {
             ),
             scale,
             mesh: Mesh::default(),
-            selected: true,
-            enabled: true,
-            name: "".to_string(),
-            visible: true,
             uuid: Uuid::new_v4(),
-            aabb: AABB::default(),
             material: Material::default_resin(),
-            display_in_ui_list: true,
-            selectable: true,
         };
 
         // Act: Compute the model matrix
@@ -422,94 +315,5 @@ mod tests {
         // Expected min and max values for the AABB
         assert!((aabb.min - Vector3::new(-1000.0, -500.0, -300.0)).norm() < 1e-6);
         assert!((aabb.max - Vector3::new(100.0, 200.0, 400.0)).norm() < 1e-6);
-    }
-
-    #[test]
-    fn test_euler_to_quaternion_basic() {
-        // Test case: Euler angles (45°, 30°, 60°)
-        let euler_angles = Vector3::new(45.0, 30.0, 60.0);
-        let quat = Body::euler_to_quaternion(euler_angles);
-
-        // Expected quaternion from these angles can be computed manually or using a reference system
-        let expected_quat = Quaternion::new(0.82236, 0.20056, 0.39190, 0.36042);
-
-        // Check that the quaternion is close to the expected result
-        assert!((quat.w - expected_quat.w).abs() < 1e-5);
-        assert!((quat.i - expected_quat.i).abs() < 1e-5);
-        assert!((quat.j - expected_quat.j).abs() < 1e-5);
-        assert!((quat.k - expected_quat.k).abs() < 1e-5);
-    }
-
-    #[test]
-    fn test_euler_to_quaternion_identity() {
-        // Test case: Euler angles (0°, 0°, 0°) should result in identity quaternion
-        let euler_angles = Vector3::new(0.0, 0.0, 0.0);
-        let quat = Body::euler_to_quaternion(euler_angles);
-
-        // Identity quaternion (no rotation)
-        let expected_quat: Quaternion<f32> = Quaternion::identity();
-
-        assert!((quat.w - expected_quat.w).abs() < 1e-5);
-        assert!((quat.i - expected_quat.i).abs() < 1e-5);
-        assert!((quat.j - expected_quat.j).abs() < 1e-5);
-        assert!((quat.k - expected_quat.k).abs() < 1e-5);
-    }
-
-    #[test]
-    fn test_euler_to_quaternion_90_deg() {
-        // Test case: Euler angles (90°, 0°, 0°)
-        let euler_angles = Vector3::new(90.0, 0.0, 0.0);
-        let quat = Body::euler_to_quaternion(euler_angles);
-
-        // Expected quaternion for 90-degree X-axis rotation
-        let expected_quat = Quaternion::new(0.7071, 0.7071, 0.0, 0.0);
-
-        assert!((quat.w - expected_quat.w).abs() < 1e-5);
-        assert!((quat.i - expected_quat.i).abs() < 1e-5);
-        assert!((quat.j - expected_quat.j).abs() < 1e-5);
-        assert!((quat.k - expected_quat.k).abs() < 1e-5);
-    }
-
-    #[test]
-    fn test_quaternion_to_euler_basic() {
-        // Test case: Quaternion from Euler angles (45°, 30°, 60°)
-        let quat = Quaternion::new(0.82236, 0.20056, 0.39190, 0.36042);
-        let euler = Body::quaternion_to_euler(&quat);
-
-        // Expected Euler angles (in degrees)
-        let expected_euler = Vector3::new(45.0, 30.0, 60.0);
-
-        // Check that the Euler angles are close to the expected result
-        assert!((euler.x - expected_euler.x).abs() < 1e-1); // Tolerance due to floating-point precision
-        assert!((euler.y - expected_euler.y).abs() < 1e-1);
-        assert!((euler.z - expected_euler.z).abs() < 1e-1);
-    }
-
-    #[test]
-    fn test_quaternion_to_euler_identity() {
-        // Test case: Identity quaternion should result in (0°, 0°, 0°) Euler angles
-        let quat = Quaternion::identity();
-        let euler = Body::quaternion_to_euler(&quat);
-
-        // Expected Euler angles (in degrees)
-        let expected_euler = Vector3::new(0.0, 0.0, 0.0);
-
-        assert!((euler.x - expected_euler.x).abs() < 1e-5);
-        assert!((euler.y - expected_euler.y).abs() < 1e-5);
-        assert!((euler.z - expected_euler.z).abs() < 1e-5);
-    }
-
-    #[test]
-    fn test_quaternion_to_euler_90_deg() {
-        // Test case: Quaternion for a 90° rotation around the X-axis
-        let quat = Quaternion::new(0.7071, 0.7071, 0.0, 0.0);
-        let euler = Body::quaternion_to_euler(&quat);
-
-        // Expected Euler angles (in degrees)
-        let expected_euler = Vector3::new(90.0, 0.0, 0.0);
-
-        assert!((euler.x - expected_euler.x).abs() < 1e-1); // Tolerance due to precision
-        assert!((euler.y - expected_euler.y).abs() < 1e-1);
-        assert!((euler.z - expected_euler.z).abs() < 1e-1);
     }
 }

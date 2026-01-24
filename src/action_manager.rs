@@ -13,12 +13,14 @@ impl ActionManager {
         }
     }
 
+    #[allow(dead_code)]
     pub fn execute(&mut self, mut action: Box<dyn Action>) {
         action.execute();
         self.history.push(action);
         self.future.clear(); // Clear the redo stack on new action
     }
 
+    #[allow(dead_code)]
     pub fn undo(&mut self) {
         if let Some(mut action) = self.history.pop() {
             action.undo();
@@ -26,6 +28,7 @@ impl ActionManager {
         }
     }
 
+    #[allow(dead_code)]
     pub fn redo(&mut self) {
         if let Some(mut action) = self.future.pop() {
             action.execute();

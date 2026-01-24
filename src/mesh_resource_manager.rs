@@ -1,5 +1,3 @@
-use std::rc::Rc;
-
 use bevy_ecs::prelude::*;
 
 use crate::mesh::Mesh;

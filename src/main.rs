@@ -23,11 +23,8 @@ use body::Body;
 use glow::Context as GlowContext;
 use glow::HasContext;
 use log::debug;
-use log::log;
-use nalgebra::Transform;
 use nalgebra::Vector3;
 use renderer::Renderer;
-use rfd::AsyncFileDialog;
 use settings::Settings;
 use slint::platform::PointerEventButton;
 use slint::Timer;
@@ -67,6 +64,7 @@ type SharedMouseState = Rc<RefCell<MouseState>>;
 type SharedSettings = Arc<Mutex<Settings>>;
 type SharedActionManager = Arc<Mutex<ActionManager>>;
 
+#[allow(dead_code)]
 struct AppState {
     mouse_state: SharedMouseState,
     shared_mesh_renderer: SharedMeshRenderer,
