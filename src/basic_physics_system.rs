@@ -18,10 +18,6 @@ impl BasicPhysicsSystem {
                 transform.rotation =
                     Self::apply_rotation(&transform.rotation, &velocity.angular, delta_time);
             }
-            println![
-                "Transform: position={:?}, rotation={:?}",
-                transform.position, transform.rotation
-            ];
         }
     }
 

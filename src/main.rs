@@ -120,7 +120,7 @@ fn main() {
 
     let forward_slow = VelocityComponent {
         translational: Vector3::new(1.0, 2.0, 3.0),
-        angular: Vector3::new(0.01, 0.02, 0.03),
+        angular: Vector3::new(0.11, 0.22, 0.13),
     };
 
     world.borrow_mut().spawn((
@@ -174,8 +174,7 @@ fn main() {
                         let renderer = Renderer::new(
                             gl.clone(),
                             (1000.0 * render_scale) as u32,
-                            (1000.0 * render_scale) as u32,
-                            &bodies_clone,
+                            (1000.0 * render_scale) as u32
                         );
                         *mesh_renderer_clone.borrow_mut() = Some(renderer);
                     }
@@ -188,6 +187,18 @@ fn main() {
                                 let width = app.get_requested_texture_width() as f32;
                                 let renderer_settings = &shared_settings.lock().unwrap().renderer;
                                 let render_scale = renderer_settings.render_scale;
+
+                                // This is trash code
+                                let w = &world.borrow();
+                                let _bodies = &w
+                                    .get_resource::<BodyResourceManager>()
+                                    .unwrap()
+                                    .bodies;
+                                // Submit bodies to renderer
+                                let bodies = _bodies
+                                    .iter()
+                                    .collect::<Vec<&Body>>();
+                                renderer.submit_bodies(bodies);
                                 let texture = renderer.render(
                                     (width * render_scale) as u32,
                                     (height * render_scale) as u32,

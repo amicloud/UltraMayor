@@ -1,6 +1,7 @@
 use std::fs;
 use std::rc::Rc;
 slint::include_modules!();
+use crate::body::Body;
 use crate::camera::Camera;
 use crate::mesh::Vertex;
 use crate::render_texture::RenderTexture;
@@ -29,12 +30,12 @@ pub struct Renderer {
     edge_thickness_location: glow::UniformLocation,
     displayed_texture: RenderTexture,
     next_texture: RenderTexture,
-    bodies: SharedBodies,
+    bodies: Vec<Body>,
     camera: Camera,
 }
 
 impl Renderer {
-    pub fn new(gl: Rc<GlowContext>, width: u32, height: u32, bodies: &SharedBodies) -> Self {
+    pub fn new(gl: Rc<GlowContext>, width: u32, height: u32) -> Self {
         unsafe {
             // Create shader program
             let shader_program = gl.create_program().expect("Cannot create program");
@@ -224,7 +225,7 @@ impl Renderer {
                 ebo,
                 displayed_texture,
                 next_texture,
-                bodies: bodies.clone(),
+                bodies: Vec::new(),
                 camera,
                 light_color_location,
                 albedo_location,
@@ -238,6 +239,11 @@ impl Renderer {
         }
     }
 
+    pub fn submit_bodies(&mut self, bodies: Vec<&Body>) {
+        self.bodies.clear();
+        self.bodies = bodies.into_iter().map(|b| b.clone()).collect();
+    }
+    
     pub fn render(
         &mut self,
         width: u32,
@@ -319,9 +325,10 @@ impl Renderer {
                 gl.bind_buffer(glow::ARRAY_BUFFER, Some(self.vbo));
                 gl.bind_buffer(glow::ELEMENT_ARRAY_BUFFER, Some(self.ebo));
                 // Body Rendering Loop
-                for body in self.bodies.borrow().iter() {
+                for body in self.bodies.iter() {
+                    println!("Rendering body: {}", body.uuid);
                     // PBR Uniforms
-                    let material = &body.borrow().material;
+                    let material = &body.material;
                     gl.uniform_1_f32(Some(&self.roughness_location), material.roughness);
                     gl.uniform_3_f32(
                         Some(&self.albedo_location),
@@ -346,12 +353,12 @@ impl Renderer {
                         (material.can_visualize_edges && visualize_edges) as u32,
                     );
                     gl.uniform_1_f32(Some(&self.edge_thickness_location), 3.0);
-                    let mesh = &body.borrow().mesh;
+                    let mesh = &body.mesh;
                     // Set the model uniform
                     gl.uniform_matrix_4_f32_slice(
                         Some(&self.model_location),
                         false,
-                        body.borrow().get_model_matrix().as_slice(),
+                        body.get_model_matrix().as_slice(),
                     );
 
                     // Upload the vertex data to the GPU
