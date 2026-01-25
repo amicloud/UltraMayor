@@ -41,6 +41,7 @@ use crate::basic_physics_system::BasicPhysicsSystem;
 use crate::mesh::Mesh;
 use crate::mesh_component::MeshComponent;
 use crate::mesh_resource_manager::MeshResourceManager;
+use crate::render_instance::RenderInstance;
 use crate::render_queue::RenderQueue;
 use crate::render_system::RenderSystem;
 use crate::renderer::RenderParams;
@@ -161,11 +162,11 @@ fn main() {
                             .get_resource_mut::<MeshResourceManager>()
                             .unwrap()
                             .add_mesh(
-                                Mesh::from_obj(OsStr::new("resources/models/cube.obj")).unwrap(),
+                                Mesh::from_obj(OsStr::new("resources/models/utah_teapot.obj")).unwrap(),
                                 &gl,
                             );
 
-                        for _ in 0..1000 {
+                        for _ in 0..100 {
                             // Random position
                             let pos = Vector3::new(
                                 random_range(-10.0..10.0),
@@ -213,23 +214,30 @@ fn main() {
                                 let width = app.get_requested_texture_width() as f32;
                                 let renderer_settings = &shared_settings.lock().unwrap().renderer;
                                 let render_scale = renderer_settings.render_scale;
-
-                                let w = &world.borrow();
-                                let render_queue = w
-                                    .get_resource::<RenderQueue>()
-                                    .expect("RenderQueue resource not found");
-                                let mesh_manager = w
-                                    .get_resource::<MeshResourceManager>()
-                                    .expect("MeshResourceManager resource not found");
-                                let instances = &render_queue.instances;
                                 let render_params = RenderParams {
                                     width: (width * render_scale) as u32,
                                     height: (height * render_scale) as u32,
                                     visualize_edges: renderer_settings.visualize_edges,
                                     visualize_normals: renderer_settings.visualize_normals,
                                 };
+                                let w = &mut world.borrow_mut();
+                                // 1. Extract instance data FIRST
+                                let instances: Vec<RenderInstance> = {
+                                    let render_queue = w
+                                        .get_resource::<RenderQueue>()
+                                        .expect("RenderQueue resource not found");
+
+                                    render_queue.instances.clone()
+                                }; // <- immutable borrow ends HERE
+
+                                // 2. Now mutable borrow is legal
+                                let mut mesh_manager = w
+                                    .get_resource_mut::<MeshResourceManager>()
+                                    .expect("MeshResourceManager resource not found");
+
+                                // 3. Render
                                 let texture =
-                                    renderer.render(render_params, mesh_manager, instances);
+                                    renderer.render(render_params, &mut *mesh_manager, &instances);
 
                                 app.set_texture(texture);
                                 app.set_visualize_edges(renderer_settings.visualize_edges);
@@ -262,11 +270,11 @@ fn main() {
         }
     }
 
-    // Handler for scrollwheel zooming TODO: Consider renaming for clarity
+    // Handler for scrollwheel/scroll gesture
     {
         let app_weak_clone = app_weak.clone(); // Clone app_weak again for this closure
         let mesh_renderer_clone = Rc::clone(&state.shared_mesh_renderer); // Clone mesh_renderer for this closure
-        app.on_zoom(move |amt| {
+        app.on_mouse_scroll(move |amt| {
             // Access the renderer
             if let Some(renderer) = mesh_renderer_clone.borrow_mut().as_mut() {
                 // Move the camera

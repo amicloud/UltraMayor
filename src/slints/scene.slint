@@ -22,7 +22,7 @@ export component App inherits Window {
     callback toggle_edge_visualization();
     callback toggle_normal_visualization();
 
-    callback zoom(length);
+    callback mouse_scroll(length);
     callback mouse_move_renderer(length, length);
 
     title: "UltraMayor";
@@ -66,10 +66,10 @@ export component App inherits Window {
                 TouchArea {
                     scroll-event(e) => {
                         if e.delta-y > 0 {
-                            root.zoom(e.delta-y);
+                            root.mouse_scroll(e.delta-y);
                             return accept;
                         } else if e.delta-y < 0 {
-                            root.zoom(e.delta-y);
+                            root.mouse_scroll(e.delta-y);
                             return accept;
                         }
                         return reject;

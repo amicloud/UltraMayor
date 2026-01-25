@@ -1,8 +1,10 @@
+use std::collections::HashMap;
 use std::fs;
 use std::rc::Rc;
 slint::include_modules!();
 use crate::camera::Camera;
 use crate::material::Material;
+use crate::mesh::Mesh;
 use crate::mesh::Vertex;
 use crate::mesh_resource_manager::MeshResourceManager;
 use crate::render_instance::RenderInstance;
@@ -16,7 +18,7 @@ pub struct Renderer {
 
     view_proj_location: glow::UniformLocation,
     camera_position_location: glow::UniformLocation,
-    model_location: glow::UniformLocation,
+    // model_location: glow::UniformLocation,
     light_direction_location: glow::UniformLocation,
     light_color_location: glow::UniformLocation,
     albedo_location: glow::UniformLocation,
@@ -111,7 +113,7 @@ impl Renderer {
                 .get_uniform_location(shader_program, "camera_position")
                 .unwrap();
 
-            let model_location = gl.get_uniform_location(shader_program, "model").unwrap();
+            // let model_location = gl.get_uniform_location(shader_program, "model").unwrap();
 
             let light_direction_location = gl
                 .get_uniform_location(shader_program, "light_direction")
@@ -209,7 +211,7 @@ impl Renderer {
                 view_proj_location,
                 camera_position_location,
                 light_direction_location,
-                model_location,
+                // model_location,
                 displayed_texture,
                 next_texture,
                 camera,
@@ -228,13 +230,13 @@ impl Renderer {
     pub fn render(
         &mut self,
         render_params: RenderParams,
-        meshes: &MeshResourceManager,
+        meshes: &mut MeshResourceManager,
         instances: &[RenderInstance],
     ) -> slint::Image {
         unsafe {
             let gl = &self.gl;
             gl.use_program(Some(self.program));
-            // Enable face culling
+
             gl.enable(glow::CULL_FACE);
             gl.cull_face(glow::BACK);
 
@@ -246,21 +248,17 @@ impl Renderer {
                     RenderTexture::new(gl, render_params.width, render_params.height);
                 std::mem::swap(&mut self.next_texture, &mut new_texture);
             }
+
             let light_intensity = 0.25;
             let default_light_color =
                 Vector3::new(light_intensity, light_intensity, light_intensity);
 
             self.next_texture.with_texture_as_active_fbo(|| {
-                if gl.check_framebuffer_status(glow::FRAMEBUFFER) != glow::FRAMEBUFFER_COMPLETE {
-                    panic!("Framebuffer is not complete!");
-                }
-                // **Enable depth testing inside the framebuffer binding**
                 gl.enable(glow::DEPTH_TEST);
                 gl.depth_func(glow::LEQUAL);
-                // Clear color and depth buffers
                 gl.clear(glow::COLOR_BUFFER_BIT | glow::DEPTH_BUFFER_BIT);
-                // Save and set viewport
-                let mut saved_viewport: [i32; 4] = [0; 4];
+
+                let mut saved_viewport = [0; 4];
                 gl.get_parameter_i32_slice(glow::VIEWPORT, &mut saved_viewport);
                 gl.viewport(
                     0,
@@ -269,12 +267,19 @@ impl Renderer {
                     self.next_texture.height as i32,
                 );
 
-                // Compute view and projection matrices
+                // Camera / matrices
                 self.camera
                     .set_aspect_ratio(render_params.width as f32 / render_params.height as f32);
-                let projection = self.camera.projection_matrix;
-                let view = self.camera.view_matrix();
-                let view_proj = projection * view;
+
+                let view_proj = self.camera.projection_matrix * self.camera.view_matrix();
+                let view_proj_matrix: [f32; 16] = view_proj.as_slice().try_into().unwrap();
+
+                gl.uniform_matrix_4_f32_slice(
+                    Some(&self.view_proj_location),
+                    false,
+                    &view_proj_matrix,
+                );
+
                 gl.uniform_3_f32(
                     Some(&self.camera_position_location),
                     self.camera.position.x,
@@ -282,89 +287,72 @@ impl Renderer {
                     self.camera.position.z,
                 );
 
-                // Set the light direction (e.g., a fixed directional light)
                 gl.uniform_3_f32(Some(&self.light_direction_location), 0.0, 0.0, 1.0);
-
-                // Convert view_proj_matrix to column-major array
-                let view_proj_matrix: [f32; 16] = view_proj
-                    .as_slice()
-                    .try_into()
-                    .expect("Slice with incorrect length");
-
-                // Set the view_proj uniform
-                gl.uniform_matrix_4_f32_slice(
-                    Some(&self.view_proj_location),
-                    false,
-                    &view_proj_matrix,
-                );
                 gl.uniform_3_f32(
                     Some(&self.light_color_location),
                     default_light_color.x,
                     default_light_color.y,
                     default_light_color.z,
                 );
-                // Rendering Loop
-                let frame_time = std::time::Instant::now();
-                let mut num_draw_calls: i32 = 0;
-                for instance in instances.iter() {
-                    let mesh = meshes.get_mesh(instance.mesh_id).unwrap();
 
-                    // PBR Uniforms
-                    let material = Material::default();
-                    gl.uniform_1_f32(Some(&self.roughness_location), material.roughness);
-                    gl.uniform_3_f32(
-                        Some(&self.albedo_location),
-                        material.albedo.x,
-                        material.albedo.y,
-                        material.albedo.z,
-                    );
-                    gl.uniform_3_f32(
-                        Some(&self.base_reflectance_location),
-                        material.base_reflectance.x,
-                        material.base_reflectance.y,
-                        material.base_reflectance.z,
-                    );
+                // ------------------------------------------------------------
+                // PASS 1: GATHER (no mesh mutation, no GL draws)
+                // ------------------------------------------------------------
+                let mut per_mesh_instances: HashMap<u32, Vec<[f32; 16]>> = HashMap::new();
 
-                    gl.uniform_1_u32(
-                        Some(&self.visualize_normals_location),
-                        (render_params.visualize_normals && material.visualize_normals) as u32,
-                    );
+                for inst in instances.iter() {
+                    per_mesh_instances
+                        .entry(inst.mesh_id)
+                        .or_insert_with(Vec::new)
+                        .push(inst.transform.as_slice().try_into().unwrap());
+                }
 
-                    gl.uniform_1_u32(
-                        Some(&self.visualize_edges_location),
-                        (material.can_visualize_edges && render_params.visualize_edges) as u32,
-                    );
-                    gl.uniform_1_f32(Some(&self.edge_thickness_location), 3.0);
+                // ------------------------------------------------------------
+                // PASS 2: UPLOAD + DRAW (mutable mesh access)
+                // ------------------------------------------------------------
+                let material = Material::default();
 
-                    // Model transform
-                    gl.uniform_matrix_4_f32_slice(
-                        Some(&self.model_location),
-                        false,
-                        instance.transform.as_slice(),
-                    );
+                gl.uniform_1_f32(Some(&self.roughness_location), material.roughness);
+                gl.uniform_3_f32(
+                    Some(&self.albedo_location),
+                    material.albedo.x,
+                    material.albedo.y,
+                    material.albedo.z,
+                );
+                gl.uniform_3_f32(
+                    Some(&self.base_reflectance_location),
+                    material.base_reflectance.x,
+                    material.base_reflectance.y,
+                    material.base_reflectance.z,
+                );
 
-                    // Bind the mesh VAO and draw
+                gl.uniform_1_u32(
+                    Some(&self.visualize_normals_location),
+                    (render_params.visualize_normals && material.visualize_normals) as u32,
+                );
+                gl.uniform_1_u32(
+                    Some(&self.visualize_edges_location),
+                    (material.can_visualize_edges && render_params.visualize_edges) as u32,
+                );
+                gl.uniform_1_f32(Some(&self.edge_thickness_location), 3.0);
+                // Rendering Loop 
+                for (mesh_id, matrices) in per_mesh_instances {
+                    let mesh = meshes.get_mesh_mut(mesh_id).expect("mesh not found");
+
+                    // Upload per-instance transforms
+                    mesh.update_instance_buffer(&matrices, gl);
+
                     gl.bind_vertex_array(mesh.vao);
-                    gl.draw_elements(
+                    gl.draw_elements_instanced(
                         glow::TRIANGLES,
                         mesh.indices.len() as i32,
                         glow::UNSIGNED_INT,
                         0,
+                        matrices.len() as i32,
                     );
-                    num_draw_calls += 1;
                 }
-                println!(
-                    "Frame rendered in {:?}, draw calls: {}",
-                    frame_time.elapsed(),
-                    num_draw_calls
-                );
 
-                // Unbind the buffers
                 gl.bind_vertex_array(None);
-                self.gl.bind_buffer(glow::ARRAY_BUFFER, None);
-                self.gl.bind_buffer(glow::ELEMENT_ARRAY_BUFFER, None);
-
-                // Restore viewport
                 gl.viewport(
                     saved_viewport[0],
                     saved_viewport[1],
@@ -376,7 +364,6 @@ impl Renderer {
             gl.use_program(None);
         }
 
-        // Create the result texture
         let result_texture = unsafe {
             slint::BorrowedOpenGLTextureBuilder::new_gl_2d_rgba_texture(
                 self.next_texture.texture.0,
@@ -385,9 +372,7 @@ impl Renderer {
             .build()
         };
 
-        // Swap textures for the next frame
         std::mem::swap(&mut self.next_texture, &mut self.displayed_texture);
-
         result_texture
     }
 
@@ -401,6 +386,26 @@ impl Renderer {
 
     pub(crate) fn zoom(&mut self, amt: f32) {
         self.camera.zoom(amt);
+    }
+
+    /// Deletes a mesh's GPU resources
+    #[allow(dead_code)]
+    pub fn delete_mesh_gpu(&self, mesh: &mut Mesh) {
+        unsafe {
+            if let Some(vao) = mesh.vao.take() {
+                self.gl.delete_vertex_array(vao);
+            }
+            if let Some(vbo) = mesh.vbo.take() {
+                self.gl.delete_buffer(vbo);
+            }
+            if let Some(ebo) = mesh.ebo.take() {
+                self.gl.delete_buffer(ebo);
+            }
+            if let Some(inst) = mesh.instance_vbo.take() {
+                self.gl.delete_buffer(inst);
+            }
+            mesh.instance_count = 0;
+        }
     }
 }
 

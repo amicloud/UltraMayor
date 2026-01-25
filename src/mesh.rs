@@ -95,6 +95,10 @@ pub struct Mesh {
     pub vao: Option<glow::VertexArray>,
     pub vbo: Option<glow::Buffer>,
     pub ebo: Option<glow::Buffer>,
+
+    // Instancing
+    pub instance_vbo: Option<glow::Buffer>,
+    pub instance_count: usize,
 }
 
 impl Mesh {
@@ -103,6 +107,8 @@ impl Mesh {
             let vao = gl.create_vertex_array().unwrap();
             let vbo = gl.create_buffer().unwrap();
             let ebo = gl.create_buffer().unwrap();
+
+            let instance_vbo = gl.create_buffer().expect("create instance VBO");
 
             gl.bind_vertex_array(Some(vao));
 
@@ -163,6 +169,32 @@ impl Mesh {
                 barycentric_offset * 4,
             );
 
+            // Instance buffer: reserve no data yet (we'll upload per-frame when we know instance count)
+            gl.bind_buffer(glow::ARRAY_BUFFER, Some(instance_vbo));
+            gl.buffer_data_u8_slice(glow::ARRAY_BUFFER, &[], glow::DYNAMIC_DRAW);
+
+            // The model matrix is 4 vec4 attributes at locations 3..6.
+            // Stride = 4 * vec4 = 64 bytes, offsets = 0, 16, 32, 48
+            let mat_stride = (16 * std::mem::size_of::<f32>()) as i32; // 64 bytes
+            for i in 0..4 {
+                let loc = 3 + i; // 3,4,5,6
+                gl.enable_vertex_attrib_array(loc);
+                gl.vertex_attrib_pointer_f32(
+                    loc,
+                    4,
+                    glow::FLOAT,
+                    false,
+                    mat_stride,
+                    (i * 16) as i32, // offset in bytes (i * vec4 size = i * 16 bytes? careful)
+                );
+                // Important: the offset argument of vertex_attrib_pointer_f32 expects bytes.
+                // (i * 16) is wrong if we think in bytes; correct is (i * 16) bytes? Actually each vec4 is 4 floats -> 16 bytes.
+                // So use i * 16 (bytes), but because vertex_attrib_pointer_f32 expects i32 offset in BYTES, we compute:
+                // (i * 16) // 16 bytes per vec4
+                // Here we used (i * 16) already (it is bytes).
+                gl.vertex_attrib_divisor(loc, 1); // this makes it per-instance
+            }
+
             gl.bind_vertex_array(None);
             gl.bind_buffer(glow::ARRAY_BUFFER, None);
             gl.bind_buffer(glow::ELEMENT_ARRAY_BUFFER, None);
@@ -170,6 +202,27 @@ impl Mesh {
             self.vao = Some(vao);
             self.vbo = Some(vbo);
             self.ebo = Some(ebo);
+            self.instance_vbo = Some(instance_vbo);
+            self.instance_count = 0;
+        }
+    }
+
+    /// Upload per-instance model matrices (slice of `[f32;16]`) to the instance VBO.
+    pub fn update_instance_buffer(&mut self, instance_matrices: &[[f32; 16]], gl: &glow::Context) {
+        if instance_matrices.is_empty() {
+            self.instance_count = 0;
+            return;
+        }
+        unsafe {
+            let instance_buf = self.instance_vbo.expect("no instance buffer");
+            gl.bind_buffer(glow::ARRAY_BUFFER, Some(instance_buf));
+            gl.buffer_data_u8_slice(
+                glow::ARRAY_BUFFER,
+                bytemuck::cast_slice(instance_matrices),
+                glow::DYNAMIC_DRAW,
+            );
+            gl.bind_buffer(glow::ARRAY_BUFFER, None);
+            self.instance_count = instance_matrices.len();
         }
     }
 
