@@ -88,8 +88,8 @@ impl Vertex {
 #[allow(dead_code)]
 #[derive(Default, Clone)]
 pub struct AABB {
-    min: Vector3<f32>,
-    max: Vector3<f32>,
+    pub min: Vector3<f32>,
+    pub max: Vector3<f32>,
 }
 
 #[allow(dead_code)]
@@ -111,7 +111,6 @@ impl AABB {
         tmax >= tmin.max(0.0)
     }
 
-    #[allow(dead_code)]
     fn from_vertices(vertices: &Vec<crate::mesh::Vertex>) -> Self {
         // Initialize min and max with the first vertex
         let mut min = vertices[0];
@@ -133,6 +132,8 @@ impl AABB {
             max: max.position.into(),
         }
     }
+
+    
 }
 
 #[derive(Default, Clone)]
@@ -141,6 +142,9 @@ pub struct Mesh {
     pub vertices: Vec<Vertex>,
     pub indices: Vec<u32>,
     pub aabb: AABB,
+    // Bounding sphere
+    pub sphere_center: Vector3<f32>,
+    pub sphere_radius: f32,
 
     // GPU handles
     pub vao: Option<glow::VertexArray>,
@@ -304,7 +308,44 @@ impl Mesh {
         };
 
         mesh.aabb = AABB::from_vertices(&mesh.vertices);
+        mesh.compute_bounding_sphere();
         Ok(mesh)
+    }
+
+    pub fn transformed_aabb(&self, transform: &nalgebra::Matrix4<f32>) -> AABB {
+        let corners = [
+            Vector3::new(self.aabb.min.x, self.aabb.min.y, self.aabb.min.z),
+            Vector3::new(self.aabb.min.x, self.aabb.min.y, self.aabb.max.z),
+            Vector3::new(self.aabb.min.x, self.aabb.max.y, self.aabb.min.z),
+            Vector3::new(self.aabb.min.x, self.aabb.max.y, self.aabb.max.z),
+            Vector3::new(self.aabb.max.x, self.aabb.min.y, self.aabb.min.z),
+            Vector3::new(self.aabb.max.x, self.aabb.min.y, self.aabb.max.z),
+            Vector3::new(self.aabb.max.x, self.aabb.max.y, self.aabb.min.z),
+            Vector3::new(self.aabb.max.x, self.aabb.max.y, self.aabb.max.z),
+        ];
+
+        let mut min = Vector3::new(f32::MAX, f32::MAX, f32::MAX);
+        let mut max = Vector3::new(f32::MIN, f32::MIN, f32::MIN);
+
+        for corner in &corners {
+            let transformed = transform.transform_point(&nalgebra::Point3::from(*corner));
+            min.x = min.x.min(transformed.x);
+            min.y = min.y.min(transformed.y);
+            min.z = min.z.min(transformed.z);
+
+            max.x = max.x.max(transformed.x);
+            max.y = max.y.max(transformed.y);
+            max.z = max.z.max(transformed.z);
+        }
+
+        AABB { min, max }
+    }
+
+    pub fn compute_bounding_sphere(&mut self) {
+        // Center = AABB center
+        self.sphere_center = (self.aabb.min + self.aabb.max) * 0.5;
+        // Radius = distance from center to farthest corner
+        self.sphere_radius = (self.aabb.max - self.sphere_center).norm();
     }
 }
 

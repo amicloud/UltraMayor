@@ -11,6 +11,7 @@ use crate::render_instance::RenderInstance;
 use crate::render_texture::RenderTexture;
 use glow::Context as GlowContext;
 use glow::HasContext;
+use nalgebra::Point3;
 use nalgebra::Vector3;
 pub struct Renderer {
     gl: Rc<GlowContext>,
@@ -234,6 +235,7 @@ impl Renderer {
         instances: &[RenderInstance],
     ) -> slint::Image {
         unsafe {
+            let current_time = std::time::Instant::now();
             let gl = &self.gl;
             gl.use_program(Some(self.program));
 
@@ -298,13 +300,27 @@ impl Renderer {
                 // ------------------------------------------------------------
                 // PASS 1: GATHER (no mesh mutation, no GL draws)
                 // ------------------------------------------------------------
+
+                let frustum = crate::frustum::Frustum::from_view_proj(&view_proj);
+                
                 let mut per_mesh_instances: HashMap<u32, Vec<[f32; 16]>> = HashMap::new();
 
                 for inst in instances.iter() {
-                    per_mesh_instances
-                        .entry(inst.mesh_id)
-                        .or_insert_with(Vec::new)
-                        .push(inst.transform.as_slice().try_into().unwrap());
+                    // Get the mesh's AABB
+                    let mesh = meshes.get_mesh(inst.mesh_id).expect("mesh not found");
+                    
+                    let scale = inst.transform.fixed_view::<3,3>(0,0).abs().max(); // conservative
+                    let world_center = inst.transform.transform_point(&Point3::from(mesh.sphere_center));
+                    let world_radius = mesh.sphere_radius * scale;
+
+                    // Cull against the frustum
+                    if frustum.intersects_sphere(world_center.coords, world_radius) {
+                    // {
+                        per_mesh_instances
+                            .entry(inst.mesh_id)
+                            .or_insert_with(Vec::new)
+                            .push(inst.transform.as_slice().try_into().unwrap());
+                    }
                 }
 
                 // ------------------------------------------------------------
@@ -360,6 +376,10 @@ impl Renderer {
                     saved_viewport[3],
                 );
             });
+            println!(
+                "Render time: {:.2} ms",
+                current_time.elapsed().as_secs_f32() * 1000.0
+            );
 
             gl.use_program(None);
         }

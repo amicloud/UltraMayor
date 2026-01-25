@@ -17,6 +17,7 @@ mod renderer;
 mod settings;
 mod transform_component;
 mod velocity_component;
+mod frustum;
 use action_manager::ActionManager;
 use bevy_ecs::prelude::*;
 use glow::Context as GlowContext;
@@ -161,12 +162,12 @@ fn main() {
                             .get_resource_mut::<MeshResourceManager>()
                             .unwrap()
                             .add_mesh(
-                                Mesh::from_obj(OsStr::new("resources/models/utah_teapot.obj"))
+                                Mesh::from_obj(OsStr::new("resources/models/cube.obj"))
                                     .unwrap(),
                                 &gl,
                             );
 
-                        for _ in 0..100 {
+                        for _ in 0..1000 {
                             // Random position
                             let pos = Vector3::new(
                                 random_range(-10.0..10.0),
