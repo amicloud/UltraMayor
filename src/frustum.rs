@@ -71,21 +71,6 @@ impl Frustum {
         Self { planes }
     }
 
-    pub fn intersects_aabb(&self, min: Vector3<f32>, max: Vector3<f32>) -> bool {
-        for plane in &self.planes {
-            // Compute positive vertex for plane
-            let p = Vector3::new(
-                if plane.normal.x >= 0.0 { max.x } else { min.x },
-                if plane.normal.y >= 0.0 { max.y } else { min.y },
-                if plane.normal.z >= 0.0 { max.z } else { min.z },
-            );
-            if plane.normal.dot(&p) + plane.distance < 0.0 {
-                return false; // outside
-            }
-        }
-        true
-    }
-
     pub fn intersects_sphere(&self, center: Vector3<f32>, radius: f32) -> bool {
         for plane in &self.planes {
             if plane.normal.dot(&center) + plane.distance < -radius {

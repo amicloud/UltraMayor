@@ -315,11 +315,10 @@ impl Renderer {
 
                     // Cull against the frustum
                     if frustum.intersects_sphere(world_center.coords, world_radius) {
-                    // {
-                        per_mesh_instances
+                        let entry = per_mesh_instances
                             .entry(inst.mesh_id)
-                            .or_insert_with(Vec::new)
-                            .push(inst.transform.as_slice().try_into().unwrap());
+                            .or_insert_with(Vec::new);
+                        entry.push(inst.transform.as_slice().try_into().unwrap());
                     }
                 }
 

@@ -262,7 +262,6 @@ impl Mesh {
         }
     }
 
-    /// Upload per-instance model matrices (slice of `[f32;16]`) to the instance VBO.
     pub fn update_instance_buffer(&mut self, instance_matrices: &[[f32; 16]], gl: &glow::Context) {
         if instance_matrices.is_empty() {
             self.instance_count = 0;
@@ -310,35 +309,6 @@ impl Mesh {
         mesh.aabb = AABB::from_vertices(&mesh.vertices);
         mesh.compute_bounding_sphere();
         Ok(mesh)
-    }
-
-    pub fn transformed_aabb(&self, transform: &nalgebra::Matrix4<f32>) -> AABB {
-        let corners = [
-            Vector3::new(self.aabb.min.x, self.aabb.min.y, self.aabb.min.z),
-            Vector3::new(self.aabb.min.x, self.aabb.min.y, self.aabb.max.z),
-            Vector3::new(self.aabb.min.x, self.aabb.max.y, self.aabb.min.z),
-            Vector3::new(self.aabb.min.x, self.aabb.max.y, self.aabb.max.z),
-            Vector3::new(self.aabb.max.x, self.aabb.min.y, self.aabb.min.z),
-            Vector3::new(self.aabb.max.x, self.aabb.min.y, self.aabb.max.z),
-            Vector3::new(self.aabb.max.x, self.aabb.max.y, self.aabb.min.z),
-            Vector3::new(self.aabb.max.x, self.aabb.max.y, self.aabb.max.z),
-        ];
-
-        let mut min = Vector3::new(f32::MAX, f32::MAX, f32::MAX);
-        let mut max = Vector3::new(f32::MIN, f32::MIN, f32::MIN);
-
-        for corner in &corners {
-            let transformed = transform.transform_point(&nalgebra::Point3::from(*corner));
-            min.x = min.x.min(transformed.x);
-            min.y = min.y.min(transformed.y);
-            min.z = min.z.min(transformed.z);
-
-            max.x = max.x.max(transformed.x);
-            max.y = max.y.max(transformed.y);
-            max.z = max.z.max(transformed.z);
-        }
-
-        AABB { min, max }
     }
 
     pub fn compute_bounding_sphere(&mut self) {

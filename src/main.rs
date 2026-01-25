@@ -395,40 +395,6 @@ fn main() {
                 Err(e) => error!("Error when updating user settings: {:?}", e),
             }
         });
-
-        // async fn open_files_from_dialog(mesh_manager: &mut MeshResourceManager) {
-        //     // Handling the option prevents crashes
-        //     if let Some(paths) = AsyncFileDialog::new()
-        //         .add_filter("obj", &["obj", "OBJ"])
-        //         .set_directory("~")
-        //         .pick_files()
-        //         .await
-        //     {
-        //         for path in paths {
-        //             let mesh = Mesh::from_obj(path.path().as_os_str()).unwrap();
-        //             mesh_manager.add_mesh(mesh);
-        //         }
-        //     } else {
-        //         println!("File picker returned no files");
-        //     }
-        // }
-
-        // // Handler for opening OBJ importer file picker
-        // {
-        //     //let bodies_clone = Rc::clone(&state.shared_bodies);
-        //     let world_clone = Rc::clone(&world);
-        //     app.on_click_import_obj(move || {
-        //         let slint_future = async move {
-        //             let binding = world_clone
-        //                 .borrow_mut();
-        //             let mut mesh_manager = binding
-        //                 .get_resource::<MeshResourceManager>()
-        //                 .unwrap();
-        //             open_files_from_dialog(&mut mesh_manager).await;
-        //         };
-        //         slint::spawn_local(async_compat::Compat::new(slint_future)).unwrap();
-        //     });
-        // }
     }
 
     // Run the Slint application

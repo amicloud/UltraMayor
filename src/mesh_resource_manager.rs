@@ -4,7 +4,7 @@ use crate::{mesh::Mesh, renderer::Renderer};
 
 #[derive(Default, Resource)]
 pub struct MeshResourceManager {
-    meshes: std::collections::HashMap<u32, Mesh>,
+    pub meshes: std::collections::HashMap<u32, Mesh>,
 }
 
 impl MeshResourceManager {
