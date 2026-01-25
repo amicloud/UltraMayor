@@ -32,6 +32,7 @@ pub struct Renderer {
     displayed_texture: RenderTexture,
     next_texture: RenderTexture,
     camera: Camera,
+    frames_rendered: u64,
 }
 pub struct RenderParams {
     pub width: u32,
@@ -223,6 +224,7 @@ impl Renderer {
                 visualize_normals_location,
                 visualize_edges_location,
                 edge_thickness_location,
+                frames_rendered: 0
             };
             me
         }
@@ -306,7 +308,6 @@ impl Renderer {
                 let mut per_mesh_instances: HashMap<u32, Vec<[f32; 16]>> = HashMap::new();
 
                 for inst in instances.iter() {
-                    // Get the mesh's AABB
                     let mesh = meshes.get_mesh(inst.mesh_id).expect("mesh not found");
                     
                     let scale = inst.transform.fixed_view::<3,3>(0,0).abs().max(); // conservative
@@ -375,10 +376,15 @@ impl Renderer {
                     saved_viewport[3],
                 );
             });
-            println!(
-                "Render time: {:.2} ms",
-                current_time.elapsed().as_secs_f32() * 1000.0
-            );
+            self.frames_rendered += 1;
+            if self.frames_rendered % 60 == 0  {
+                println!("Frames rendered: {}", self.frames_rendered);
+                println!(
+                    "Render time: {:.2} ms",
+                    current_time.elapsed().as_secs_f32() * 1000.0
+                );
+            }
+            
 
             gl.use_program(None);
         }
