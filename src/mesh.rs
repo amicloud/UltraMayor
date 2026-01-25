@@ -85,6 +85,56 @@ impl Vertex {
     }
 }
 
+#[allow(dead_code)]
+#[derive(Default, Clone)]
+pub struct AABB {
+    min: Vector3<f32>,
+    max: Vector3<f32>,
+}
+
+#[allow(dead_code)]
+impl AABB {
+    #[allow(dead_code)]
+    fn intersect_ray(&self, ray_origin: Vector3<f32>, ray_dir: Vector3<f32>) -> bool {
+        let inv_dir = Vector3::new(1.0 / ray_dir.x, 1.0 / ray_dir.y, 1.0 / ray_dir.z);
+
+        let t1 = (self.min.x - ray_origin.x) * inv_dir.x;
+        let t2 = (self.max.x - ray_origin.x) * inv_dir.x;
+        let t3 = (self.min.y - ray_origin.y) * inv_dir.y;
+        let t4 = (self.max.y - ray_origin.y) * inv_dir.y;
+        let t5 = (self.min.z - ray_origin.z) * inv_dir.z;
+        let t6 = (self.max.z - ray_origin.z) * inv_dir.z;
+
+        let tmin = t1.min(t2).max(t3.min(t4)).max(t5.min(t6));
+        let tmax = t1.max(t2).min(t3.max(t4)).min(t5.max(t6));
+
+        tmax >= tmin.max(0.0)
+    }
+
+    #[allow(dead_code)]
+    fn from_vertices(vertices: &Vec<crate::mesh::Vertex>) -> Self {
+        // Initialize min and max with the first vertex
+        let mut min = vertices[0];
+        let mut max = vertices[0];
+
+        // Iterate over all vertices to find min and max values
+        for vertex in vertices.iter() {
+            min.position[0] = min.position[0].min(vertex.position[0]);
+            min.position[1] = min.position[1].min(vertex.position[1]);
+            min.position[2] = min.position[2].min(vertex.position[2]);
+
+            max.position[0] = max.position[0].max(vertex.position[0]);
+            max.position[1] = max.position[1].max(vertex.position[1]);
+            max.position[2] = max.position[2].max(vertex.position[2]);
+        }
+
+        AABB {
+            min: min.position.into(),
+            max: max.position.into(),
+        }
+    }
+}
+
 #[derive(Default, Clone)]
 pub struct Mesh {
     pub id: u32,

@@ -4,7 +4,6 @@
 mod action;
 mod action_manager;
 mod basic_physics_system;
-mod body;
 mod camera;
 mod material;
 mod mesh;
@@ -162,7 +161,8 @@ fn main() {
                             .get_resource_mut::<MeshResourceManager>()
                             .unwrap()
                             .add_mesh(
-                                Mesh::from_obj(OsStr::new("resources/models/utah_teapot.obj")).unwrap(),
+                                Mesh::from_obj(OsStr::new("resources/models/utah_teapot.obj"))
+                                    .unwrap(),
                                 &gl,
                             );
 

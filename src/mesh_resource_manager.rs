@@ -24,7 +24,6 @@ impl MeshResourceManager {
         self.meshes.get_mut(&mesh_id)
     }
 
-    
     #[allow(dead_code)]
     pub fn remove_mesh(&mut self, mesh_id: u32, renderer: &Renderer) {
         if let Some(mut mesh) = self.meshes.remove(&mesh_id) {

@@ -335,7 +335,7 @@ impl Renderer {
                     (material.can_visualize_edges && render_params.visualize_edges) as u32,
                 );
                 gl.uniform_1_f32(Some(&self.edge_thickness_location), 3.0);
-                // Rendering Loop 
+                // Rendering Loop
                 for (mesh_id, matrices) in per_mesh_instances {
                     let mesh = meshes.get_mesh_mut(mesh_id).expect("mesh not found");
 
