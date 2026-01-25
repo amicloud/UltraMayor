@@ -304,6 +304,8 @@ impl Renderer {
                     default_light_color.z,
                 );
                 // Rendering Loop
+                let frame_time = std::time::Instant::now();
+                let mut num_draw_calls: i32 = 0;
                 for instance in instances.iter() {
                     let mesh = meshes.get_mesh(instance.mesh_id).unwrap();
 
@@ -349,7 +351,13 @@ impl Renderer {
                         glow::UNSIGNED_INT,
                         0,
                     );
+                    num_draw_calls += 1;
                 }
+                println!(
+                    "Frame rendered in {:?}, draw calls: {}",
+                    frame_time.elapsed(),
+                    num_draw_calls
+                );
 
                 // Unbind the buffers
                 gl.bind_vertex_array(None);
