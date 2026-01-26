@@ -10,12 +10,16 @@ use std::fs::File;
 use std::io::BufReader;
 use std::{hash::Hash, hash::Hasher};
 
+use crate::handles::MeshHandle;
+
 #[repr(C)]
 #[derive(Default, Clone, Pod, Copy, Debug)]
 pub struct Vertex {
     pub position: [f32; 3],
     pub normal: [f32; 3],
     pub barycentric: [f32; 3],
+    pub uv_albedo: [f32; 2],
+    pub uv_normal: [f32; 2],
 }
 
 impl PartialEq for Vertex {
@@ -32,6 +36,8 @@ unsafe impl Zeroable for Vertex {
             position: [0.0, 0.0, 0.0],
             normal: [0.0, 0.0, 0.0],
             barycentric: [0.0, 0.0, 0.0],
+            uv_albedo: [0.0, 0.0],
+            uv_normal: [0.0, 0.0],
         }
     }
 }
@@ -46,15 +52,6 @@ impl Hash for Vertex {
 }
 
 impl Vertex {
-    #[allow(dead_code)]
-    pub fn new(position: [f32; 3], normal: [f32; 3], barycentric: [f32; 3]) -> Self {
-        Self {
-            position,
-            normal,
-            barycentric,
-        }
-    }
-
     fn rounded_bits(f: f32, decimal_places: u32) -> u32 {
         // Calculate the scaling factor based on desired decimal places
         let scale = 10f32.powi(decimal_places as i32);
@@ -77,11 +74,6 @@ impl Vertex {
     /// Helper method to get bit representation of normal
     fn barycentric_bits(&self) -> [u32; 3] {
         self.barycentric.map(|f| Self::rounded_bits(f, 5))
-    }
-
-    #[allow(dead_code)]
-    pub fn get_position_vector3(&self) -> Vector3<f32> {
-        Vector3::new(self.position[0], self.position[1], self.position[2])
     }
 }
 
@@ -132,13 +124,11 @@ impl AABB {
             max: max.position.into(),
         }
     }
-
-    
 }
 
 #[derive(Default, Clone)]
 pub struct Mesh {
-    pub id: u32,
+    pub id: MeshHandle,
     pub vertices: Vec<Vertex>,
     pub indices: Vec<u32>,
     pub aabb: AABB,
@@ -162,8 +152,7 @@ impl Mesh {
             let vao = gl.create_vertex_array().unwrap();
             let vbo = gl.create_buffer().unwrap();
             let ebo = gl.create_buffer().unwrap();
-
-            let instance_vbo = gl.create_buffer().expect("create instance VBO");
+            let instance_vbo = gl.create_buffer().unwrap();
 
             gl.bind_vertex_array(Some(vao));
 
@@ -183,56 +172,38 @@ impl Mesh {
                 glow::STATIC_DRAW,
             );
 
-            let vertex_stride: i32 = std::mem::size_of::<Vertex>() as i32;
-            let position_size = 3;
-            let normal_size = 3;
-            let barycentric_size = 3;
+            let stride = std::mem::size_of::<Vertex>() as i32;
 
-            // Offsets
+            // Offsets in floats
             let position_offset = 0;
-            let normal_offset = position_offset + position_size;
-            let barycentric_offset = normal_offset + normal_size;
+            let normal_offset = 3;
+            let bary_offset = normal_offset + 3;
+            let uv_albedo_offset = bary_offset + 3;
+            let uv_normal_offset = uv_albedo_offset + 2;
 
-            // Enable attributes
+            // Enable vertex attributes (per-vertex)
             gl.enable_vertex_attrib_array(0); // position
-            gl.vertex_attrib_pointer_f32(
-                0,
-                position_size,
-                glow::FLOAT,
-                false,
-                vertex_stride,
-                position_offset * 4,
-            );
+            gl.vertex_attrib_pointer_f32(0, 3, glow::FLOAT, false, stride, position_offset * 4);
 
             gl.enable_vertex_attrib_array(1); // normal
-            gl.vertex_attrib_pointer_f32(
-                1,
-                normal_size,
-                glow::FLOAT,
-                true,
-                vertex_stride,
-                normal_offset * 4,
-            );
+            gl.vertex_attrib_pointer_f32(1, 3, glow::FLOAT, true, stride, normal_offset * 4);
 
             gl.enable_vertex_attrib_array(2); // barycentric
-            gl.vertex_attrib_pointer_f32(
-                2,
-                barycentric_size,
-                glow::FLOAT,
-                true,
-                vertex_stride,
-                barycentric_offset * 4,
-            );
+            gl.vertex_attrib_pointer_f32(2, 3, glow::FLOAT, true, stride, bary_offset * 4);
 
-            // Instance buffer: reserve no data yet (we'll upload per-frame when we know instance count)
+            gl.enable_vertex_attrib_array(3); // uv_albedo
+            gl.vertex_attrib_pointer_f32(3, 2, glow::FLOAT, false, stride, uv_albedo_offset * 4);
+
+            gl.enable_vertex_attrib_array(4); // uv_normal
+            gl.vertex_attrib_pointer_f32(4, 2, glow::FLOAT, false, stride, uv_normal_offset * 4);
+
+            // Instance buffer (model matrices)
             gl.bind_buffer(glow::ARRAY_BUFFER, Some(instance_vbo));
             gl.buffer_data_u8_slice(glow::ARRAY_BUFFER, &[], glow::DYNAMIC_DRAW);
 
-            // The model matrix is 4 vec4 attributes at locations 3..6.
-            // Stride = 4 * vec4 = 64 bytes, offsets = 0, 16, 32, 48
-            let mat_stride = (16 * std::mem::size_of::<f32>()) as i32; // 64 bytes
+            let mat_stride = 16 * 4; // 16 floats * 4 bytes
             for i in 0..4 {
-                let loc = 3 + i; // 3,4,5,6
+                let loc = 5 + i; // locations 5,6,7,8
                 gl.enable_vertex_attrib_array(loc);
                 gl.vertex_attrib_pointer_f32(
                     loc,
@@ -240,14 +211,9 @@ impl Mesh {
                     glow::FLOAT,
                     false,
                     mat_stride,
-                    (i * 16) as i32, // offset in bytes (i * vec4 size = i * 16 bytes? careful)
+                    (i * 4 * 4) as i32, // i * vec4 size in bytes
                 );
-                // Important: the offset argument of vertex_attrib_pointer_f32 expects bytes.
-                // (i * 16) is wrong if we think in bytes; correct is (i * 16) bytes? Actually each vec4 is 4 floats -> 16 bytes.
-                // So use i * 16 (bytes), but because vertex_attrib_pointer_f32 expects i32 offset in BYTES, we compute:
-                // (i * 16) // 16 bytes per vec4
-                // Here we used (i * 16) already (it is bytes).
-                gl.vertex_attrib_divisor(loc, 1); // this makes it per-instance
+                gl.vertex_attrib_divisor(loc, 1);
             }
 
             gl.bind_vertex_array(None);
@@ -285,25 +251,28 @@ impl Mesh {
         let obj: Obj = load_obj(input)?;
         let mut mesh = Mesh::default();
 
-        #[inline]
-        pub fn f32x3_to_f32x3(v: [f32; 3]) -> [f32; 3] {
-            [v[0] as f32, v[1] as f32, v[2] as f32]
-        }
-
         mesh.vertices = obj
             .vertices
             .into_iter()
             .map(|pos| Vertex {
-                position: f32x3_to_f32x3(pos.position),
-                normal: f32x3_to_f32x3(pos.normal),
+                position: pos.position,
+                normal: pos.normal,
                 barycentric: [0.0, 0.0, 0.0],
+                uv_albedo: [
+                    (pos.position[0] + 0.5), // X mapped 0→1
+                    (pos.position[1] + 0.5), // Y mapped 0→1
+                ],
+                uv_normal: [
+                    (pos.position[0] + 0.5), // X mapped 0→1
+                    (pos.position[1] + 0.5), // Y mapped 0→1
+                ],
             })
             .collect();
         mesh.indices = obj.indices.iter().map(|&i| i as u32).collect();
         mesh.id = {
             let mut hasher = std::collections::hash_map::DefaultHasher::new();
             path.hash(&mut hasher);
-            hasher.finish() as u32
+            MeshHandle(hasher.finish() as u32)
         };
 
         mesh.aabb = AABB::from_vertices(&mesh.vertices);

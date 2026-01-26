@@ -8,21 +8,24 @@ in vec3 v_normal;          // Interpolated normal from vertex shader
 in vec3 v_view_dir;        // View direction from vertex shader
 in vec3 v_barycentric;     // Barycentric coordinates
 in vec3 v_camera_position; // Camera position passed from vertex shader
+in vec2 v_uv_albedo;    // Albedo texture UV coordinates
+in vec2 v_uv_normal;    // Normal map texture UV coordinates
 
 // Output Color
 out vec4 fragColor;
 
 // Uniforms for Lighting and Material Properties
-uniform vec3 light_direction;     // Light direction
-uniform vec3 light_color;         // Light color
-uniform vec3 albedo;              // Surface albedo
-uniform float roughness;          // Surface roughness
-uniform vec3 base_reflectance;    // Reflectance at normal incidence (F0)
-uniform bool visualize_normals;   // Toggle normal visualization
+uniform sampler2D u_albedo;       // Albedo texture
+uniform sampler2D u_normal;       // Normal map texture
+uniform vec3 u_light_direction;     // Light direction
+uniform vec3 u_light_color;         // Light color
+uniform float u_roughness;          // Surface roughness
+uniform vec3 u_base_reflectance;    // Reflectance at normal incidence (F0)
+uniform bool u_visualize_normals;   // Toggle normal visualization
 
 // Uniforms for Edge Visualization
-uniform bool visualize_edges;     // Toggle edge visualization
-uniform float edge_thickness;    // Thickness of the edge lines
+uniform bool u_visualize_edges;     // Toggle edge visualization
+uniform float u_edge_thickness;     // Thickness of the edge lines
 
 // Constants
 const float PI = 3.14159265359;
@@ -61,17 +64,29 @@ vec3 diffuseLambert(vec3 albedo) {
 }
 
 void main() {
+
+    vec4 albedo = texture(u_albedo, v_uv_albedo);
+    vec3 n = texture(u_normal, v_uv_normal).xyz * 2.0 - 1.0;
     // Normalize the interpolated normal and view direction
-    vec3 N = normalize(v_normal);
+    vec3 N_initial = normalize(v_normal);
+
+    // Use the normal map
+    vec3 N_map = normalize(n); // n is from u_normal
+    // Optionally combine with vertex normal
+    vec3 N = normalize(N_initial + N_map); // simple additive blend
+
+    
     vec3 V = normalize(v_view_dir);
-    vec3 L = normalize(light_direction);
+    vec3 L = normalize(u_light_direction);
     vec3 H = normalize(V + L); // Halfway vector between light and view direction
 
+    
+    
     // Roughness squared (alpha)
-    float alpha = roughness * roughness;
+    float alpha = u_roughness * u_roughness;
 
     // Fresnel reflectance at normal incidence
-    vec3 F0 = base_reflectance;
+    vec3 F0 = u_base_reflectance;
 
     // Fresnel term (F), geometry (G), and normal distribution function (D)
     vec3 F_spec = F(F0, V, H);
@@ -82,24 +97,24 @@ void main() {
     vec3 specularBRDF = (F_spec * G_spec * D_spec) / (4.0 * max(dot(N, V), 0.0) * max(dot(N, L), 0.0) + 0.000001); // Avoid division by zero
 
     // Diffuse component (Lambertian)
-    vec3 diffuseBRDF = diffuseLambert(albedo);
+    vec3 diffuseBRDF = diffuseLambert(albedo.rgb);
 
     // Light intensity (without distance-based attenuation)
-    vec3 lightIntensity = light_color;
+    vec3 lightIntensity = u_light_color;
     vec3 ambientLight = vec3(0.25, 0.25, 0.25); // Basic ambient light
-    vec3 normal_color = v_normal * 0.5 * float(visualize_normals);  
+    vec3 normal_color = v_normal * 0.5 * float(u_visualize_normals);  
 
     // Combine diffuse and specular contributions
     vec3 color = normal_color + ambientLight + (diffuseBRDF + specularBRDF) * lightIntensity * max(dot(N, L), 0.0);
 
      // Edge Visualization
-    if (visualize_edges) {
+    if (u_visualize_edges) {
         // Tchayen Edge Computation with smoothstep
         vec3 tchayen_d = fwidth(v_barycentric); // Compute the derivative for anti-aliasing
 
         // Define edge0 and edge1 for smoothstep based on edge_thickness and derivative
         // This defines a transition range where the edge smooths out
-        vec3 edge0 = (tchayen_d * edge_thickness)/10.0;
+        vec3 edge0 = (tchayen_d * u_edge_thickness)/10.0;
         vec3 edge1 = edge0 + tchayen_d;
 
         // Apply smoothstep instead of step for smooth transitions

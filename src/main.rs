@@ -5,19 +5,26 @@ mod action;
 mod action_manager;
 mod basic_physics_system;
 mod camera;
+mod frustum;
+mod handles;
 mod material;
+mod material_component;
+mod material_resource_manager;
 mod mesh;
 mod mesh_component;
 mod mesh_resource_manager;
+mod render_data_manager;
 mod render_instance;
 mod render_queue;
 mod render_system;
 mod render_texture;
 mod renderer;
 mod settings;
+mod shader;
+mod texture;
+mod texture_resource_manager;
 mod transform_component;
 mod velocity_component;
-mod frustum;
 use action_manager::ActionManager;
 use bevy_ecs::prelude::*;
 use glow::Context as GlowContext;
@@ -38,13 +45,18 @@ slint::include_modules!();
 use log::error;
 
 use crate::basic_physics_system::BasicPhysicsSystem;
+use crate::handles::MaterialHandle;
+use crate::handles::TextureHandle;
+use crate::material_component::MaterialComponent;
 use crate::mesh::Mesh;
 use crate::mesh_component::MeshComponent;
 use crate::mesh_resource_manager::MeshResourceManager;
+use crate::render_data_manager::RenderDataManager;
 use crate::render_instance::RenderInstance;
 use crate::render_queue::RenderQueue;
 use crate::render_system::RenderSystem;
 use crate::renderer::RenderParams;
+use crate::shader::Shader;
 use crate::transform_component::TransformComponent;
 use crate::velocity_component::VelocityComponent;
 #[derive(Default)]
@@ -69,7 +81,7 @@ type SharedActionManager = Arc<Mutex<ActionManager>>;
 #[allow(dead_code)]
 struct AppState {
     mouse_state: SharedMouseState,
-    shared_mesh_renderer: SharedMeshRenderer,
+    shared_renderer: SharedMeshRenderer,
     shared_settings: SharedSettings,
     shared_action_manager: SharedActionManager,
 }
@@ -86,6 +98,11 @@ fn main() {
         .borrow_mut()
         .insert_resource(MeshResourceManager::default());
     world.borrow_mut().insert_resource(RenderQueue::default());
+    world
+        .borrow_mut()
+        .insert_resource(RenderDataManager::default());
+
+    // world.borrow_mut().insert_resource()
 
     let schedule = Rc::new(RefCell::new({
         let mut s = Schedule::default();
@@ -112,7 +129,7 @@ fn main() {
 
     let state = AppState {
         mouse_state: Rc::new(RefCell::new(MouseState::default())),
-        shared_mesh_renderer: Rc::new(RefCell::new(None)),
+        shared_renderer: Rc::new(RefCell::new(None)),
         shared_settings: settings.clone(),
         shared_action_manager: Arc::new(Mutex::new(ActionManager::new())),
     };
@@ -121,7 +138,7 @@ fn main() {
         // Set the rendering notifier with a closure
         // Create a weak reference to the app for use inside the closure
         let app_weak_clone = app_weak.clone(); // Clone app_weak for use inside the closure
-        let mesh_renderer_clone = Rc::clone(&state.shared_mesh_renderer);
+        let renderer_clone = Rc::clone(&state.shared_renderer);
         let shared_settings = Arc::clone(&state.shared_settings);
         if let Err(error) = app.window().set_rendering_notifier({
             move |rendering_state, graphics_api| {
@@ -155,19 +172,43 @@ fn main() {
                             (1000.0 * render_scale) as u32,
                             (1000.0 * render_scale) as u32,
                         );
-                        *mesh_renderer_clone.borrow_mut() = Some(renderer);
+                        *renderer_clone.borrow_mut() = Some(renderer);
+                        let w = &mut world.borrow_mut();
+                        let mut render_data_manager =
+                            w.get_resource_mut::<RenderDataManager>().unwrap();
 
-                        let cube_mesh_id = world
-                            .borrow_mut()
-                            .get_resource_mut::<MeshResourceManager>()
-                            .unwrap()
-                            .add_mesh(
-                                Mesh::from_obj(OsStr::new("resources/models/cube.obj"))
-                                    .unwrap(),
-                                &gl,
-                            );
+                        let cube_mesh_id = render_data_manager.mesh_manager.add_mesh(
+                            Mesh::from_obj(OsStr::new("resources/models/cube.obj")).unwrap(),
+                            &gl,
+                        );
 
-                        for _ in 0..1000 {
+                        let albedo_id = render_data_manager.texture_manager.load_from_file(
+                            &gl,
+                            OsStr::new("resources/textures/cube_albedo.png"),
+                            TextureHandle(0),
+                        );
+                        let normal_id = render_data_manager.texture_manager.load_from_file(
+                            &gl,
+                            OsStr::new("resources/textures/cube_normal.png"),
+                            TextureHandle(1),
+                        );
+
+                        let m_handle = render_data_manager.material_manager.add_material(
+                            crate::material::Material {
+                                shader: Shader::new(
+                                    &gl,
+                                    OsStr::new("resources/shaders/pbr.vert"),
+                                    OsStr::new("resources/shaders/pbr.frag"),
+                                ),
+                                id: MaterialHandle { 0: 0 },
+                                roughness: 0.5,
+                                albedo: Some(albedo_id),
+                                normal: Some(normal_id),
+                                base_reflectance: 0.04,
+                            },
+                        );
+
+                        for _ in 0..100 {
                             // Random position
                             let pos = Vector3::new(
                                 random_range(-10.0..10.0),
@@ -177,9 +218,9 @@ fn main() {
 
                             // Random translational velocity
                             let translational = Vector3::new(
-                                random_range(-5.0..5.0),
-                                random_range(-5.0..5.0),
-                                random_range(-5.0..5.0),
+                                random_range(-1.0..1.0),
+                                random_range(-1.0..1.0),
+                                random_range(-1.0..1.0),
                             );
 
                             // Random angular velocity
@@ -190,7 +231,7 @@ fn main() {
                             );
 
                             // Spawn cube
-                            world.borrow_mut().spawn((
+                            w.spawn((
                                 TransformComponent {
                                     position: pos,
                                     rotation: nalgebra::UnitQuaternion::identity(),
@@ -203,12 +244,15 @@ fn main() {
                                 MeshComponent {
                                     mesh_id: cube_mesh_id,
                                 },
+                                MaterialComponent {
+                                    material_id: m_handle,
+                                },
                             ));
                         }
                     }
                     slint::RenderingState::BeforeRendering => {
                         // Access the renderer
-                        if let Some(renderer) = mesh_renderer_clone.borrow_mut().as_mut() {
+                        if let Some(renderer) = renderer_clone.borrow_mut().as_mut() {
                             if let Some(app) = app_weak_clone.upgrade() {
                                 // Get the requested texture size for current window size
                                 let height = app.get_requested_texture_height() as f32;
@@ -227,18 +271,18 @@ fn main() {
                                     let render_queue = w
                                         .get_resource::<RenderQueue>()
                                         .expect("RenderQueue resource not found");
-
                                     render_queue.instances.clone()
-                                }; // <- immutable borrow ends HERE
-
-                                // 2. Now mutable borrow is legal
-                                let mut mesh_manager = w
-                                    .get_resource_mut::<MeshResourceManager>()
-                                    .expect("MeshResourceManager resource not found");
+                                };
+                                let mut render_data_manager = w
+                                    .get_resource_mut::<RenderDataManager>()
+                                    .expect("RenderDataManager resource not found");
 
                                 // 3. Render
-                                let texture =
-                                    renderer.render(render_params, &mut *mesh_manager, &instances);
+                                let texture = renderer.render(
+                                    render_params,
+                                    &mut *render_data_manager,
+                                    instances,
+                                );
 
                                 app.set_texture(texture);
                                 app.set_visualize_edges(renderer_settings.visualize_edges);
@@ -255,7 +299,7 @@ fn main() {
                         println!["Rendering teardown"];
                         // Clean up the renderer
 
-                        *mesh_renderer_clone.borrow_mut() = None;
+                        *renderer_clone.borrow_mut() = None;
                     }
                     _ => {}
                 }
@@ -274,7 +318,7 @@ fn main() {
     // Handler for scrollwheel/scroll gesture
     {
         let app_weak_clone = app_weak.clone(); // Clone app_weak again for this closure
-        let mesh_renderer_clone = Rc::clone(&state.shared_mesh_renderer); // Clone mesh_renderer for this closure
+        let mesh_renderer_clone = Rc::clone(&state.shared_renderer); // Clone mesh_renderer for this closure
         app.on_mouse_scroll(move |amt| {
             // Access the renderer
             if let Some(renderer) = mesh_renderer_clone.borrow_mut().as_mut() {
@@ -292,7 +336,7 @@ fn main() {
     // Handler for mouse movement in renderer
     {
         let app_weak_clone = app_weak.clone(); // Clone app_weak again for this closure
-        let mesh_renderer_clone = Rc::clone(&state.shared_mesh_renderer); // Clone mesh_renderer for this closure
+        let mesh_renderer_clone = Rc::clone(&state.shared_renderer); // Clone mesh_renderer for this closure
         let mouse_state_clone = Rc::clone(&state.mouse_state);
         app.on_mouse_move_renderer(move |x, y| {
             debug!("On mouse move event received");

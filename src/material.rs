@@ -1,28 +1,10 @@
-use nalgebra::Vector3;
-#[derive(Clone)]
+use crate::{handles::*, shader::Shader};
+
 pub struct Material {
+    pub shader: Shader,
+    pub id: MaterialHandle,
     pub roughness: f32,
-    pub albedo: Vector3<f32>,
-    pub base_reflectance: Vector3<f32>,
-    pub visualize_normals: bool,
-    pub can_visualize_edges: bool,
-}
-
-impl Material {
-    pub fn default_resin() -> Material {
-        let reflectance_b = 0.05;
-        Self {
-            roughness: 0.35,
-            albedo: Vector3::new(0.75, 0.75, 0.75),
-            base_reflectance: Vector3::new(reflectance_b, reflectance_b, reflectance_b),
-            visualize_normals: true,
-            can_visualize_edges: true,
-        }
-    }
-}
-
-impl Default for Material {
-    fn default() -> Self {
-        Self::default_resin()
-    }
+    pub albedo: Option<TextureHandle>,
+    pub normal: Option<TextureHandle>,
+    pub base_reflectance: f32,
 }
