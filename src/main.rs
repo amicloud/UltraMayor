@@ -209,7 +209,7 @@ fn main() {
                             .add_material(Material::new(m_desc));
 
                         let t_range = 2.0;
-                        for _ in 0..100 {
+                        for _ in 0..10_000 {
                             // Random position
                             let pos = Vector3::new(
                                 random_range(-10.0..10.0),
