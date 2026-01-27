@@ -98,9 +98,7 @@ fn main() {
         .borrow_mut()
         .insert_resource(MeshResourceManager::default());
     world.borrow_mut().insert_resource(RenderQueue::default());
-    world
-        .borrow_mut()
-        .insert_resource(RenderDataManager::default());
+    world.borrow_mut().insert_resource(RenderDataManager::new());
 
     let schedule = Rc::new(RefCell::new({
         let mut s = Schedule::default();
@@ -175,6 +173,10 @@ fn main() {
                         let mut render_data_manager =
                             w.get_resource_mut::<RenderDataManager>().unwrap();
 
+                        render_data_manager
+                            .texture_manager
+                            .create_default_normal_map(&gl);
+
                         let cube_mesh_id = render_data_manager.mesh_manager.add_mesh(
                             Mesh::from_obj(OsStr::new("resources/models/cube.obj")).unwrap(),
                             &gl,
@@ -183,7 +185,7 @@ fn main() {
                         let albedo_id = render_data_manager
                             .texture_manager
                             .load_from_file(&gl, OsStr::new("resources/textures/cube_albedo.png"));
-                        let normal_id = render_data_manager
+                        let _normal_id = render_data_manager
                             .texture_manager
                             .load_from_file(&gl, OsStr::new("resources/textures/cube_normal.png"));
 
@@ -195,8 +197,8 @@ fn main() {
                             ),
                             0.5,
                             0.04,
-                            Some(albedo_id),
-                            Some(normal_id),
+                            albedo_id,
+                            None,
                         );
 
                         let m_handle = render_data_manager
@@ -269,7 +271,7 @@ fn main() {
                                     render_queue.instances.clone()
                                 };
 
-                                // 2. Get the render data manager 
+                                // 2. Get the render data manager
                                 let mut render_data_manager = w
                                     .get_resource_mut::<RenderDataManager>()
                                     .expect("RenderDataManager resource not found");

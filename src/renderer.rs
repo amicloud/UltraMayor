@@ -172,19 +172,28 @@ impl Renderer {
                     gl.uniform_1_f32(Some(&shader.u_edge_thickness_location), 1.0);
 
                     // Bind textures
-                    if let Some(albedo_tex) = material.desc.albedo {
-                        let tex = render_data_manager
-                            .texture_manager
-                            .get_texture(albedo_tex)
-                            .expect("Albedo texture missing");
-                        gl.active_texture(glow::TEXTURE0);
-                        gl.bind_texture(glow::TEXTURE_2D, tex.gl_tex);
-                        gl.uniform_1_i32(Some(&shader.u_albedo_location), 0);
-                    }
+                    let albedo_tex = material.desc.albedo;
+                    let tex = render_data_manager
+                        .texture_manager
+                        .get_texture(albedo_tex)
+                        .expect("Albedo texture missing");
+                    gl.active_texture(glow::TEXTURE0);
+                    gl.bind_texture(glow::TEXTURE_2D, tex.gl_tex);
+                    gl.uniform_1_i32(Some(&shader.u_albedo_location), 0);
+
+                    // Optional normal map
                     if let Some(normal_tex) = material.desc.normal {
                         let tex = render_data_manager
                             .texture_manager
                             .get_texture(normal_tex)
+                            .expect("Normal texture missing");
+                        gl.active_texture(glow::TEXTURE1);
+                        gl.bind_texture(glow::TEXTURE_2D, tex.gl_tex);
+                        gl.uniform_1_i32(Some(&shader.u_normal_location), 1);
+                    } else {
+                        let tex = render_data_manager
+                            .texture_manager
+                            .get_texture(render_data_manager.texture_manager.default_normal_map)
                             .expect("Normal texture missing");
                         gl.active_texture(glow::TEXTURE1);
                         gl.bind_texture(glow::TEXTURE_2D, tex.gl_tex);

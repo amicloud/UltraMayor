@@ -9,7 +9,7 @@ use crate::{handles::*, shader::Shader};
 pub struct MaterialDesc {
     pub shader: Shader,
     pub roughness: u32,
-    pub albedo: Option<TextureHandle>,
+    pub albedo: TextureHandle,
     pub normal: Option<TextureHandle>,
     pub base_reflectance: u32,
 }
@@ -19,7 +19,7 @@ impl MaterialDesc {
         shader: Shader,
         roughness: f32,
         base_reflectance: f32,
-        albedo: Option<TextureHandle>,
+        albedo: TextureHandle,
         normal: Option<TextureHandle>,
     ) -> Self {
         Self {
