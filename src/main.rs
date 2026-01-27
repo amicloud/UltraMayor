@@ -45,8 +45,6 @@ slint::include_modules!();
 use log::error;
 
 use crate::basic_physics_system::BasicPhysicsSystem;
-use crate::material::Material;
-use crate::material::MaterialDesc;
 use crate::material_component::MaterialComponent;
 use crate::mesh::Mesh;
 use crate::mesh_component::MeshComponent;
@@ -56,7 +54,6 @@ use crate::render_instance::RenderInstance;
 use crate::render_queue::RenderQueue;
 use crate::render_system::RenderSystem;
 use crate::renderer::RenderParams;
-use crate::shader::Shader;
 use crate::transform_component::TransformComponent;
 use crate::velocity_component::VelocityComponent;
 #[derive(Default)]
@@ -177,39 +174,28 @@ fn main() {
                             .texture_manager
                             .create_default_normal_map(&gl);
 
+                        let test_gltf = OsStr::new("resources/models/suzanne/Suzanne.gltf");
+
                         let test_object_id = render_data_manager.mesh_manager.add_mesh(
-                            Mesh::from_gltf(OsStr::new("resources/models/cube/Cube.gltf")).unwrap(),
+                            Mesh::from_gltf(test_gltf).unwrap(),
                             &gl,
                         );
 
-                        let albedo_id = render_data_manager.texture_manager.load_from_file(
-                            &gl,
-                            OsStr::new("resources/models/cube/Cube_BaseColor.png"),
-                        );
-
-                        let normal_id = render_data_manager.texture_manager.load_from_file(
-                            &gl,
-                            OsStr::new("resources/models/cube/Cube_Normal.png"),
-                        );
-
-                        let m_desc = MaterialDesc::new(
-                            Shader::new(
+                        let mut material_handles = render_data_manager
+                            .load_materials_from_gltf(
                                 &gl,
+                                test_gltf,
                                 OsStr::new("resources/shaders/pbr.vert"),
                                 OsStr::new("resources/shaders/pbr.frag"),
-                            ),
-                            0.5,
-                            0.04,
-                            albedo_id,
-                            Some(normal_id),
-                        );
+                            )
+                            .expect("Failed to load glTF materials");
 
-                        let m_handle = render_data_manager
-                            .material_manager
-                            .add_material(Material::new(m_desc));
+                        let m_handle = material_handles
+                            .pop()
+                            .expect("No materials found in glTF");
 
                         let t_range = 2.0;
-                        for _ in 0..10_000 {
+                        for _ in 0..1 {
                             // Random position
                             let pos = Vector3::new(
                                 random_range(-10.0..10.0),
@@ -240,7 +226,7 @@ fn main() {
                             // // Random angular velocity
                             // let angular = Vector3::zeros();
 
-                            let scale = 1.0;
+                            let scale = 10.0;
                             // Spawn test objects
                             w.spawn((
                                 TransformComponent {
