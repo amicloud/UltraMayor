@@ -3,6 +3,7 @@
 use approx::relative_eq;
 use bytemuck::{Pod, Zeroable};
 use glow::HasContext;
+use log::warn;
 use nalgebra::Vector3;
 use std::ffi::OsStr;
 use std::{hash::Hash, hash::Hasher};
@@ -282,9 +283,15 @@ impl Mesh {
 
         for gltf_mesh in gltf.meshes() {
             println!("Mesh #{}", gltf_mesh.index());
+            if gltf_mesh.index() > 0 {
+                warn!("Trying to load a glTF with more than 1 mesh, which is currently not supported.");
+            }
 
             for primitive in gltf_mesh.primitives() {
                 println!("- Primitive #{}", primitive.index());
+                if primitive.index() > 0 {
+                    warn!("Trying to load a glTF with more than 1 primitive, which is currently not supported.");
+                }
 
                 let reader = primitive.reader(|buffer| Some(&buffers[buffer.index()]));
 
