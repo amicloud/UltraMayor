@@ -31,7 +31,7 @@ use glow::Context as GlowContext;
 use glow::HasContext;
 use log::debug;
 use nalgebra::Vector3;
-// use rand::random_range;
+use rand::random_range;
 use renderer::Renderer;
 use settings::Settings;
 use slint::platform::PointerEventButton;
@@ -178,19 +178,19 @@ fn main() {
                             .create_default_normal_map(&gl);
 
                         let test_object_id = render_data_manager.mesh_manager.add_mesh(
-                            Mesh::from_gltf(OsStr::new("resources/models/suzanne/Suzanne.gltf"))
-                                .unwrap(),
+                            Mesh::from_gltf(OsStr::new("resources/models/cube/Cube.gltf")).unwrap(),
                             &gl,
                         );
 
                         let albedo_id = render_data_manager.texture_manager.load_from_file(
                             &gl,
-                            OsStr::new("resources/models/suzanne/Suzanne_BaseColor.png"),
+                            OsStr::new("resources/models/cube/Cube_BaseColor.png"),
                         );
 
-                        let normal_id = render_data_manager
-                            .texture_manager
-                            .load_from_file(&gl, OsStr::new("resources/models/normal_tangent_test/NormalTangentMirrorTest_Normal.png"));
+                        let normal_id = render_data_manager.texture_manager.load_from_file(
+                            &gl,
+                            OsStr::new("resources/models/cube/Cube_Normal.png"),
+                        );
 
                         let m_desc = MaterialDesc::new(
                             Shader::new(
@@ -201,52 +201,52 @@ fn main() {
                             0.5,
                             0.04,
                             albedo_id,
-                            None
+                            Some(normal_id),
                         );
 
                         let m_handle = render_data_manager
                             .material_manager
                             .add_material(Material::new(m_desc));
 
-                        for _ in 0..1 {
-                            // {
+                        let t_range = 2.0;
+                        for _ in 0..100 {
                             // Random position
-                            // let pos = Vector3::new(
-                            //     random_range(-10.0..10.0),
-                            //     random_range(-10.0..10.0),
-                            //     random_range(-10.0..10.0),
-                            // );
-
-                            // // Random translational velocity
-                            // let translational = Vector3::new(
-                            //     random_range(-1.0..1.0),
-                            //     random_range(-1.0..1.0),
-                            //     random_range(-1.0..1.0),
-                            // );
-
-                            // // Random angular velocity
-                            // let angular = Vector3::new(
-                            //     random_range(-1.0..1.0),
-                            //     random_range(-1.0..1.0),
-                            //     random_range(-1.0..1.0),
-                            // );
-
-                            // Static position
-                            let pos = Vector3::zeros();
+                            let pos = Vector3::new(
+                                random_range(-10.0..10.0),
+                                random_range(-10.0..10.0),
+                                random_range(-10.0..10.0),
+                            );
 
                             // Random translational velocity
-                            let translational = Vector3::zeros();
+                            let translational = Vector3::new(
+                                random_range(-t_range..t_range),
+                                random_range(-t_range..t_range),
+                                random_range(-t_range..t_range),
+                            );
 
                             // Random angular velocity
-                            let angular = Vector3::zeros();
+                            let angular = Vector3::new(
+                                random_range(-1.0..1.0),
+                                random_range(-1.0..1.0),
+                                random_range(-1.0..1.0),
+                            );
 
-                            let scale = 10.0;
+                            // Static position
+                            // let pos = Vector3::zeros();
+
+                            // // Random translational velocity
+                            // let translational = Vector3::zeros();
+
+                            // // Random angular velocity
+                            // let angular = Vector3::zeros();
+
+                            let scale = 1.0;
                             // Spawn test objects
                             w.spawn((
                                 TransformComponent {
                                     position: pos,
                                     rotation: nalgebra::UnitQuaternion::identity(),
-                                    scale: Vector3::new(scale,scale,scale),
+                                    scale: Vector3::new(scale, scale, scale),
                                 },
                                 VelocityComponent {
                                     translational,

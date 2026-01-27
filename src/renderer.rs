@@ -33,11 +33,13 @@ impl Renderer {
         unsafe {
             let gl = &self.gl;
             let current_time = std::time::Instant::now();
+            let mut draw_calls = 0;
 
             // Resize FBO texture if needed
             if self.next_texture.width != render_params.width
                 || self.next_texture.height != render_params.height
             {
+                println!("Resizing and making new? fbo texture");
                 let mut new_tex = RenderTexture::new(gl, render_params.width, render_params.height);
                 std::mem::swap(&mut self.next_texture, &mut new_tex);
             }
@@ -220,6 +222,7 @@ impl Renderer {
                             0,
                             matrices.len() as i32,
                         );
+                        draw_calls += 1;
                     }
 
                     // Unbind textures after drawing material
@@ -253,6 +256,7 @@ impl Renderer {
                     "Render time: {:.2} ms",
                     current_time.elapsed().as_secs_f32() * 1000.0
                 );
+                println!("Draw calls on last frame: {}", draw_calls);
             }
 
             result_texture
