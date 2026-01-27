@@ -36,20 +36,31 @@ void main() {
         instance_model_col3
     );
 
-    // Transform position to world space
+    // World position
     vec3 world_pos = vec3(instance_model * vec4(position, 1.0));
     gl_Position = u_view_proj * vec4(world_pos, 1.0);
 
-    // Compute world-space normal matrix
+    // Normal matrix
     mat3 normal_matrix = mat3(transpose(inverse(instance_model)));
+
+    // World-space normal
     vec3 N = normalize(normal_matrix * normal);
+
+    // World-space tangent (with Gram–Schmidt)
     vec3 T = normalize(normal_matrix * tangent.xyz);
-    vec3 B = cross(N, T) * tangent.w; // Apply tangent handedness
+    T = normalize(T - N * dot(N, T));
 
-    // Pass TBN to fragment shader
-    v_tbn = mat3(T, B, N);
+    // Reconstructed bitangent (glTF: tangent.w = handedness)
+    vec3 B = tangent.w * normalize(cross(N, T));
 
-    // Other interpolated outputs
+    // TBN matrix
+    v_tbn = mat3(
+        normalize(T),
+        normalize(B),
+        normalize(N)
+    );
+
+    // Other outputs
     v_normal = N;
     v_view_dir = normalize(u_camera_position - world_pos);
     v_barycentric = barycentric;

@@ -257,6 +257,7 @@ impl Mesh {
             println!("Mesh #{}", gltf_mesh.index());
 
             for primitive in gltf_mesh.primitives() {
+                
                 println!("- Primitive #{}", primitive.index());
 
                 let reader = primitive.reader(|buffer| Some(&buffers[buffer.index()]));
@@ -276,6 +277,7 @@ impl Mesh {
                     .read_tex_coords(0)
                     .ok_or("Mesh missing TEXCOORD_0")?
                     .into_f32()
+                    // .map(|[u, v]| [u, 1.0 - v])
                     .collect();
 
                 let tangents: Vec<[f32; 4]> = reader

@@ -22,8 +22,7 @@ impl TextureResourceManager {
     pub fn load_from_file(&mut self, gl: &Context, path: &OsStr) -> TextureHandle {
         // Load image with the `image` crate
         let img = image::open(path)
-            .expect("Failed to open texture image")
-            .flipv();
+            .expect("Failed to open texture image");
         let rgba = img.to_rgba8();
         let (width, height) = img.dimensions();
         let mut id: TextureHandle = {
