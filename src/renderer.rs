@@ -64,12 +64,12 @@ impl Renderer {
 
                 let camera = render_data_manager
                     .camera_manager
-                    .get_camera_mut(CameraHandle(0))
+                    .get_camera(CameraHandle(0))
                     .expect("Camera not found");
 
-                // Update camera
-                camera.set_aspect_ratio(render_params.width as f32 / render_params.height as f32);
-                let view_proj = camera.projection_matrix * camera.view_matrix();
+                let aspect_ratio = render_params.width as f32 / render_params.height as f32;
+                let projection_matrix = crate::camera::Camera::projection_matrix(aspect_ratio);
+                let view_proj = projection_matrix * camera.view_matrix();
 
                 // ------------------------------------------------------------
                 // PASS 1: Frustum culling

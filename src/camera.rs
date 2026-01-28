@@ -14,7 +14,6 @@ pub struct Camera {
     pitch: f32,       // Rotation around the X axis
     sensitivity: f32, // Mouse sensitivity
     distance: f32,    // Distance from the target for zooming
-    aspect_ratio: f32,
     pub projection_matrix: Matrix4<f32>,
 }
 
@@ -29,18 +28,10 @@ impl Camera {
             pitch: -45.0,
             sensitivity: 0.1, // Adjust as needed for mouse sensitivity
             distance: 100.0,  // Initial distance from the target
-            aspect_ratio,
             projection_matrix: Self::projection_matrix(aspect_ratio),
         };
         camera.update_camera_position();
         camera
-    }
-
-    pub fn set_aspect_ratio(&mut self, aspect_ratio: f32) {
-        if self.aspect_ratio != aspect_ratio {
-            self.aspect_ratio = aspect_ratio;
-            self.projection_matrix = Self::projection_matrix(aspect_ratio);
-        }
     }
 
     /// Returns the view matrix calculated using LookAt.
@@ -49,7 +40,7 @@ impl Camera {
     }
 
     /// Returns the projection matrix using a perspective projection.
-    fn projection_matrix(aspect_ratio: f32) -> Matrix4<f32> {
+    pub fn projection_matrix(aspect_ratio: f32) -> Matrix4<f32> {
         Matrix4::new_perspective(aspect_ratio, 75.0_f32.to_radians(), 0.1, 1000.0)
     }
 
