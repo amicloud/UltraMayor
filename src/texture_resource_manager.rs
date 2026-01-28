@@ -52,12 +52,7 @@ impl TextureResourceManager {
                 .flat_map(|rgb| [rgb[0], rgb[1], rgb[2], 255])
                 .collect(),
             Format::R8G8B8A8 => image.pixels.clone(),
-            _ => {
-                return Err(format!(
-                    "Unsupported glTF image format: {:?}",
-                    image.format
-                ))
-            }
+            _ => return Err(format!("Unsupported glTF image format: {:?}", image.format)),
         };
 
         Ok(rgba)
@@ -89,9 +84,7 @@ impl TextureResourceManager {
         gl: &Context,
         path: &OsStr,
     ) -> Result<HashMap<usize, TextureHandle>, Box<dyn Error>> {
-        let path_str = path
-            .to_str()
-            .ok_or("Invalid UTF-8 in glTF path")?;
+        let path_str = path.to_str().ok_or("Invalid UTF-8 in glTF path")?;
         let (gltf, _buffers, images) = gltf::import(path_str)?;
         self.load_from_gltf_data(gl, path, &gltf, &images)
     }

@@ -3,13 +3,9 @@ use std::error::Error;
 use std::ffi::OsStr;
 
 use crate::{
-    material::Material,
-    material::MaterialDesc,
-    material_resource_manager::MaterialResourceManager,
-    mesh_resource_manager::MeshResourceManager,
-    shader::Shader,
-    texture_resource_manager::TextureResourceManager,
-    camera_resource_manager::CameraResourceManager,
+    camera_resource_manager::CameraResourceManager, material::Material, material::MaterialDesc,
+    material_resource_manager::MaterialResourceManager, mesh_resource_manager::MeshResourceManager,
+    shader::Shader, texture_resource_manager::TextureResourceManager,
 };
 
 #[derive(Resource)]
@@ -37,9 +33,7 @@ impl RenderDataManager {
         vertex_shader: &OsStr,
         fragment_shader: &OsStr,
     ) -> Result<Vec<crate::handles::MaterialHandle>, Box<dyn Error>> {
-        let path_str = gltf_path
-            .to_str()
-            .ok_or("Invalid UTF-8 in glTF path")?;
+        let path_str = gltf_path.to_str().ok_or("Invalid UTF-8 in glTF path")?;
         let (gltf, _buffers, images) = gltf::import(path_str)?;
 
         let texture_map = self
@@ -71,7 +65,13 @@ impl RenderDataManager {
                 .and_then(|info| texture_map.get(&info.texture().index()).copied());
 
             let shader = Shader::new(gl, vertex_shader, fragment_shader);
-            let desc = MaterialDesc::new(shader, roughness, base_reflectance, albedo_handle, normal_handle);
+            let desc = MaterialDesc::new(
+                shader,
+                roughness,
+                base_reflectance,
+                albedo_handle,
+                normal_handle,
+            );
             let handle = self.material_manager.add_material(Material::new(desc));
             material_handles.push(handle);
         }

@@ -67,7 +67,7 @@ impl Camera {
     /// Expects the offset value in both the x and y direction.
     pub fn pitch_yaw(&mut self, delta_x: f32, delta_y: f32) {
         self.yaw += delta_x * self.sensitivity;
-        self.pitch += delta_y * self.sensitivity;
+        self.pitch -= delta_y * self.sensitivity;
 
         self.pitch = self.pitch.clamp(-89.9, 89.9);
 

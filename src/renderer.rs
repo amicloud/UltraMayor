@@ -1,6 +1,5 @@
 use std::rc::Rc;
 slint::include_modules!();
-use crate::camera::Camera;
 use crate::handles::CameraHandle;
 use crate::handles::MaterialHandle;
 use crate::handles::MeshHandle;
@@ -28,7 +27,7 @@ impl Renderer {
         &mut self,
         render_params: RenderParams,
         render_data_manager: &mut RenderDataManager,
-        instances: Vec<RenderInstance>
+        instances: Vec<RenderInstance>,
     ) -> slint::Image {
         unsafe {
             let gl = &self.gl;
@@ -39,7 +38,6 @@ impl Renderer {
             if self.next_texture.width != render_params.width
                 || self.next_texture.height != render_params.height
             {
-                println!("Resizing and making new? fbo texture");
                 let mut new_tex = RenderTexture::new(gl, render_params.width, render_params.height);
                 std::mem::swap(&mut self.next_texture, &mut new_tex);
             }
@@ -70,8 +68,7 @@ impl Renderer {
                     .expect("Camera not found");
 
                 // Update camera
-                camera
-                    .set_aspect_ratio(render_params.width as f32 / render_params.height as f32);
+                camera.set_aspect_ratio(render_params.width as f32 / render_params.height as f32);
                 let view_proj = camera.projection_matrix * camera.view_matrix();
 
                 // ------------------------------------------------------------
@@ -270,8 +267,6 @@ impl Renderer {
 
     pub fn new(gl: Rc<GlowContext>, width: u32, height: u32) -> Self {
         unsafe {
-            let aspect_ratio = width as f32 / height as f32;
-
             let depth_buffer = gl.create_renderbuffer().unwrap();
             gl.bind_renderbuffer(glow::RENDERBUFFER, Some(depth_buffer));
             gl.framebuffer_renderbuffer(

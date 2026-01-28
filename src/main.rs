@@ -5,6 +5,8 @@ mod action;
 mod action_manager;
 mod basic_physics_system;
 mod camera;
+mod camera_input;
+mod camera_resource_manager;
 mod frustum;
 mod handles;
 mod material;
@@ -25,9 +27,8 @@ mod texture;
 mod texture_resource_manager;
 mod transform_component;
 mod velocity_component;
-mod camera_component;
-mod camera_resource_manager;
 use action_manager::ActionManager;
+use bevy_ecs::message::Messages;
 use bevy_ecs::prelude::*;
 use glow::Context as GlowContext;
 use glow::HasContext;
@@ -36,7 +37,6 @@ use nalgebra::Vector3;
 use rand::random_range;
 use renderer::Renderer;
 use settings::Settings;
-use slint::platform::PointerEventButton;
 use slint::Timer;
 use std::cell::RefCell;
 use std::ffi::OsStr;
@@ -48,6 +48,9 @@ use log::error;
 
 use crate::basic_physics_system::BasicPhysicsSystem;
 use crate::camera::Camera;
+use crate::camera_input::{
+    apply_camera_input, update_camera_messages, ActiveCamera, CameraInputMessage, CameraInputState,
+};
 use crate::material_component::MaterialComponent;
 use crate::mesh::Mesh;
 use crate::mesh_component::MeshComponent;
@@ -60,6 +63,7 @@ use crate::renderer::RenderParams;
 use crate::transform_component::TransformComponent;
 use crate::velocity_component::VelocityComponent;
 #[derive(Default)]
+#[allow(dead_code)]
 struct MouseState {
     x: f32,
     y: f32,
@@ -99,13 +103,25 @@ fn main() {
         .insert_resource(MeshResourceManager::default());
     world.borrow_mut().insert_resource(RenderQueue::default());
     world.borrow_mut().insert_resource(RenderDataManager::new());
+    world
+        .borrow_mut()
+        .insert_resource(CameraInputState::default());
+    world.borrow_mut().insert_resource(ActiveCamera::default());
+    world
+        .borrow_mut()
+        .init_resource::<Messages<CameraInputMessage>>();
 
     let schedule = Rc::new(RefCell::new({
         let mut s = Schedule::default();
-        s.add_systems((
-            BasicPhysicsSystem::update,
-            RenderSystem::extract_render_data,
-        ));
+        s.add_systems(
+            (
+                BasicPhysicsSystem::update,
+                apply_camera_input,
+                RenderSystem::extract_render_data,
+                update_camera_messages,
+            )
+                .chain(),
+        );
         s
     }));
 
@@ -136,6 +152,7 @@ fn main() {
         let app_weak_clone = app_weak.clone(); // Clone app_weak for use inside the closure
         let renderer_clone = Rc::clone(&state.shared_renderer);
         let shared_settings = Arc::clone(&state.shared_settings);
+        let world = world.clone();
         if let Err(error) = app.window().set_rendering_notifier({
             move |rendering_state, graphics_api| {
                 match rendering_state {
@@ -169,11 +186,18 @@ fn main() {
                             (900.0 * render_scale) as u32,
                         );
                         *renderer_clone.borrow_mut() = Some(renderer);
-                        
+
                         let w = &mut world.borrow_mut();
-                        w.get_resource_mut::<RenderDataManager>().unwrap().camera_manager.add_camera(
-                            Camera::new(16.0 / 9.0),
-                        );
+                        let camera_handle = w
+                            .get_resource_mut::<RenderDataManager>()
+                            .unwrap()
+                            .camera_manager
+                            .add_camera(Camera::new(16.0 / 9.0));
+                        if let Some(mut active_camera) = w.get_resource_mut::<ActiveCamera>() {
+                            active_camera.0 = camera_handle;
+                        } else {
+                            w.insert_resource(ActiveCamera(camera_handle));
+                        }
 
                         let test_models = [
                             "resources/models/cube/Cube.gltf",
@@ -192,10 +216,9 @@ fn main() {
                             let mut objects = Vec::with_capacity(test_models.len());
                             for model_path in test_models {
                                 let test_gltf = OsStr::new(model_path);
-                                let test_object_id = render_data_manager.mesh_manager.add_mesh(
-                                    Mesh::from_gltf(test_gltf).unwrap(),
-                                    &gl,
-                                );
+                                let test_object_id = render_data_manager
+                                    .mesh_manager
+                                    .add_mesh(Mesh::from_gltf(test_gltf).unwrap(), &gl);
 
                                 let mut material_handles = render_data_manager
                                     .load_materials_from_gltf(
@@ -206,9 +229,8 @@ fn main() {
                                     )
                                     .expect("Failed to load glTF materials");
 
-                                let m_handle = material_handles
-                                    .pop()
-                                    .expect("No materials found in glTF");
+                                let m_handle =
+                                    material_handles.pop().expect("No materials found in glTF");
 
                                 objects.push((test_object_id, m_handle));
                             }
@@ -337,28 +359,52 @@ fn main() {
 
     // Handler for scrollwheel/scroll gesture
     {
+        let world = world.clone();
         app.on_mouse_scroll(move |amt| {
-            
+            if let Ok(mut w) = world.try_borrow_mut() {
+                let _ = w.write_message(CameraInputMessage::MouseScroll { delta: amt });
+            } else {
+                debug!("Skipping scroll input: world already borrowed");
+            }
         });
     }
 
     // Handler for mouse movement
     {
+        let world = world.clone();
         app.on_mouse_move_renderer(move |x, y| {
-            
+            if let Ok(mut w) = world.try_borrow_mut() {
+                let _ = w.write_message(CameraInputMessage::MouseMove { x, y: y });
+            } else {
+                debug!("Skipping mouse move input: world already borrowed");
+            }
         });
     }
 
     // Mouse down handler
     {
+        let world = world.clone();
         app.on_mouse_down_renderer(move |button| {
-            
+            if let Ok(mut w) = world.try_borrow_mut() {
+                let _ = w.write_message(CameraInputMessage::MouseDown {
+                    button: button.into(),
+                });
+            } else {
+                debug!("Skipping mouse down input: world already borrowed");
+            }
         });
     }
     // Mouse up handler
     {
+        let world = world.clone();
         app.on_mouse_up_renderer(move |button| {
-            
+            if let Ok(mut w) = world.try_borrow_mut() {
+                let _ = w.write_message(CameraInputMessage::MouseUp {
+                    button: button.into(),
+                });
+            } else {
+                debug!("Skipping mouse up input: world already borrowed");
+            }
         });
     }
 

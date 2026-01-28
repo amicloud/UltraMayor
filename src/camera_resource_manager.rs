@@ -1,6 +1,6 @@
 use bevy_ecs::prelude::*;
 
-use crate::{handles::CameraHandle, camera::Camera};
+use crate::{camera::Camera, handles::CameraHandle};
 
 #[derive(Default, Resource)]
 pub struct CameraResourceManager {
@@ -14,6 +14,7 @@ impl CameraResourceManager {
         id
     }
 
+    #[allow(dead_code)]
     pub fn get_camera(&self, camera_id: CameraHandle) -> Option<&Camera> {
         self.cameras.get(&camera_id)
     }
@@ -27,5 +28,3 @@ impl CameraResourceManager {
         self.cameras.remove(&camera_id);
     }
 }
-
-
