@@ -199,7 +199,7 @@ fn main() {
                             w.insert_resource(ActiveCamera(camera_handle));
                         }
 
-                        let test_models = [
+                        let test_gltfs = [
                             "resources/models/cube/Cube.gltf",
                             "resources/models/normal_tangent_test/NormalTangentMirrorTest.gltf",
                             "resources/models/suzanne/Suzanne.gltf",
@@ -213,10 +213,10 @@ fn main() {
                                 .texture_manager
                                 .create_default_normal_map(&gl);
 
-                            let mut objects = Vec::with_capacity(test_models.len());
-                            for model_path in test_models {
+                            let mut objects = Vec::with_capacity(test_gltfs.len());
+                            for model_path in test_gltfs {
                                 let test_gltf = OsStr::new(model_path);
-                                let test_object_id = render_data_manager
+                                let mesh_handle = render_data_manager
                                     .mesh_manager
                                     .add_mesh(Mesh::from_gltf(test_gltf).unwrap(), &gl);
 
@@ -232,13 +232,13 @@ fn main() {
                                 let m_handle =
                                     material_handles.pop().expect("No materials found in glTF");
 
-                                objects.push((test_object_id, m_handle));
+                                objects.push((mesh_handle, m_handle));
                             }
                             objects
                         };
 
                         let t_range = 2.0;
-                        for (test_object_id, m_handle) in test_objects {
+                        for (mesh_handle, material_handle) in test_objects {
                             // Random position
                             let pos = Vector3::new(
                                 random_range(-10.0..10.0),
@@ -282,10 +282,10 @@ fn main() {
                                     angular,
                                 },
                                 MeshComponent {
-                                    mesh_id: test_object_id,
+                                    mesh_id: mesh_handle,
                                 },
                                 MaterialComponent {
-                                    material_id: m_handle,
+                                    material_id: material_handle,
                                 },
                             ));
                         }
