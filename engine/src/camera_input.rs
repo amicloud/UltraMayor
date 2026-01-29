@@ -5,6 +5,7 @@ use bevy_ecs::message::{Message, MessageReader, Messages};
 use bevy_ecs::prelude::*;
 
 use crate::handles::CameraHandle;
+use crate::input::MouseButton;
 use crate::render_data_manager::RenderResourceManager;
 
 #[derive(Copy, Clone, Debug, Default, Resource)]
@@ -50,17 +51,6 @@ pub enum CameraInputMessage {
     MouseScroll { delta: f32 },
     MouseDown { button: MouseButton },
     MouseUp { button: MouseButton },
-}
-
-#[allow(dead_code)]
-#[derive(Copy, Clone, Debug)]
-pub enum MouseButton {
-    Left,
-    Middle,
-    Right,
-    Other,
-    Back,
-    Forward,
 }
 
 pub fn apply_camera_input(

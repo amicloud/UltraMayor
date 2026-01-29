@@ -9,6 +9,7 @@ mod camera_input;
 mod camera_resource;
 mod frustum;
 mod handles;
+mod input;
 mod material;
 mod material_component;
 mod material_resource;
@@ -42,8 +43,8 @@ use crate::basic_physics_system::BasicPhysicsSystem;
 use crate::camera::Camera;
 use crate::camera_input::{
     apply_camera_input, update_camera_messages, ActiveCamera, CameraInputMessage, CameraInputState,
-    MouseButton,
 };
+use crate::input::MouseButton;
 use crate::material_component::MaterialComponent;
 use crate::mesh::Mesh;
 use crate::mesh_component::MeshComponent;
@@ -248,14 +249,12 @@ impl Engine {
                                 camera_messages.write(CameraInputMessage::MouseScroll { delta });
                             }
                             sdl2::event::Event::MouseButtonDown { mouse_btn, .. } => {
-                                if let Some(button) = map_mouse_button(mouse_btn) {
-                                    camera_messages.write(CameraInputMessage::MouseDown { button });
-                                }
+                                let button = MouseButton::from(mouse_btn);
+                                camera_messages.write(CameraInputMessage::MouseDown { button });
                             }
                             sdl2::event::Event::MouseButtonUp { mouse_btn, .. } => {
-                                if let Some(button) = map_mouse_button(mouse_btn) {
-                                    camera_messages.write(CameraInputMessage::MouseUp { button });
-                                }
+                                let button = MouseButton::from(mouse_btn);
+                                camera_messages.write(CameraInputMessage::MouseUp { button });
                             }
                             _ => {}
                         }
@@ -332,16 +331,5 @@ impl Engine {
         let event_loop = sdl.event_pump().unwrap();
 
         (gl, window, event_loop, gl_context)
-    }
-}
-
-fn map_mouse_button(button: sdl2::mouse::MouseButton) -> Option<MouseButton> {
-    match button {
-        sdl2::mouse::MouseButton::Left => Some(MouseButton::Left),
-        sdl2::mouse::MouseButton::Middle => Some(MouseButton::Middle),
-        sdl2::mouse::MouseButton::Right => Some(MouseButton::Right),
-        sdl2::mouse::MouseButton::X1 => Some(MouseButton::Back),
-        sdl2::mouse::MouseButton::X2 => Some(MouseButton::Forward),
-        _ => Some(MouseButton::Other),
     }
 }
