@@ -29,8 +29,6 @@ mod velocity_component;
 use bevy_ecs::message::Messages;
 use bevy_ecs::prelude::*;
 use glow::HasContext;
-use nalgebra::Vector3;
-use rand::random_range;
 use renderer::Renderer;
 use std::ffi::OsStr;
 use std::rc::Rc;
@@ -44,17 +42,20 @@ use crate::camera_input::{
     apply_camera_input, update_camera_messages, ActiveCamera, CameraInputMessage, CameraInputState,
 };
 use crate::input::MouseButton;
-use crate::material_component::MaterialComponent;
+use crate::handles::CameraHandle;
 use crate::mesh::Mesh;
-use crate::mesh_component::MeshComponent;
 use crate::mesh_resource::MeshResource;
 use crate::render_data_manager::RenderResourceManager;
 use crate::render_instance::RenderInstance;
 use crate::render_queue::RenderQueue;
 use crate::render_system::RenderSystem;
 use crate::renderer::RenderParams;
-use crate::transform_component::TransformComponent;
-use crate::velocity_component::VelocityComponent;
+
+pub use crate::handles::{MaterialHandle, MeshHandle};
+pub use crate::material_component::MaterialComponent;
+pub use crate::mesh_component::MeshComponent;
+pub use crate::transform_component::TransformComponent;
+pub use crate::velocity_component::VelocityComponent;
 #[derive(Default)]
 #[allow(dead_code)]
 struct MouseState {
@@ -73,11 +74,18 @@ struct MouseState {
 pub struct Engine {
     pub world: World,
     pub schedule: Schedule,
+    gl: Rc<glow::Context>,
+    window: sdl2::video::Window,
+    events_loop: sdl2::EventPump,
+    _gl_context: sdl2::video::GLContext,
 }
 
 
 impl Engine {
     pub fn new() -> Self {
+        let (gl, window, events_loop, gl_context) = unsafe { Self::create_sdl2_context() };
+        let gl = Rc::new(gl);
+
         let mut world = World::new();
         world.insert_resource(MeshResource::default());
         world.insert_resource(RenderQueue::default());
@@ -97,15 +105,76 @@ impl Engine {
                     .chain(),
             );
         
-        Engine { world, schedule }
+        Engine {
+            world,
+            schedule,
+            gl,
+            window,
+            events_loop,
+            _gl_context: gl_context,
+        }
     }
+
+    pub fn load_gltf(&mut self, gltf_path: &OsStr) -> (MeshHandle, MaterialHandle) {
+        let gl = &self.gl;
+        let (mesh_handle, material_handle, camera_handle) = {
+            let mut render_data_manager = self
+                .world
+                .get_resource_mut::<RenderResourceManager>()
+                .expect("RenderResourceManager resource not found");
+
+            let camera_handle = if render_data_manager
+                .camera_manager
+                .get_camera(CameraHandle(0))
+                .is_none()
+            {
+                Some(
+                    render_data_manager
+                        .camera_manager
+                        .add_camera(Camera::new(16.0 / 9.0)),
+                )
+            } else {
+                None
+            };
+
+            render_data_manager
+                .texture_manager
+                .create_default_normal_map(gl);
+
+            let mesh_handle = render_data_manager
+                .mesh_manager
+                .add_mesh(Mesh::from_gltf(gltf_path).unwrap(), gl);
+
+            let mut material_handles = render_data_manager
+                .load_materials_from_gltf(
+                    gl,
+                    gltf_path,
+                    OsStr::new("resources/shaders/pbr.vert"),
+                    OsStr::new("resources/shaders/pbr.frag"),
+                )
+                .expect("Failed to load glTF materials");
+
+            let material_handle = material_handles
+                .pop()
+                .expect("No materials found in glTF");
+
+            (mesh_handle, material_handle, camera_handle)
+        };
+
+        if let Some(camera_handle) = camera_handle {
+            if let Some(mut active_camera) = self.world.get_resource_mut::<ActiveCamera>() {
+                active_camera.0 = camera_handle;
+            } else {
+                self.world.insert_resource(ActiveCamera(camera_handle));
+            }
+        }
+
+        (mesh_handle, material_handle)
+    }
+
     pub fn run(&mut self) {
         unsafe {
-            let (gl, window, mut events_loop, _context) = Self::create_sdl2_context();
-
-            
-
-            let gl = Rc::new(gl); // Wrap in Rc for shared ownership
+            let gl = self.gl.clone();
             let version = gl.get_parameter_string(glow::VERSION);
             println!("OpenGL Version: {}", version);
 
@@ -120,109 +189,6 @@ impl Engine {
             );
             // Initialize renderer
             let mut renderer = Renderer::new(gl.clone());
-
-            let camera_handle = self.world
-                .get_resource_mut::<RenderResourceManager>()
-                .unwrap()
-                .camera_manager
-                .add_camera(Camera::new(16.0 / 9.0));
-            if let Some(mut active_camera) = self.world.get_resource_mut::<ActiveCamera>() {
-                active_camera.0 = camera_handle;
-            } else {
-                self.world.insert_resource(ActiveCamera(camera_handle));
-            }
-
-            let test_gltfs = [
-                "resources/models/cube/Cube.gltf",
-                "resources/models/normal_tangent_test/NormalTangentMirrorTest.gltf",
-                "resources/models/suzanne/Suzanne.gltf",
-            ];
-
-            let test_objects = {
-                let mut render_data_manager =
-                    self.world.get_resource_mut::<RenderResourceManager>().unwrap();
-
-                render_data_manager
-                    .texture_manager
-                    .create_default_normal_map(&gl);
-
-                let mut objects = Vec::with_capacity(test_gltfs.len());
-                for model_path in test_gltfs {
-                    let test_gltf = OsStr::new(model_path);
-                    let mesh_handle = render_data_manager
-                        .mesh_manager
-                        .add_mesh(Mesh::from_gltf(test_gltf).unwrap(), &gl);
-
-                    let mut material_handles = render_data_manager
-                        .load_materials_from_gltf(
-                            &gl,
-                            test_gltf,
-                            OsStr::new("resources/shaders/pbr.vert"),
-                            OsStr::new("resources/shaders/pbr.frag"),
-                        )
-                        .expect("Failed to load glTF materials");
-
-                    let m_handle = material_handles.pop().expect("No materials found in glTF");
-
-                    objects.push((mesh_handle, m_handle));
-                }
-                objects
-            };
-
-            let t_range = 2.0;
-            for _ in 0..5 {
-                for (mesh_handle, material_handle) in &test_objects {
-                    // Random position
-                    let pos = Vector3::new(
-                        random_range(-10.0..10.0),
-                        random_range(-10.0..10.0),
-                        random_range(-10.0..10.0),
-                    );
-
-                    // Random translational velocity
-                    let translational = Vector3::new(
-                        random_range(-t_range..t_range),
-                        random_range(-t_range..t_range),
-                        random_range(-t_range..t_range),
-                    );
-
-                    // Random angular velocity
-                    let angular = Vector3::new(
-                        random_range(-1.0..1.0),
-                        random_range(-1.0..1.0),
-                        random_range(-1.0..1.0),
-                    );
-
-                    // Static position
-                    // let pos = Vector3::zeros();
-
-                    // // Random translational velocity
-                    // let translational = Vector3::zeros();
-
-                    // // Random angular velocity
-                    // let angular = Vector3::zeros();
-
-                    let scale = 10.0;
-                    // Spawn test objects
-                    self.world.spawn((
-                        TransformComponent {
-                            position: pos,
-                            rotation: nalgebra::UnitQuaternion::identity(),
-                            scale: Vector3::new(scale, scale, scale),
-                        },
-                        VelocityComponent {
-                            translational,
-                            angular,
-                        },
-                        MeshComponent {
-                            mesh_id: *mesh_handle,
-                        },
-                        MaterialComponent {
-                            material_id: *material_handle,
-                        },
-                    ));
-                }
-            }
             let mut last_frame = Instant::now();
             let mut accumulator = Duration::ZERO;
             let fixed_dt = Duration::from_millis(16); // ~60 Hz
@@ -235,7 +201,7 @@ impl Engine {
                         .get_resource_mut::<Messages<CameraInputMessage>>()
                         .expect("CameraInputMessage resource not found");
 
-                    for event in events_loop.poll_iter() {
+                    for event in self.events_loop.poll_iter() {
                         match event {
                             sdl2::event::Event::Quit { .. } => {
                                 break 'render;
@@ -265,8 +231,8 @@ impl Engine {
                         }
                     }
 
-                    let width = window.size().0 as f32;
-                    let height = window.size().1 as f32;
+                    let width = self.window.size().0 as f32;
+                    let height = self.window.size().1 as f32;
                     let render_scale = 1.0;
                     let render_params = RenderParams {
                         width: (width * render_scale) as u32,
@@ -302,7 +268,7 @@ impl Engine {
                     // 3. Render
                     renderer.render(render_params, &mut *render_data_manager, instances);
                 }
-                window.gl_swap_window();
+                self.window.gl_swap_window();
                 let frame_time = frame_start.elapsed();
                 if frame_time < target_frame {
                     sleep(target_frame - frame_time);

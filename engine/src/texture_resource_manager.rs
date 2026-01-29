@@ -5,7 +5,7 @@ use image::GenericImageView;
 use std::collections::HashMap;
 use std::error::Error;
 use std::ffi::OsStr;
-use std::hash::{Hash, Hasher}; // cargo add image
+use std::hash::{Hash, Hasher}; 
 
 #[derive(Default)]
 pub struct TextureResource {
