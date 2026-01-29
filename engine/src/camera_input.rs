@@ -84,7 +84,7 @@ pub fn apply_camera_input(
                     if input_state.buttons.left {
                         camera.pitch_yaw(dx, dy);
                     } else if input_state.buttons.middle {
-                        camera.pan(dx, dy);
+                        camera.pan(dx, -dy);
                     } else if input_state.buttons.right {
                         camera.zoom(dy);
                     }

@@ -246,7 +246,7 @@ impl Engine {
                                 if direction == sdl2::mouse::MouseWheelDirection::Flipped {
                                     delta = -delta;
                                 }
-                                camera_messages.write(CameraInputMessage::MouseScroll { delta });
+                                camera_messages.write(CameraInputMessage::MouseScroll { delta: delta * 10.0 });
                             }
                             sdl2::event::Event::MouseButtonDown { mouse_btn, .. } => {
                                 let button = MouseButton::from(mouse_btn);

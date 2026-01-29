@@ -16,6 +16,13 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          libwayland-dev \
+          pkg-config \
+          libx11-dev  # if you use X11 too
     - name: Build
       run: cargo build --verbose
     - name: Run tests
