@@ -167,7 +167,7 @@ impl Engine {
                                 if direction == sdl2::mouse::MouseWheelDirection::Flipped {
                                     delta = -delta;
                                 }
-                                input_messages.write(InputMessage::MouseScroll { delta: delta * 10.0 });
+                                input_messages.write(InputMessage::MouseScroll { delta: delta});
                             }
                             sdl2::event::Event::MouseButtonDown { mouse_btn, .. } => {
                                 let button = MouseButton::from(mouse_btn);

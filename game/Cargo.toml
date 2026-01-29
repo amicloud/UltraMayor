@@ -8,6 +8,7 @@ ultramayor_engine = { path = "../engine" }
 nalgebra = "0.32"
 rand = "0.9.2"
 bevy_ecs = "0.18.0"
+sdl2 = "0.38.0"
 
 # UI / UX
 rfd = "0.15.0"
