@@ -41,7 +41,7 @@ impl Camera {
 
     /// Returns the projection matrix using a perspective projection.
     pub fn projection_matrix(aspect_ratio: f32) -> Matrix4<f32> {
-        Matrix4::new_perspective(aspect_ratio, 75.0_f32.to_radians(), 0.1, 1000.0)
+        Matrix4::new_perspective(aspect_ratio, 75.0_f32.to_radians(), 1.0, 500.0)
     }
 
     #[allow(dead_code)]

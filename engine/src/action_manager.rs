@@ -6,6 +6,7 @@ pub struct ActionManager {
 }
 
 impl ActionManager {
+    #[allow(dead_code)]
     pub fn new() -> Self {
         Self {
             history: Vec::new(),

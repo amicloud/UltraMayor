@@ -1,6 +1,4 @@
-#version 310 es
-precision highp float;
-precision highp int;
+#version 330 core
 
 // Vertex attributes
 layout(location = 0) in vec3 position;

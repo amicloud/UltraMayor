@@ -43,6 +43,7 @@ pub struct CameraInputState {
     buttons: MouseButtons,
 }
 
+#[allow(dead_code)]
 #[derive(Copy, Clone, Debug, Message)]
 pub enum CameraInputMessage {
     MouseMove { x: f32, y: f32 },
@@ -51,6 +52,7 @@ pub enum CameraInputMessage {
     MouseUp { button: MouseButton },
 }
 
+#[allow(dead_code)]
 #[derive(Copy, Clone, Debug)]
 pub enum MouseButton {
     Left,
@@ -59,20 +61,6 @@ pub enum MouseButton {
     Other,
     Back,
     Forward,
-}
-
-impl From<slint::platform::PointerEventButton> for MouseButton {
-    fn from(value: slint::platform::PointerEventButton) -> Self {
-        match value {
-            slint::platform::PointerEventButton::Left => Self::Left,
-            slint::platform::PointerEventButton::Middle => Self::Middle,
-            slint::platform::PointerEventButton::Right => Self::Right,
-            slint::platform::PointerEventButton::Other => Self::Other,
-            slint::platform::PointerEventButton::Back => Self::Back,
-            slint::platform::PointerEventButton::Forward => Self::Forward,
-            _ => Self::Other,
-        }
-    }
 }
 
 pub fn apply_camera_input(

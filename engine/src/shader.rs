@@ -61,6 +61,8 @@ impl Shader {
                     "Program linking failed: {}",
                     gl.get_program_info_log(program)
                 );
+            } else {
+                println!("Program linked successfully");
             }
 
             let shader = Shader {

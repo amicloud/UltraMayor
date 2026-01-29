@@ -1,10 +1,8 @@
-use crate::SharedSettings; // Ensure this is correctly defined as Arc<Mutex<Settings>> or similar
 use dirs_next::config_dir; // Use dirs-next for better maintenance
 use serde::{Deserialize, Serialize};
 use std::{
     fs,
     path::{Path, PathBuf},
-    sync::{Arc, Mutex},
 };
 use thiserror::Error; // For better error handling
 
@@ -108,6 +106,8 @@ impl Settings {
         Ok(())
     }
 
+
+    #[allow(dead_code)]
     /// Saves settings to the user settings file.
     pub fn save_user_settings(&self) -> Result<(), SettingsError> {
         let user_path = Settings::user_settings_path()?;
@@ -115,12 +115,12 @@ impl Settings {
     }
 
     /// Loads user settings, handling defaults and creating necessary files.
-    pub fn load_user_settings() -> SharedSettings {
+    pub fn load_user_settings() -> Settings {
         match Settings::initialize_settings() {
-            Ok(settings) => Arc::new(Mutex::new(settings)),
+            Ok(settings) => settings,
             Err(e) => {
                 eprintln!("Error initializing settings: {}", e);
-                Arc::new(Mutex::new(Settings::default()))
+                Settings::default()
             }
         }
     }
@@ -1088,67 +1088,6 @@ use_https = false
         assert_eq!(settings.network.use_https, true);
 
         reset_config_dir(&original_home, original_xdg_config_home.as_deref());
-    }
-
-    /// Test Case 8a: Concurrent Access to SharedSettings
-    #[test]
-    fn test_concurrent_access_to_shared_settings() {
-        use std::sync::Arc;
-        use std::thread;
-
-        let settings = Settings::default();
-        let shared_settings: SharedSettings = Arc::new(Mutex::new(settings));
-
-        let mut handles = vec![];
-
-        for i in 0..10 {
-            let shared_clone = Arc::clone(&shared_settings);
-            handles.push(thread::spawn(move || {
-                let mut settings = shared_clone.lock().unwrap();
-                settings.general.username = format!("User{}", i);
-                settings.network.timeout += i;
-            }));
-        }
-
-        for handle in handles {
-            handle.join().unwrap();
-        }
-
-        let final_settings = shared_settings.lock().unwrap();
-        // The final username and timeout are nondeterministic since threads run concurrently
-        // But we can assert that timeout has been incremented correctly
-        // Initial timeout is 30, added by 0+1+2+...+9 = 45, so final timeout should be 75
-        assert_eq!(final_settings.network.timeout, 75);
-    }
-
-    /// Test Case 8b: Deadlock Prevention
-    #[test]
-    fn test_deadlock_prevention() {
-        use std::sync::Arc;
-        use std::thread;
-
-        let settings = Settings::default();
-        let shared_settings: SharedSettings = Arc::new(Mutex::new(settings));
-
-        let shared_clone1 = Arc::clone(&shared_settings);
-        let shared_clone2 = Arc::clone(&shared_settings);
-
-        let handle1 = thread::spawn(move || {
-            let mut settings = shared_clone1.lock().unwrap();
-            settings.general.username = "Thread1".to_string();
-        });
-
-        let handle2 = thread::spawn(move || {
-            let mut settings = shared_clone2.lock().unwrap();
-            settings.network.timeout = 100;
-        });
-
-        handle1.join().unwrap();
-        handle2.join().unwrap();
-
-        let final_settings = shared_settings.lock().unwrap();
-        assert_eq!(final_settings.general.username, "Thread1");
-        assert_eq!(final_settings.network.timeout, 100);
     }
 
     /// Test Case 10a: Full Load and Save Cycle (Integration Test)

@@ -11,7 +11,7 @@ use std::{hash::Hash, hash::Hasher};
 use crate::handles::MeshHandle;
 
 #[repr(C)]
-#[derive(Default, Clone, Pod, Copy, Debug)]
+#[derive(Default, Clone, Copy, Debug)]
 pub struct Vertex {
     pub position: [f32; 3],
     pub normal: [f32; 3],
@@ -41,6 +41,8 @@ unsafe impl Zeroable for Vertex {
         }
     }
 }
+
+unsafe impl Pod for Vertex {}
 impl Eq for Vertex {}
 
 impl Hash for Vertex {

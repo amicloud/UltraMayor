@@ -1,6 +1,4 @@
-#version 310 es
-precision highp float;
-precision highp int;
+#version 330 core
 
 in vec3 v_normal;
 in vec3 v_view_dir;

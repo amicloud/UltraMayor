@@ -4,8 +4,8 @@ use std::ffi::OsStr;
 
 use crate::{
     camera_resource::CameraResource, material::Material, material::MaterialDesc,
-    material_resource::MaterialResource, mesh_resource::MeshResource,
-    shader::Shader, texture_resource_manager::TextureResource,
+    material_resource::MaterialResource, mesh_resource::MeshResource, shader::Shader,
+    texture_resource_manager::TextureResource,
 };
 
 #[derive(Resource)]
