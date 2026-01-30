@@ -8,4 +8,7 @@ pub struct MaterialHandle(pub u32);
 pub struct TextureHandle(pub u32);
 
 #[derive(Copy, Clone, PartialEq, Eq, Hash, Debug, Default)]
+pub struct ShaderHandle(pub u32);
+
+#[derive(Copy, Clone, PartialEq, Eq, Hash, Debug, Default)]
 pub struct RenderBodyHandle(pub u32);

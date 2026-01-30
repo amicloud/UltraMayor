@@ -4,8 +4,8 @@ use std::ffi::OsStr;
 
 use crate::{
     material::Material, material::MaterialDesc, material_resource::MaterialResource,
-    mesh_resource::MeshResource, render_body_resource::RenderBodyResource, shader::Shader,
-    texture_resource_manager::TextureResource,
+    mesh_resource::MeshResource, render_body_resource::RenderBodyResource,
+    shader_resource::ShaderResource, texture_resource_manager::TextureResource,
 };
 
 #[derive(Resource)]
@@ -14,6 +14,7 @@ pub struct RenderResourceManager {
     pub render_body_manager: RenderBodyResource,
     pub material_manager: MaterialResource,
     pub texture_manager: TextureResource,
+    pub shader_manager: ShaderResource,
 }
 
 impl RenderResourceManager {
@@ -23,6 +24,7 @@ impl RenderResourceManager {
             render_body_manager: RenderBodyResource::default(),
             material_manager: MaterialResource::default(),
             texture_manager: TextureResource::default(),
+            shader_manager: ShaderResource::default(),
         }
     }
 
@@ -41,6 +43,9 @@ impl RenderResourceManager {
             .load_from_gltf_data(gl, gltf_path, &gltf, &images)?;
 
         let mut material_handles = Vec::new();
+        let shader_handle = self
+            .shader_manager
+            .get_or_load(gl, vertex_shader, fragment_shader);
         for material in gltf.materials() {
             let pbr = material.pbr_metallic_roughness();
             let roughness = pbr.roughness_factor();
@@ -64,9 +69,8 @@ impl RenderResourceManager {
                 .normal_texture()
                 .and_then(|info| texture_map.get(&info.texture().index()).copied());
 
-            let shader = Shader::new(gl, vertex_shader, fragment_shader);
             let desc = MaterialDesc::new(
-                shader,
+                shader_handle,
                 albedo_handle,
                 normal_handle,
                 roughness,

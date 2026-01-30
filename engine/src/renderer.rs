@@ -117,7 +117,10 @@ impl Renderer {
                     .material_manager
                     .get_material(material_id)
                     .expect("Material not found");
-                let shader = &material.desc.shader;
+                let shader = render_data_manager
+                    .shader_manager
+                    .get_shader(material.desc.shader)
+                    .expect("Shader not found");
 
                 // Bind shader
                 gl.use_program(Some(shader.program));

@@ -26,8 +26,6 @@ impl Shader {
             let vertex_shader_source = fs::read_to_string(&vertex_src.to_str().unwrap())
                 .expect("Failed to read vertex shader file");
             gl.shader_source(vertex_shader, &vertex_shader_source);
-            // let shader_source = "#version 310 es\nprecision highp float;\nin vec3 position;\nvoid main(){gl_Position = vec4(position,1.0);}";
-            // gl.shader_source(vertex_shader, shader_source);
             gl.compile_shader(vertex_shader);
             if !gl.get_shader_compile_status(vertex_shader) {
                 panic!(

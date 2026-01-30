@@ -22,6 +22,7 @@ mod render_resource_manager;
 mod render_system;
 mod renderer;
 mod shader;
+mod shader_resource;
 mod texture;
 mod texture_resource_manager;
 mod transform_component;
@@ -107,14 +108,14 @@ impl Engine {
         let gl = &self.gl;
         let os_path = OsStr::new(gltf_path);
         let render_body_handle = {
-            let mut render_data_manager = self
+            let mut render_resource_manager = self
                 .world
                 .get_resource_mut::<RenderResourceManager>()
                 .expect("RenderResourceManager resource not found");
 
             let mesh_primitives = Mesh::from_gltf(os_path).unwrap();
 
-            let material_handles = render_data_manager
+            let material_handles = render_resource_manager
                 .load_materials_from_gltf(
                     gl,
                     os_path,
@@ -129,7 +130,7 @@ impl Engine {
 
             let mut parts = Vec::with_capacity(mesh_primitives.len());
             for prim in mesh_primitives {
-                let mesh_handle = render_data_manager.mesh_manager.add_mesh(prim.mesh, gl);
+                let mesh_handle = render_resource_manager.mesh_manager.add_mesh(prim.mesh, gl);
 
                 let material_handle = prim
                     .material_index
@@ -150,7 +151,7 @@ impl Engine {
             };
 
             let render_body = RenderBody::new(render_body_id, parts);
-            render_data_manager
+            render_resource_manager
                 .render_body_manager
                 .add_render_body(render_body)
         };

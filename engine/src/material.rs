@@ -3,11 +3,11 @@ use std::{
     hash::{Hash, Hasher},
 };
 
-use crate::{handles::*, shader::Shader};
+use crate::handles::*;
 
 #[derive(Hash)]
 pub struct MaterialDesc {
-    pub shader: Shader,
+    pub shader: ShaderHandle,
     pub albedo: TextureHandle,
     pub normal: Option<TextureHandle>,
     pub roughness: u32,
@@ -16,7 +16,7 @@ pub struct MaterialDesc {
 
 impl MaterialDesc {
     pub fn new(
-        shader: Shader,
+        shader: ShaderHandle,
         albedo: TextureHandle,
         normal: Option<TextureHandle>,
         roughness: f32,

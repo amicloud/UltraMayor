@@ -105,7 +105,7 @@ fn main() {
             let pos = Vector3::new(
                 random_range(-10.0..10.0),
                 random_range(-10.0..10.0),
-                random_range(-10.0..10.0),
+                random_range(300.0..325.0),
             );
 
             // Random translational velocity
