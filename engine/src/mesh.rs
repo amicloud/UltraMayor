@@ -315,10 +315,22 @@ impl Mesh {
                     // .map(|[u, v]| [u, 1.0 - v])
                     .collect();
 
-                let tangents: Vec<[f32; 4]> = reader
-                    .read_tangents()
-                    .ok_or("Mesh missing tangents")?
+                // Indices (required for tangent generation)
+                let indices: Vec<u32> = reader
+                    .read_indices()
+                    .ok_or("Mesh missing indices")?
+                    .into_u32()
                     .collect();
+
+                // Some meshes might not have tangents
+                // If so, we need to compute them
+
+                let tangents: Vec<[f32; 4]> = if let Some(tangent_reader) = reader.read_tangents() {
+                    tangent_reader.collect()
+                } else {
+                    warn!("Mesh is missing tangents, computing tangents.");
+                    Self::compute_tangents(&positions, &normals, &uvs, &indices)
+                };
 
                 // Sanity check
                 assert_eq!(positions.len(), normals.len());
@@ -342,12 +354,6 @@ impl Mesh {
                     });
                 }
 
-                // Read indices
-                let indices: Vec<u32> = reader
-                    .read_indices()
-                    .ok_or("Mesh missing indices")?
-                    .into_u32()
-                    .collect();
                 mesh.indices.extend(indices);
             }
         }
@@ -369,6 +375,86 @@ impl Mesh {
         self.sphere_center = (self.aabb.min + self.aabb.max) * 0.5;
         // Radius = distance from center to farthest corner
         self.sphere_radius = (self.aabb.max - self.sphere_center).norm();
+    }
+
+    fn compute_tangents(
+        positions: &[[f32; 3]],
+        normals: &[[f32; 3]],
+        uvs: &[[f32; 2]],
+        indices: &[u32],
+    ) -> Vec<[f32; 4]> {
+        let mut tan1 = vec![Vector3::new(0.0, 0.0, 0.0); positions.len()];
+        let mut tan2 = vec![Vector3::new(0.0, 0.0, 0.0); positions.len()];
+
+        let tri_count = indices.len() / 3;
+        for t in 0..tri_count {
+            let i0 = indices[t * 3] as usize;
+            let i1 = indices[t * 3 + 1] as usize;
+            let i2 = indices[t * 3 + 2] as usize;
+
+            let p0 = Vector3::from(positions[i0]);
+            let p1 = Vector3::from(positions[i1]);
+            let p2 = Vector3::from(positions[i2]);
+
+            let w0 = uvs[i0];
+            let w1 = uvs[i1];
+            let w2 = uvs[i2];
+
+            let x1 = p1.x - p0.x;
+            let x2 = p2.x - p0.x;
+            let y1 = p1.y - p0.y;
+            let y2 = p2.y - p0.y;
+            let z1 = p1.z - p0.z;
+            let z2 = p2.z - p0.z;
+
+            let s1 = w1[0] - w0[0];
+            let s2 = w2[0] - w0[0];
+            let t1 = w1[1] - w0[1];
+            let t2 = w2[1] - w0[1];
+
+            let denom = s1 * t2 - s2 * t1;
+            if denom.abs() < f32::EPSILON {
+                continue;
+            }
+            let r = 1.0 / denom;
+            let sdir = Vector3::new(
+                (t2 * x1 - t1 * x2) * r,
+                (t2 * y1 - t1 * y2) * r,
+                (t2 * z1 - t1 * z2) * r,
+            );
+            let tdir = Vector3::new(
+                (s1 * x2 - s2 * x1) * r,
+                (s1 * y2 - s2 * y1) * r,
+                (s1 * z2 - s2 * z1) * r,
+            );
+
+            tan1[i0] += sdir;
+            tan1[i1] += sdir;
+            tan1[i2] += sdir;
+
+            tan2[i0] += tdir;
+            tan2[i1] += tdir;
+            tan2[i2] += tdir;
+        }
+
+        let mut tangents = Vec::with_capacity(positions.len());
+        for i in 0..positions.len() {
+            let n = Vector3::from(normals[i]);
+            let t = tan1[i];
+
+            let tangent = (t - n * n.dot(&t)).try_normalize(f32::EPSILON);
+            let tangent = tangent.unwrap_or(Vector3::new(1.0, 0.0, 0.0));
+
+            let handedness = if n.cross(&tangent).dot(&tan2[i]) < 0.0 {
+                -1.0
+            } else {
+                1.0
+            };
+
+            tangents.push([tangent.x, tangent.y, tangent.z, handedness]);
+        }
+
+        tangents
     }
 }
 
