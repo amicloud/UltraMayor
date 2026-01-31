@@ -4,6 +4,7 @@ use std::ffi::OsStr;
 use std::hash::{Hash, Hasher};
 
 use crate::handles::{MaterialHandle, MeshHandle, RenderBodyHandle};
+use crate::material::{Material, MaterialDesc};
 use crate::mesh::Mesh;
 use crate::render_body::{RenderBody, RenderBodyPart};
 use crate::render_resource_manager::RenderResourceManager;
@@ -41,7 +42,7 @@ impl Engine {
         let obj_path = std::path::Path::new(obj_path);
         let base_dir = obj_path.parent().unwrap_or_else(|| std::path::Path::new("."));
 
-        let (models, materials) = tobj::load_obj(
+        let (models, obj_materials) = tobj::load_obj(
             obj_path,
             &tobj::LoadOptions {
                 single_index: true,
@@ -64,8 +65,8 @@ impl Engine {
 
             let mut material_handles: Vec<MaterialHandle> = Vec::new();
 
-            if let Ok(materials) = materials.as_ref() {
-                for material in materials {
+            if let Ok(obj_materials) = obj_materials.as_ref() {
+                for material in obj_materials {
                     let albedo_handle = if let Some(tex) = material.diffuse_texture.as_ref() {
                         if !tex.is_empty() {
                             let tex_path = base_dir.join(tex);
@@ -118,7 +119,7 @@ impl Engine {
                         1.0
                     };
 
-                    let desc = crate::material::MaterialDesc::new(
+                    let desc = MaterialDesc::new(
                         shader_handle,
                         albedo_handle,
                         normal_handle,
@@ -127,7 +128,7 @@ impl Engine {
                     );
                     let handle = render_resource_manager
                         .material_manager
-                        .add_material(crate::material::Material::new(desc));
+                        .add_material(Material::new(desc));
                     material_handles.push(handle);
                 }
             }
@@ -138,7 +139,7 @@ impl Engine {
                 let albedo = render_resource_manager
                     .texture_manager
                     .create_solid_rgba(gl, [255, 255, 255, 255]);
-                let desc = crate::material::MaterialDesc::new(
+                let desc = MaterialDesc::new(
                     shader_handle,
                     albedo,
                     None,
@@ -147,7 +148,7 @@ impl Engine {
                 );
                 render_resource_manager
                     .material_manager
-                    .add_material(crate::material::Material::new(desc))
+                    .add_material(Material::new(desc))
             };
 
             let mut parts = Vec::with_capacity(models.len());
