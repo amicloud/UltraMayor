@@ -11,9 +11,9 @@ pub mod input;
 mod material;
 mod material_component;
 mod material_resource;
-mod model_loader;
 mod mesh;
 mod mesh_resource;
+mod model_loader;
 mod render_body;
 mod render_body_component;
 mod render_body_resource;
@@ -104,7 +104,6 @@ impl Engine {
         }
     }
 
-
     pub fn run(&mut self) {
         unsafe {
             let gl = self.gl.clone();
@@ -185,7 +184,7 @@ impl Engine {
                     let render_scale = 1.0;
                     let render_params = RenderParams {
                         width: (width * render_scale) as u32,
-                        height: (height * render_scale) as u32
+                        height: (height * render_scale) as u32,
                     };
 
                     let now = Instant::now();
@@ -267,7 +266,11 @@ impl Engine {
 
     /// Builds camera render data from the ECS world.
     /// Returns `None` if there is no active camera or if the camera entity is invalid.
-    fn build_camera_render_data(world: &mut World, width: u32, height: u32) -> Option<CameraRenderData> {
+    fn build_camera_render_data(
+        world: &mut World,
+        width: u32,
+        height: u32,
+    ) -> Option<CameraRenderData> {
         let active = world.get_resource::<ActiveCamera>()?;
         let entity = active.0?;
 

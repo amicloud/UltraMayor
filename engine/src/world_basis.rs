@@ -20,11 +20,7 @@ impl WorldBasis {
         let forward = forward.normalize();
         let right = forward.cross(&up).normalize();
 
-        Self {
-            up,
-            forward,
-            right,
-        }
+        Self { up, forward, right }
     }
 
     pub fn canonical() -> Self {

@@ -5,7 +5,7 @@ use std::hash::{Hash, Hasher};
 
 use crate::handles::{MaterialHandle, MeshHandle, RenderBodyHandle};
 use crate::material::{Material, MaterialDesc};
-use crate::mesh::Mesh;
+use crate::mesh::{GltfPrimitiveMesh, Mesh, Vertex, AABB};
 use crate::render_body::{RenderBody, RenderBodyPart};
 use crate::render_resource_manager::RenderResourceManager;
 use crate::Engine;
@@ -40,7 +40,9 @@ impl Engine {
     fn load_obj(&mut self, obj_path: &str) -> RenderBodyHandle {
         let gl = &self.gl;
         let obj_path = std::path::Path::new(obj_path);
-        let base_dir = obj_path.parent().unwrap_or_else(|| std::path::Path::new("."));
+        let base_dir = obj_path
+            .parent()
+            .unwrap_or_else(|| std::path::Path::new("."));
 
         let (models, obj_materials) = tobj::load_obj(
             obj_path,
@@ -81,7 +83,9 @@ impl Engine {
                                 (diffuse[2].clamp(0.0, 1.0) * 255.0) as u8,
                                 255,
                             ];
-                            render_resource_manager.texture_manager.create_solid_rgba(gl, rgba)
+                            render_resource_manager
+                                .texture_manager
+                                .create_solid_rgba(gl, rgba)
                         }
                     } else {
                         let diffuse = material.diffuse.unwrap_or([1.0, 1.0, 1.0]);
@@ -91,7 +95,9 @@ impl Engine {
                             (diffuse[2].clamp(0.0, 1.0) * 255.0) as u8,
                             255,
                         ];
-                        render_resource_manager.texture_manager.create_solid_rgba(gl, rgba)
+                        render_resource_manager
+                            .texture_manager
+                            .create_solid_rgba(gl, rgba)
                     };
 
                     let normal_handle = if let Some(tex) = material.normal_texture.as_ref() {
@@ -139,13 +145,7 @@ impl Engine {
                 let albedo = render_resource_manager
                     .texture_manager
                     .create_solid_rgba(gl, [255, 255, 255, 255]);
-                let desc = MaterialDesc::new(
-                    shader_handle,
-                    albedo,
-                    None,
-                    1.0,
-                    0.04,
-                );
+                let desc = MaterialDesc::new(shader_handle, albedo, None, 1.0, 0.04);
                 render_resource_manager
                     .material_manager
                     .add_material(Material::new(desc))
@@ -221,7 +221,9 @@ impl Engine {
                 built_mesh.aabb = crate::mesh::AABB::from_vertices(&built_mesh.vertices);
                 built_mesh.compute_bounding_sphere();
 
-                let mesh_handle = render_resource_manager.mesh_manager.add_mesh(built_mesh, gl);
+                let mesh_handle = render_resource_manager
+                    .mesh_manager
+                    .add_mesh(built_mesh, gl);
                 let material_handle = mesh
                     .material_id
                     .and_then(|idx| material_handles.get(idx).copied())
@@ -266,7 +268,7 @@ impl Engine {
                 .get_resource_mut::<RenderResourceManager>()
                 .expect("RenderResourceManager resource not found");
 
-            let mesh_primitives = Mesh::from_gltf(os_path).unwrap();
+            let mesh_primitives = Self::mesh_primatives_from_gltf(os_path).unwrap();
 
             let material_handles = render_resource_manager
                 .load_materials_from_gltf(
@@ -310,5 +312,101 @@ impl Engine {
         };
 
         render_body_handle
+    }
+
+    fn mesh_primatives_from_gltf(
+        path: &OsStr,
+    ) -> Result<Vec<GltfPrimitiveMesh>, Box<dyn std::error::Error>> {
+        let (gltf, buffers, _) = gltf::import(path.to_str().unwrap())?;
+        let mut meshes = Vec::new();
+
+        for gltf_mesh in gltf.meshes() {
+            println!("Mesh #{}", gltf_mesh.index());
+
+            for primitive in gltf_mesh.primitives() {
+                println!("- Primitive #{}", primitive.index());
+
+                let reader = primitive.reader(|buffer| Some(&buffers[buffer.index()]));
+
+                // Mandatory attributes
+                let positions: Vec<[f32; 3]> = reader
+                    .read_positions()
+                    .ok_or("Mesh missing positions")?
+                    .collect();
+
+                let normals: Vec<[f32; 3]> = reader
+                    .read_normals()
+                    .ok_or("Mesh missing normals")?
+                    .collect();
+
+                let uvs: Vec<[f32; 2]> = reader
+                    .read_tex_coords(0)
+                    .ok_or("Mesh missing TEXCOORD_0")?
+                    .into_f32()
+                    // .map(|[u, v]| [u, 1.0 - v])
+                    .collect();
+
+                // Indices (required for tangent generation)
+                let indices: Vec<u32> = reader
+                    .read_indices()
+                    .ok_or("Mesh missing indices")?
+                    .into_u32()
+                    .collect();
+
+                // Some meshes might not have tangents
+                // If so, we need to compute them
+
+                let tangents: Vec<[f32; 4]> = if let Some(tangent_reader) = reader.read_tangents() {
+                    tangent_reader.collect()
+                } else {
+                    warn!("Mesh is missing tangents, computing tangents.");
+                    Mesh::compute_tangents(&positions, &normals, &uvs, &indices)
+                };
+
+                // Sanity check
+                assert_eq!(positions.len(), normals.len());
+                assert_eq!(positions.len(), uvs.len());
+                assert_eq!(positions.len(), tangents.len());
+
+                let mut mesh = Mesh::default();
+
+                // Build vertices
+                for i in 0..positions.len() {
+                    mesh.vertices.push(Vertex {
+                        position: positions[i],
+                        normal: normals[i],
+                        barycentric: [0.0, 0.0, 0.0],
+                        uv_albedo: uvs[i],
+                        uv_normal: uvs[i],
+                        tangent: [
+                            tangents[i][0],
+                            tangents[i][1],
+                            tangents[i][2],
+                            tangents[i][3],
+                        ],
+                    });
+                }
+
+                mesh.indices.extend(indices);
+
+                // Mesh ID & bounds (include mesh + primitive indices to ensure uniqueness)
+                mesh.id = {
+                    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+                    path.hash(&mut hasher);
+                    gltf_mesh.index().hash(&mut hasher);
+                    primitive.index().hash(&mut hasher);
+                    MeshHandle(hasher.finish() as u32)
+                };
+                mesh.aabb = AABB::from_vertices(&mesh.vertices);
+                mesh.compute_bounding_sphere();
+
+                meshes.push(GltfPrimitiveMesh {
+                    mesh,
+                    material_index: primitive.material().index(),
+                });
+            }
+        }
+
+        Ok(meshes)
     }
 }

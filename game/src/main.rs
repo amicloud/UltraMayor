@@ -7,12 +7,12 @@ use camera_controller::{
     FlyingCameraMovementComponent,
 };
 // use input_controller::{update_input_state, InputState};
-use nalgebra::Vector3;
-use rand::random_range;
 use engine::{
     ActiveCamera, CameraComponent, Engine, RenderBodyComponent, TransformComponent,
     VelocityComponent,
 };
+use nalgebra::Vector3;
+use rand::random_range;
 
 use crate::camera_controller::{
     apply_orbit_camera_input, apply_switch_camera_input, OrbitCameraComponent,
@@ -92,12 +92,18 @@ fn main() {
         // )),
         // engine.load_gltf(OsStr::new("resources/models/suzanne/Suzanne.gltf")),
         // engine.load_model("resources/models/avocado/Avocado.gltf").unwrap(),
-        engine.load_model("resources/models/building/building.obj").unwrap(),
+        engine
+            .load_model("resources/models/building/building.obj")
+            .unwrap(),
     ];
 
-    let ground = engine.load_model("resources/models/opalton/opalton3Dterrain.gltf").unwrap();
+    let ground = engine
+        .load_model("resources/models/opalton/opalton3Dterrain.gltf")
+        .unwrap();
 
-    let antique_camera = engine.load_model("resources/models/antique_camera/AntiqueCamera.gltf").unwrap();
+    let antique_camera = engine
+        .load_model("resources/models/antique_camera/AntiqueCamera.gltf")
+        .unwrap();
 
     let t_range = 2.0;
     for _ in 0..1 {

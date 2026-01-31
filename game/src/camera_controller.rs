@@ -1,11 +1,10 @@
 use bevy_ecs::prelude::*;
+use engine::input::InputStateResource;
+use engine::{
+    ActiveCamera, CameraComponent, MouseButton, TransformComponent, VelocityComponent, WorldBasis,
+};
 use nalgebra::{Matrix3, UnitQuaternion, Vector3};
 use sdl2::keyboard::Keycode;
-use engine::{
-    ActiveCamera, CameraComponent, MouseButton, TransformComponent,
-    VelocityComponent, WorldBasis,
-};
-use engine::input::InputStateResource;
 
 /// Orbit-style camera parameters controlled by input.
 #[derive(Component, Debug)]

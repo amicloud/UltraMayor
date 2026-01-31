@@ -16,7 +16,7 @@ pub struct Renderer {
 }
 pub struct RenderParams {
     pub width: u32,
-    pub height: u32
+    pub height: u32,
 }
 
 /// Precomputed camera data required by the renderer.

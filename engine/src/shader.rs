@@ -13,7 +13,7 @@ pub struct Shader {
     pub u_albedo_location: glow::UniformLocation,
     pub u_normal_location: glow::UniformLocation,
     pub u_roughness_location: glow::UniformLocation,
-    pub u_base_reflectance_location: glow::UniformLocation
+    pub u_base_reflectance_location: glow::UniformLocation,
 }
 
 impl Shader {
@@ -75,7 +75,7 @@ impl Shader {
                 u_roughness_location: gl.get_uniform_location(program, "u_roughness").unwrap(),
                 u_base_reflectance_location: gl
                     .get_uniform_location(program, "u_base_reflectance")
-                    .unwrap()
+                    .unwrap(),
             };
 
             gl.delete_shader(vertex_shader);
