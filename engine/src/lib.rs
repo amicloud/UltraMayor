@@ -185,9 +185,7 @@ impl Engine {
                     let render_scale = 1.0;
                     let render_params = RenderParams {
                         width: (width * render_scale) as u32,
-                        height: (height * render_scale) as u32,
-                        visualize_edges: false,
-                        visualize_normals: false,
+                        height: (height * render_scale) as u32
                     };
 
                     let now = Instant::now();

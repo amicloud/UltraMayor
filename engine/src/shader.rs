@@ -13,10 +13,7 @@ pub struct Shader {
     pub u_albedo_location: glow::UniformLocation,
     pub u_normal_location: glow::UniformLocation,
     pub u_roughness_location: glow::UniformLocation,
-    pub u_base_reflectance_location: glow::UniformLocation,
-    pub u_visualize_normals_location: glow::UniformLocation,
-    pub u_visualize_edges_location: glow::UniformLocation,
-    pub u_edge_thickness_location: glow::UniformLocation,
+    pub u_base_reflectance_location: glow::UniformLocation
 }
 
 impl Shader {
@@ -78,16 +75,7 @@ impl Shader {
                 u_roughness_location: gl.get_uniform_location(program, "u_roughness").unwrap(),
                 u_base_reflectance_location: gl
                     .get_uniform_location(program, "u_base_reflectance")
-                    .unwrap(),
-                u_visualize_normals_location: gl
-                    .get_uniform_location(program, "u_visualize_normals")
-                    .unwrap(),
-                u_visualize_edges_location: gl
-                    .get_uniform_location(program, "u_visualize_edges")
-                    .unwrap(),
-                u_edge_thickness_location: gl
-                    .get_uniform_location(program, "u_edge_thickness")
-                    .unwrap(),
+                    .unwrap()
             };
 
             gl.delete_shader(vertex_shader);

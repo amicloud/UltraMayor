@@ -16,9 +16,7 @@ pub struct Renderer {
 }
 pub struct RenderParams {
     pub width: u32,
-    pub height: u32,
-    pub visualize_edges: bool,
-    pub visualize_normals: bool,
+    pub height: u32
 }
 
 /// Precomputed camera data required by the renderer.
@@ -157,25 +155,6 @@ impl Renderer {
                     default_light_color.y,
                     default_light_color.z,
                 );
-
-                // Visualization uniforms
-                gl.uniform_1_f32(
-                    Some(&shader.u_visualize_normals_location),
-                    if render_params.visualize_normals {
-                        1.0
-                    } else {
-                        0.0
-                    },
-                );
-                gl.uniform_1_f32(
-                    Some(&shader.u_visualize_edges_location),
-                    if render_params.visualize_edges {
-                        1.0
-                    } else {
-                        0.0
-                    },
-                );
-                gl.uniform_1_f32(Some(&shader.u_edge_thickness_location), 1.0);
 
                 // Bind textures
                 let albedo_tex = material.desc.albedo;

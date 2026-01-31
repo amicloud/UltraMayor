@@ -16,9 +16,6 @@ uniform vec3 u_light_direction;
 uniform vec3 u_light_color;
 uniform float u_roughness;
 uniform vec3 u_base_reflectance;
-uniform bool u_visualize_normals;
-uniform bool u_visualize_edges;
-uniform float u_edge_thickness;
 
 const float PI = 3.14159265359;
 
@@ -85,20 +82,6 @@ void main() {
     vec3 ambient = albedo * u_light_color * 0.2;
 
     vec3 color = direct_light + ambient;
-
-    // Normal visualization (debug)
-    vec3 normal_color = v_normal * 0.5 * float(u_visualize_normals);
-    color += normal_color;
-
-    // Edge visualization
-    if (u_visualize_edges) {
-        vec3 d = fwidth(v_barycentric);
-        vec3 edge0 = d * u_edge_thickness / 10.0;
-        vec3 edge1 = edge0 + d;
-        vec3 f = smoothstep(edge0, edge1, v_barycentric);
-        float edge_factor = min(min(f.x, f.y), f.z);
-        color = mix(color, vec3(0.0), max(0.15 - edge_factor, 0.0));
-    }
 
     fragColor = vec4(color, 1.0);
 }
