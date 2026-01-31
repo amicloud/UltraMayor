@@ -1,5 +1,5 @@
 [package]
-name = "ultramayor_engine"
+name = "engine"
 version = "0.0.1"
 edition = "2021"
 
@@ -28,6 +28,7 @@ obj-rs = "0.7.4"
 # async / platform glue
 async-compat = "0.2.4"
 sdl2 = "0.38.0"
+tobj = "4.0.3"
 
 # native
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]

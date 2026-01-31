@@ -1,11 +1,11 @@
 use bevy_ecs::prelude::*;
 use nalgebra::{Matrix3, UnitQuaternion, Vector3};
 use sdl2::keyboard::Keycode;
-use ultramayor_engine::{
+use engine::{
     ActiveCamera, CameraComponent, MouseButton, TransformComponent,
     VelocityComponent, WorldBasis,
 };
-use ultramayor_engine::input::InputStateResource;
+use engine::input::InputStateResource;
 
 /// Orbit-style camera parameters controlled by input.
 #[derive(Component, Debug)]

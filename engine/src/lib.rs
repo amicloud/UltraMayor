@@ -126,6 +126,7 @@ impl Engine {
         match extension.as_str() {
             "gltf" | "glb" => Some(self.load_gltf(model_path)),
             "fbx" => Some(self.load_fbx(model_path)),
+            "obj" => Some(self.load_obj(model_path)),
             _ => {
                 warn!("Unsupported model format: {}", extension);
                 None
@@ -133,6 +134,12 @@ impl Engine {
         }
     }
 
+    /// Loads an OBJ model from the specified file path and returns a `RenderBodyHandle`.
+    fn load_obj(&mut self, _obj_path: &str) -> RenderBodyHandle {
+        unimplemented!("OBJ loading is not yet implemented");
+    }
+
+    /// Loads an FBX model from the specified file path and returns a `RenderBodyHandle`.
     fn load_fbx(&mut self, _fbx_path: &str) -> RenderBodyHandle {
         unimplemented!("FBX loading is not yet implemented");
     }

@@ -9,7 +9,7 @@ use camera_controller::{
 // use input_controller::{update_input_state, InputState};
 use nalgebra::Vector3;
 use rand::random_range;
-use ultramayor_engine::{
+use engine::{
     ActiveCamera, CameraComponent, Engine, RenderBodyComponent, TransformComponent,
     VelocityComponent,
 };
