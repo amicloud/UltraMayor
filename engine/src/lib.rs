@@ -125,8 +125,8 @@ impl Engine {
             let mut renderer = Renderer::new(gl.clone());
             let mut last_frame = Instant::now();
             let mut accumulator = Duration::ZERO;
-            let fixed_dt = Duration::from_millis(16); // ~60 Hz
-            let target_frame = Duration::from_millis(16); // ~60 FPS max
+            let target_simulation_dt = Duration::from_millis(16); // ~60 Hz
+            let target_frame_time = Duration::from_millis(16); // ~60 FPS max
 
             'render: loop {
                 let frame_start = Instant::now();
@@ -196,9 +196,9 @@ impl Engine {
 
                     accumulator += frame_time;
 
-                    while accumulator >= fixed_dt {
+                    while accumulator >= target_simulation_dt {
                         self.schedule.run(&mut self.world);
-                        accumulator -= fixed_dt;
+                        accumulator -= target_simulation_dt;
                     }
 
                     // 1. Extract instance data AFTER systems run
@@ -233,8 +233,8 @@ impl Engine {
                 }
                 self.window.gl_swap_window();
                 let frame_time = frame_start.elapsed();
-                if frame_time < target_frame {
-                    sleep(target_frame - frame_time);
+                if frame_time < target_frame_time {
+                    sleep(target_frame_time - frame_time);
                 }
             }
         }
