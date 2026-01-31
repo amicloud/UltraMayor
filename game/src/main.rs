@@ -91,15 +91,16 @@ fn main() {
         //     "resources/models/normal_tangent_test/NormalTangentMirrorTest.gltf",
         // )),
         // engine.load_gltf(OsStr::new("resources/models/suzanne/Suzanne.gltf")),
-        engine.load_gltf("resources/models/avocado/Avocado.gltf"),
+        // engine.load_model("resources/models/avocado/Avocado.gltf").unwrap(),
+        engine.load_model("resources/models/building.fbx").unwrap(),
     ];
 
-    let ground = engine.load_gltf("resources/models/opalton/opalton3Dterrain.gltf");
+    let ground = engine.load_model("resources/models/opalton/opalton3Dterrain.gltf").unwrap();
 
-    let antique_camera = engine.load_gltf("resources/models/antique_camera/AntiqueCamera.gltf");
+    let antique_camera = engine.load_model("resources/models/antique_camera/AntiqueCamera.gltf").unwrap();
 
     let t_range = 2.0;
-    for _ in 0..100 {
+    for _ in 0..1 {
         for render_body_handle in &assets {
             // Random position
             let pos = Vector3::new(

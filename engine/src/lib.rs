@@ -30,6 +30,7 @@ mod velocity_component;
 mod world_basis;
 use bevy_ecs::prelude::*;
 use glow::HasContext;
+use log::warn;
 use renderer::Renderer;
 use std::ffi::OsStr;
 use std::hash::{Hash, Hasher};
@@ -107,7 +108,38 @@ impl Engine {
         }
     }
 
-    pub fn load_gltf(&mut self, gltf_path: &str) -> RenderBodyHandle {
+
+    /// Loads a model from the specified file path. Supports different model formats based on file extension.
+    /// Returns a `RenderBodyHandle` if the model is successfully loaded, or `None` if the format is unsupported.
+    /// 
+    /// Currently supported formats: glTF (.gltf) 
+    /// 
+    /// FBX (.fbx) loading is not yet implemented.
+    pub fn load_model(&mut self, model_path: &str) -> Option<RenderBodyHandle> {
+        // Get the file extension to determine the loader
+        let extension = std::path::Path::new(model_path)
+            .extension()
+            .and_then(|ext| ext.to_str())
+            .unwrap_or("")
+            .to_lowercase();
+
+        match extension.as_str() {
+            "gltf" | "glb" => Some(self.load_gltf(model_path)),
+            "fbx" => Some(self.load_fbx(model_path)),
+            _ => {
+                warn!("Unsupported model format: {}", extension);
+                None
+            }
+        }
+    }
+
+    fn load_fbx(&mut self, _fbx_path: &str) -> RenderBodyHandle {
+        unimplemented!("FBX loading is not yet implemented");
+    }
+
+    // Not particularly happy with how this works, but it will do for now.
+    /// Loads a glTF model from the specified file path and returns a `RenderBodyHandle`.
+    fn load_gltf(&mut self, gltf_path: &str) -> RenderBodyHandle {
         let gl = &self.gl;
         let os_path = OsStr::new(gltf_path);
         let render_body_handle = {
@@ -177,6 +209,7 @@ impl Engine {
                 "OpenGL Major Version: {}. OpenGL Minor Version: {}",
                 major_version, minor_version
             );
+
             // Initialize renderer
             let mut renderer = Renderer::new(gl.clone());
             let mut last_frame = Instant::now();
@@ -191,6 +224,7 @@ impl Engine {
                         .world
                         .get_resource_mut::<InputStateResource>()
                         .expect("InputStateResource resource not found");
+
                     input_state.previous_keys = input_state.current_keys.clone();
                     input_state.previous_mouse_buttons = input_state.current_mouse_buttons.clone();
                     input_state.mouse_delta = (0.0, 0.0);
@@ -266,7 +300,7 @@ impl Engine {
                     };
 
                     // 2. Compute camera matrices from ECS state (camera is fully game-driven).
-                    let camera_data = Self::camera_render_data(
+                    let camera_data = Self::build_camera_render_data(
                         &mut self.world,
                         render_params.width,
                         render_params.height,
@@ -323,7 +357,8 @@ impl Engine {
     }
 
     /// Builds camera render data from the ECS world.
-    fn camera_render_data(world: &mut World, width: u32, height: u32) -> Option<CameraRenderData> {
+    /// Returns `None` if there is no active camera or if the camera entity is invalid.
+    fn build_camera_render_data(world: &mut World, width: u32, height: u32) -> Option<CameraRenderData> {
         let active = world.get_resource::<ActiveCamera>()?;
         let entity = active.0?;
 
