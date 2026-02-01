@@ -11,4 +11,8 @@ pub enum PhysicsType {
 pub struct PhysicsComponent {
     pub physics_type: PhysicsType,
     pub mass: f32,
+    pub friction: f32,
+    pub drag_coefficient: f32,
+    pub angular_drag_coefficient: f32,
+    pub restitution: f32,
 }

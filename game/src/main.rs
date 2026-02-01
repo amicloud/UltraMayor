@@ -9,6 +9,7 @@ use camera_controller::{
 // use input_controller::{update_input_state, InputState};
 use engine::{
     physics_component::{PhysicsComponent, PhysicsType},
+    physics_resource::Impulse,
     ActiveCamera, CameraComponent, Engine, RenderBodyComponent, TransformComponent,
     VelocityComponent,
 };
@@ -195,17 +196,30 @@ fn main() {
         },
         antique_camera_velocity / 2.0,
     ));
-    engine.world.spawn((
-        antique_camera_transform,
-        RenderBodyComponent {
-            render_body_id: antique_camera,
-        },
-        antique_camera_velocity / 3.0,
-        PhysicsComponent {
-            mass: 1.0,
-            physics_type: PhysicsType::Dynamic,
-        },
-    ));
+    let phys_cam = engine
+        .world
+        .spawn((
+            antique_camera_transform,
+            RenderBodyComponent {
+                render_body_id: antique_camera,
+            },
+            antique_camera_velocity / 3.0,
+            PhysicsComponent {
+                mass: 1.0,
+                physics_type: PhysicsType::Dynamic,
+                friction: 0.5,
+                drag_coefficient: 0.1,
+                angular_drag_coefficient: 0.1,
+                restitution: 0.5,
+            },
+        ))
+        .id();
+
+    engine.add_impulse(Impulse {
+        entity: phys_cam,
+        linear: Vec3::new(5.0, 2.0, 100.0) * 1.0,
+        angular: Vec3::new(0.0, 0.0, 0.0),
+    });
 
     engine.run();
 }

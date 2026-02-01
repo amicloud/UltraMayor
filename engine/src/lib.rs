@@ -15,6 +15,7 @@ mod mesh_resource;
 mod model_loader;
 mod movement_system;
 pub mod physics_component;
+pub mod physics_resource;
 mod physics_system;
 mod render_body;
 mod render_body_component;
@@ -30,7 +31,7 @@ mod texture;
 mod texture_resource_manager;
 mod transform_component;
 mod velocity_component;
-mod world_basis;
+pub mod world_basis;
 use bevy_ecs::prelude::*;
 use glam::Mat4;
 use glow::HasContext;
@@ -43,6 +44,8 @@ use std::time::Instant;
 use crate::input::InputStateResource;
 use crate::mesh_resource::MeshResource;
 use crate::movement_system::MovementSystem;
+use crate::physics_resource::Impulse;
+use crate::physics_resource::PhysicsResource;
 use crate::physics_system::PhysicsSystem;
 use crate::render_instance::RenderInstance;
 use crate::render_queue::RenderQueue;
@@ -78,12 +81,14 @@ impl Engine {
         world.insert_resource(RenderResourceManager::new());
         world.insert_resource(ActiveCamera::default());
         world.insert_resource(InputStateResource::default());
-        world.insert_resource(crate::world_basis::WorldBasis::canonical());
+        world.insert_resource(WorldBasis::canonical());
+        world.insert_resource(PhysicsResource::default());
 
         let mut schedule = Schedule::default();
         // Engine-only systems. Game code adds its own systems to this schedule.
         schedule.add_systems(
             (
+                PhysicsSystem::apply_impulses,
                 PhysicsSystem::update_bodies,
                 MovementSystem::update,
                 RenderSystem::extract_render_data,
@@ -303,6 +308,13 @@ impl Engine {
             view_proj: projection * view,
             position: transform.position,
         })
+    }
+
+    pub fn add_impulse(&mut self, impulse: Impulse) {
+        self.world
+            .get_resource_mut::<PhysicsResource>()
+            .unwrap()
+            .add_impulse(impulse.entity, impulse.linear, impulse.angular);
     }
 }
 
