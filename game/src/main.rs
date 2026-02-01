@@ -10,8 +10,8 @@ use camera_controller::{
 use engine::{
     physics_component::{PhysicsComponent, PhysicsType},
     physics_resource::Impulse,
-    ActiveCamera, CameraComponent, Engine, RenderBodyComponent, TransformComponent,
-    VelocityComponent,
+    ActiveCamera, CameraComponent, CollisionLayer, Engine, RenderBodyComponent, TransformComponent,
+    VelocityComponent, WorldBasis,
 };
 use glam::{Quat, Vec3};
 use rand::random_range;
@@ -24,10 +24,13 @@ fn main() {
     let mut engine = Engine::new();
 
     // Create an ECS-driven camera entity and mark it active.
+    let eye = Vec3::new(0.0, 0.0, 0.0);
+    let center = Vec3::new(1.0, 1.0, -1.0);
+    let up = WorldBasis::default().up();
     let aspect_ratio = 1024.0 / 769.0;
     let camera_transform = TransformComponent {
         position: Vec3::new(0.0, 0.0, 0.0),
-        rotation: Quat::IDENTITY,
+        rotation: Quat::look_at_rh(eye, center, up),
         scale: Vec3::new(1.0, 1.0, 1.0),
     };
 
@@ -133,6 +136,9 @@ fn main() {
             );
 
             let scale = 100.0;
+            let collider = engine
+                .collider_from_render_body(*render_body_handle, CollisionLayer::Default)
+                .expect("Render body AABB not found");
             // Spawn test objects
             engine.world.spawn((
                 TransformComponent {
@@ -147,11 +153,15 @@ fn main() {
                 RenderBodyComponent {
                     render_body_id: *render_body_handle,
                 },
+                collider,
             ));
         }
     }
 
     let ground_scale = 1.0;
+    let ground_collider = engine
+        .collider_from_render_body(ground, CollisionLayer::Default)
+        .expect("Render body AABB not found");
     engine.world.spawn((
         TransformComponent {
             position: Vec3::new(0.0, 0.0, -300.0),
@@ -161,6 +171,7 @@ fn main() {
         RenderBodyComponent {
             render_body_id: ground,
         },
+        ground_collider,
     ));
 
     let antique_camera_scale = 10.0;
@@ -196,6 +207,9 @@ fn main() {
         },
         antique_camera_velocity / 2.0,
     ));
+    let antique_collider = engine
+        .collider_from_render_body(antique_camera, CollisionLayer::Default)
+        .expect("Render body AABB not found");
     let phys_cam = engine
         .world
         .spawn((
@@ -212,6 +226,7 @@ fn main() {
                 angular_drag_coefficient: 0.1,
                 restitution: 0.5,
             },
+            antique_collider,
         ))
         .id();
 

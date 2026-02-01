@@ -36,6 +36,7 @@ mod velocity_component;
 pub mod world_basis;
 use bevy_ecs::prelude::*;
 use glam::Mat4;
+use glam::Vec3;
 use glow::HasContext;
 use renderer::Renderer;
 use std::rc::Rc;
@@ -45,6 +46,7 @@ use std::time::Instant;
 
 use crate::collision_system::CollisionSystem;
 use crate::input::InputStateResource;
+use crate::mesh::AABB;
 use crate::mesh_resource::MeshResource;
 use crate::movement_system::MovementSystem;
 use crate::physics_resource::Impulse;
@@ -57,6 +59,7 @@ use crate::render_system::RenderSystem;
 use crate::renderer::{CameraRenderData, RenderParams};
 
 pub use crate::camera_component::{ActiveCamera, CameraComponent};
+pub use crate::collider_component::{ColliderComponent, CollisionLayer};
 pub use crate::handles::{MaterialHandle, MeshHandle, RenderBodyHandle};
 pub use crate::input::MouseButton;
 pub use crate::material_component::MaterialComponent;
@@ -91,10 +94,11 @@ impl Engine {
         // Engine-only systems. Game code adds its own systems to this schedule.
         schedule.add_systems(
             (
-                CollisionSystem::do_aabb_collisions,
                 PhysicsSystem::apply_impulses,
                 PhysicsSystem::update_bodies,
                 MovementSystem::update,
+                CollisionSystem::update_world_aabb_cache,
+                CollisionSystem::do_aabb_collisions,
                 RenderSystem::extract_render_data,
             )
                 .chain(),
@@ -325,5 +329,74 @@ impl Engine {
 impl Default for Engine {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+impl Engine {
+    pub fn aabb_from_render_body(&self, render_body_id: RenderBodyHandle) -> Option<AABB> {
+        let render_resource_manager = self.world.get_resource::<RenderResourceManager>()?;
+        let render_body = render_resource_manager
+            .render_body_manager
+            .get_render_body(render_body_id)?;
+
+        let mut combined: Option<AABB> = None;
+        for part in &render_body.parts {
+            let mesh = render_resource_manager
+                .mesh_manager
+                .get_mesh(part.mesh_id)?;
+            let part_aabb = transform_aabb_with_mat4(mesh.aabb, &part.local_transform);
+            combined = Some(match combined {
+                Some(existing) => union_aabb(existing, part_aabb),
+                None => part_aabb,
+            });
+        }
+
+        combined
+    }
+
+    pub fn collider_from_render_body(
+        &self,
+        render_body_id: RenderBodyHandle,
+        layer: CollisionLayer,
+    ) -> Option<ColliderComponent> {
+        self.aabb_from_render_body(render_body_id)
+            .map(|aabb| ColliderComponent::new(aabb, layer))
+    }
+}
+
+fn transform_aabb_with_mat4(aabb: AABB, transform: &Mat4) -> AABB {
+    let min = aabb.min;
+    let max = aabb.max;
+
+    let corners = [
+        Vec3::new(min.x, min.y, min.z),
+        Vec3::new(min.x, min.y, max.z),
+        Vec3::new(min.x, max.y, min.z),
+        Vec3::new(min.x, max.y, max.z),
+        Vec3::new(max.x, min.y, min.z),
+        Vec3::new(max.x, min.y, max.z),
+        Vec3::new(max.x, max.y, min.z),
+        Vec3::new(max.x, max.y, max.z),
+    ];
+
+    let mut world_min = transform.transform_point3(corners[0]);
+    let mut world_max = world_min;
+
+    for corner in corners.iter().skip(1) {
+        let world = transform.transform_point3(*corner);
+        world_min = world_min.min(world);
+        world_max = world_max.max(world);
+    }
+
+    AABB {
+        min: world_min,
+        max: world_max,
+    }
+}
+
+fn union_aabb(a: AABB, b: AABB) -> AABB {
+    AABB {
+        min: a.min.min(b.min),
+        max: a.max.max(b.max),
     }
 }

@@ -1,5 +1,8 @@
 use bevy_ecs::prelude::*;
 use glam::Vec3;
+use std::collections::HashMap;
+
+use crate::mesh::AABB;
 
 pub struct Impulse {
     pub entity: Entity,
@@ -10,6 +13,7 @@ pub struct Impulse {
 #[derive(Default, Resource)]
 pub struct PhysicsResource {
     pub impulses: Vec<Impulse>,
+    pub world_aabbs: HashMap<Entity, AABB>,
 }
 
 impl PhysicsResource {

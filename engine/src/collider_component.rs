@@ -3,7 +3,7 @@ use bevy_ecs::component::Component;
 use crate::mesh::AABB;
 
 #[derive(Clone, Copy)]
-enum CollisionLayer {
+pub enum CollisionLayer {
     Default,
     Player,
     Enemy,
@@ -12,8 +12,8 @@ enum CollisionLayer {
 
 #[derive(Clone, Copy, Component)]
 pub struct ColliderComponent {
-    aabb: AABB,
-    layer: CollisionLayer,
+    pub aabb: AABB,
+    pub layer: CollisionLayer,
 }
 
 impl ColliderComponent {
@@ -21,6 +21,11 @@ impl ColliderComponent {
         Self { aabb, layer }
     }
 
+    pub fn aabb(&self) -> AABB {
+        self.aabb
+    }
+
+    #[allow(dead_code)]
     pub fn intersects(&self, other: &ColliderComponent) -> bool {
         (self.aabb.min.x <= other.aabb.max.x && self.aabb.max.x >= other.aabb.min.x)
             && (self.aabb.min.y <= other.aabb.max.y && self.aabb.max.y >= other.aabb.min.y)
