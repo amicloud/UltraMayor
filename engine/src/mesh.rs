@@ -77,16 +77,13 @@ impl Vertex {
     }
 }
 
-#[allow(dead_code)]
-#[derive(Default, Clone)]
+#[derive(Default, Clone, Copy)]
 pub struct AABB {
     pub min: Vec3,
     pub max: Vec3,
 }
 
-#[allow(dead_code)]
 impl AABB {
-    #[allow(dead_code)]
     fn intersect_ray(&self, ray_origin: Vec3, ray_dir: Vec3) -> bool {
         let inv_dir = Vec3::new(1.0 / ray_dir.x, 1.0 / ray_dir.y, 1.0 / ray_dir.z);
 

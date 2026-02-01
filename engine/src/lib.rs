@@ -4,6 +4,8 @@
 mod action;
 mod action_manager;
 mod camera_component;
+mod collider_component;
+mod collision_system;
 mod frustum;
 mod handles;
 pub mod input;
@@ -41,6 +43,7 @@ use std::thread::sleep;
 use std::time::Duration;
 use std::time::Instant;
 
+use crate::collision_system::CollisionSystem;
 use crate::input::InputStateResource;
 use crate::mesh_resource::MeshResource;
 use crate::movement_system::MovementSystem;
@@ -88,6 +91,7 @@ impl Engine {
         // Engine-only systems. Game code adds its own systems to this schedule.
         schedule.add_systems(
             (
+                CollisionSystem::do_aabb_collisions,
                 PhysicsSystem::apply_impulses,
                 PhysicsSystem::update_bodies,
                 MovementSystem::update,
