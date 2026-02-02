@@ -14,6 +14,58 @@ use crate::texture_resource_manager::TextureResource;
 use crate::Engine;
 
 impl Engine {
+    fn rgba_from_rgb(rgb: [f32; 3]) -> [u8; 4] {
+        [
+            (rgb[0].clamp(0.0, 1.0) * 255.0) as u8,
+            (rgb[1].clamp(0.0, 1.0) * 255.0) as u8,
+            (rgb[2].clamp(0.0, 1.0) * 255.0) as u8,
+            255,
+        ]
+    }
+
+    fn rgba_from_rgba_f32(rgba: [f32; 4]) -> [u8; 4] {
+        [
+            (rgba[0].clamp(0.0, 1.0) * 255.0) as u8,
+            (rgba[1].clamp(0.0, 1.0) * 255.0) as u8,
+            (rgba[2].clamp(0.0, 1.0) * 255.0) as u8,
+            (rgba[3].clamp(0.0, 1.0) * 255.0) as u8,
+        ]
+    }
+
+    fn create_pbr_material(
+        render_resource_manager: &mut RenderResourceManager,
+        shader_handle: crate::handles::ShaderHandle,
+        albedo_handle: TextureHandle,
+        normal_handle: TextureHandle,
+        roughness: f32,
+    ) -> MaterialHandle {
+        let mut params = HashMap::new();
+        params.insert("u_roughness".to_string(), UniformValue::Float(roughness));
+        params.insert(
+            "u_base_reflectance".to_string(),
+            UniformValue::Float(0.04),
+        );
+        params.insert(
+            "u_albedo".to_string(),
+            UniformValue::Texture {
+                handle: albedo_handle,
+                unit: 0,
+            },
+        );
+        params.insert(
+            "u_normal".to_string(),
+            UniformValue::Texture {
+                handle: normal_handle,
+                unit: 1,
+            },
+        );
+
+        let desc = MaterialDesc::new(shader_handle, params);
+        render_resource_manager
+            .material_manager
+            .add_material(Material::new(desc))
+    }
+
     /// Loads a model from the specified file path. Supports different model formats based on file extension.
     /// Returns a `RenderBodyHandle` if the model is successfully loaded, or `None` if the format is unsupported.
     ///
@@ -79,24 +131,14 @@ impl Engine {
                                 .load_from_file(gl, tex_path.as_os_str())
                         } else {
                             let diffuse = material.diffuse.unwrap_or([1.0, 1.0, 1.0]);
-                            let rgba = [
-                                (diffuse[0].clamp(0.0, 1.0) * 255.0) as u8,
-                                (diffuse[1].clamp(0.0, 1.0) * 255.0) as u8,
-                                (diffuse[2].clamp(0.0, 1.0) * 255.0) as u8,
-                                255,
-                            ];
+                            let rgba = Self::rgba_from_rgb(diffuse);
                             render_resource_manager
                                 .texture_manager
                                 .create_solid_rgba(gl, rgba)
                         }
                     } else {
                         let diffuse = material.diffuse.unwrap_or([1.0, 1.0, 1.0]);
-                        let rgba = [
-                            (diffuse[0].clamp(0.0, 1.0) * 255.0) as u8,
-                            (diffuse[1].clamp(0.0, 1.0) * 255.0) as u8,
-                            (diffuse[2].clamp(0.0, 1.0) * 255.0) as u8,
-                            255,
-                        ];
+                        let rgba = Self::rgba_from_rgb(diffuse);
                         render_resource_manager
                             .texture_manager
                             .create_solid_rgba(gl, rgba)
@@ -125,28 +167,13 @@ impl Engine {
                         1.0
                     };
 
-                    let mut params = HashMap::new();
-                    params.insert("u_roughness".to_string(), UniformValue::Float(roughness));
-                    params.insert("u_base_reflectance".to_string(), UniformValue::Float(0.04));
-                    params.insert(
-                        "u_albedo".to_string(),
-                        UniformValue::Texture {
-                            handle: albedo_handle,
-                            unit: 0,
-                        },
+                    let handle = Self::create_pbr_material(
+                        &mut render_resource_manager,
+                        shader_handle,
+                        albedo_handle,
+                        normal_handle,
+                        roughness,
                     );
-                    params.insert(
-                        "u_normal".to_string(),
-                        UniformValue::Texture {
-                            handle: normal_handle,
-                            unit: 1,
-                        },
-                    );
-
-                    let desc = MaterialDesc::new(shader_handle, params);
-                    let handle = render_resource_manager
-                        .material_manager
-                        .add_material(Material::new(desc));
                     material_handles.push(handle);
                 }
             }
@@ -157,27 +184,14 @@ impl Engine {
                 let albedo = render_resource_manager
                     .texture_manager
                     .create_solid_rgba(gl, [255, 255, 255, 255]);
-                let mut params = HashMap::new();
-                params.insert("u_roughness".to_string(), UniformValue::Float(1.0));
-                params.insert("u_base_reflectance".to_string(), UniformValue::Float(0.04));
-                params.insert(
-                    "u_albedo".to_string(),
-                    UniformValue::Texture {
-                        handle: albedo,
-                        unit: 0,
-                    },
-                );
-                params.insert(
-                    "u_normal".to_string(),
-                    UniformValue::Texture {
-                        handle: render_resource_manager.texture_manager.default_normal_map,
-                        unit: 1,
-                    },
-                );
-                let desc = MaterialDesc::new(shader_handle, params);
-                render_resource_manager
-                    .material_manager
-                    .add_material(Material::new(desc))
+                let default_normal = render_resource_manager.texture_manager.default_normal_map;
+                Self::create_pbr_material(
+                    &mut render_resource_manager,
+                    shader_handle,
+                    albedo,
+                    default_normal,
+                    1.0,
+                )
             };
 
             let mut parts = Vec::with_capacity(models.len());
@@ -367,19 +381,13 @@ impl Engine {
         for material in gltf.materials() {
             let pbr = material.pbr_metallic_roughness();
             let roughness = pbr.roughness_factor();
-            let base_reflectance = 0.04;
 
             let albedo_handle = pbr
                 .base_color_texture()
                 .and_then(|info| texture_map.get(&info.texture().index()).copied())
                 .unwrap_or_else(|| {
                     let base_color = pbr.base_color_factor();
-                    let rgba = [
-                        (base_color[0] * 255.0) as u8,
-                        (base_color[1] * 255.0) as u8,
-                        (base_color[2] * 255.0) as u8,
-                        (base_color[3] * 255.0) as u8,
-                    ];
+                    let rgba = Self::rgba_from_rgba_f32(base_color);
                     render_resource_manager
                         .texture_manager
                         .create_solid_rgba(gl, rgba)
@@ -390,30 +398,13 @@ impl Engine {
                 .and_then(|info| texture_map.get(&info.texture().index()).copied())
                 .unwrap_or(render_resource_manager.texture_manager.default_normal_map);
 
-            let mut params = HashMap::new();
-            params.insert("u_roughness".to_string(), UniformValue::Float(roughness));
-            params.insert(
-                "u_base_reflectance".to_string(),
-                UniformValue::Float(base_reflectance),
+            let handle = Self::create_pbr_material(
+                render_resource_manager,
+                shader_handle,
+                albedo_handle,
+                normal_handle,
+                roughness,
             );
-            params.insert(
-                "u_albedo".to_string(),
-                UniformValue::Texture {
-                    handle: albedo_handle,
-                    unit: 0,
-                },
-            );
-            params.insert(
-                "u_normal".to_string(),
-                UniformValue::Texture {
-                    handle: normal_handle,
-                    unit: 1,
-                },
-            );
-            let desc = MaterialDesc::new(shader_handle, params);
-            let handle = render_resource_manager
-                .material_manager
-                .add_material(Material::new(desc));
             material_handles.push(handle);
         }
 
