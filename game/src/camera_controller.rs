@@ -88,19 +88,14 @@ impl OrbitCameraComponent {
 /// First-person camera controller for mouse-look.
 #[allow(dead_code)]
 #[derive(Component, Debug)]
-#[require(TransformComponent)]
+#[require(TransformComponent, VelocityComponent)]
 pub struct FlyingCameraComponent {
     pub yaw: f32,
     pub pitch: f32,
     pub sensitivity: f32,
-}
-
-/// Movement settings for the flying camera.
-#[derive(Component, Debug)]
-#[require(TransformComponent, VelocityComponent)]
-pub struct FlyingCameraMovementComponent {
     pub speed: f32,
 }
+
 
 #[allow(dead_code)]
 impl FlyingCameraComponent {
@@ -220,7 +215,7 @@ pub fn apply_flying_camera_movement(
     input_state: Res<InputStateResource>,
     mut query: Query<(
         &TransformComponent,
-        &FlyingCameraMovementComponent,
+        &FlyingCameraComponent,
         &mut VelocityComponent,
     )>,
 ) {

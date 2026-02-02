@@ -4,7 +4,6 @@ mod settings;
 
 use camera_controller::{
     apply_flying_camera_input, apply_flying_camera_movement, FlyingCameraComponent,
-    FlyingCameraMovementComponent,
 };
 // use input_controller::{update_input_state, InputState};
 use engine::{
@@ -46,12 +45,12 @@ fn main() {
                 yaw: -135.0,
                 pitch: -45.0,
                 sensitivity: 0.1,
+                speed: 100.0
             },
             VelocityComponent {
                 translational: Vec3::new(0.0, 0.0, 0.0),
                 angular: Vec3::new(0.0, 0.0, 0.0),
             },
-            FlyingCameraMovementComponent { speed: 100.0 },
         ))
         .id();
 
