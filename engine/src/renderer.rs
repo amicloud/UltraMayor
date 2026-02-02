@@ -162,10 +162,12 @@ impl Renderer {
                     }
                 }
 
+                let mut textures_bound: u32 = 0;
+
                 // 2. Bind material uniforms
                 for (name, value) in &material.desc.params {
                     if let Some(loc) = shader.uniforms.get(name) {
-                        Self::bind_uniform(gl, loc, value, render_data_manager);
+                        textures_bound += Self::bind_uniform(gl, loc, value, render_data_manager);
                     }
                 }
 
@@ -197,7 +199,7 @@ impl Renderer {
                     draw_calls += 1;
                 }
                 // Now that we are done with the material, unbind any textures it used
-                for unit in 0..16 {
+                for unit in 0..textures_bound {
                     gl.active_texture(glow::TEXTURE0 + unit);
                     gl.bind_texture(glow::TEXTURE_2D, None);
                 }
@@ -257,25 +259,31 @@ impl Renderer {
         }
     }
 
+    /// This returns an int to indicate how many texture units were bound
+    /// (so they can be unbound later). Not sure if this is clever or gross.
     fn bind_uniform(
         gl: &glow::Context,
         loc: &glow::UniformLocation,
         value: &UniformValue,
         render_data_manager: &RenderResourceManager,
-    ) {
+    ) -> u32 {
         unsafe {
             match value {
                 UniformValue::Float(v) => {
                     gl.uniform_1_f32(Some(loc), *v);
+                    return 0;
                 }
                 UniformValue::Vec3(v) => {
                     gl.uniform_3_f32(Some(loc), v.x, v.y, v.z);
+                    return 0;
                 }
                 UniformValue::Mat4(m) => {
                     gl.uniform_matrix_4_f32_slice(Some(loc), false, &m.to_cols_array());
+                    return 0;
                 }
                 UniformValue::Int(i) => {
                     gl.uniform_1_i32(Some(loc), *i);
+                    return 0;
                 }
                 UniformValue::Texture { handle, unit } => {
                     let tex = render_data_manager
@@ -286,6 +294,7 @@ impl Renderer {
                     gl.active_texture(glow::TEXTURE0 + *unit);
                     gl.bind_texture(glow::TEXTURE_2D, tex.gl_tex);
                     gl.uniform_1_i32(Some(loc), *unit as i32);
+                    return 1;
                 }
             }
         }
