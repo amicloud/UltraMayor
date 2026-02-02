@@ -29,16 +29,16 @@ impl OrbitCameraComponent {
             pitch_rad.sin(),
         )
         .normalize();
+    
         self.target.z = 0.0; // Keep the target on the ground plane.
 
         transform.position = self.target - (direction * self.distance);
 
         let forward = (self.target - transform.position).normalize();
-        let world_up = -world.up();
+        let world_up = world.up();
         let right = forward.cross(world_up).normalize();
         let up = right.cross(forward).normalize();
 
-        // Camera looks down -Z, so map local -Z to the forward direction explicitly.
         let rotation_matrix = Mat3::from_cols(right, up, -forward);
         transform.rotation = Quat::from_mat3(&rotation_matrix);
     }
@@ -104,17 +104,7 @@ pub struct FlyingCameraMovementComponent {
 
 #[allow(dead_code)]
 impl FlyingCameraComponent {
-    fn look(
-        &mut self,
-        delta_x: f32,
-        delta_y: f32,
-        transform: &mut TransformComponent,
-        world: &WorldBasis,
-    ) {
-        self.yaw -= delta_x * self.sensitivity;
-        self.pitch -= delta_y * self.sensitivity;
-        self.pitch = self.pitch.clamp(-89.9, 89.9);
-
+    fn apply_to_transform(&self, transform: &mut TransformComponent, world: &WorldBasis) {
         let yaw_rad = self.yaw.to_radians();
         let pitch_rad = self.pitch.to_radians();
 
@@ -130,6 +120,20 @@ impl FlyingCameraComponent {
 
         let rotation_matrix = Mat3::from_cols(right, up, -forward);
         transform.rotation = Quat::from_mat3(&rotation_matrix);
+    }
+
+    fn look(
+        &mut self,
+        delta_x: f32,
+        delta_y: f32,
+        transform: &mut TransformComponent,
+        world: &WorldBasis,
+    ) {
+        self.yaw -= delta_x * self.sensitivity;
+        self.pitch -= delta_y * self.sensitivity;
+        self.pitch = self.pitch.clamp(-89.9, 89.9);
+
+        self.apply_to_transform(transform, world);
     }
 }
 
@@ -175,7 +179,6 @@ pub fn apply_flying_camera_input(
     let Some(camera_entity) = active_camera.0 else {
         return;
     };
-
     let Ok((mut transform, mut camera)) = query.get_mut(camera_entity) else {
         return;
     };
@@ -198,6 +201,16 @@ pub fn apply_flying_camera_input(
     }
     if input_state.key_held(Keycode::Right) {
         camera.look(1.0 * arrow_sensitivity, 0.0, &mut transform, &world_basis);
+    }
+}
+
+/// Initializes newly spawned flying cameras so their transform matches their yaw/pitch.
+pub fn initialize_flying_camera_rotation(
+    world_basis: Res<WorldBasis>,
+    mut query: Query<(&mut TransformComponent, &FlyingCameraComponent), Added<FlyingCameraComponent>>,
+) {
+    for (mut transform, camera) in &mut query {
+        camera.apply_to_transform(&mut transform, &world_basis);
     }
 }
 

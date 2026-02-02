@@ -11,26 +11,24 @@ use engine::{
     physics_component::{PhysicsComponent, PhysicsType},
     physics_resource::Impulse,
     ActiveCamera, CameraComponent, CollisionLayer, Engine, RenderBodyComponent, TransformComponent,
-    VelocityComponent, WorldBasis,
+    VelocityComponent
 };
 use glam::{Quat, Vec3};
 use rand::random_range;
 
 use crate::camera_controller::{
-    apply_orbit_camera_input, apply_switch_camera_input, OrbitCameraComponent,
+    apply_orbit_camera_input, apply_switch_camera_input, initialize_flying_camera_rotation,
+    OrbitCameraComponent,
 };
 fn main() {
     println!("Welcome to the Game!");
     let mut engine = Engine::new();
 
     // Create an ECS-driven camera entity and mark it active.
-    let eye = Vec3::new(0.0, 0.0, 0.0);
-    let center = Vec3::new(1.0, 1.0, -1.0);
-    let up = WorldBasis::default().up();
     let aspect_ratio = 1024.0 / 769.0;
     let camera_transform = TransformComponent {
         position: Vec3::new(0.0, 0.0, 0.0),
-        rotation: Quat::look_at_rh(eye, center, up),
+        rotation: Quat::IDENTITY,
         scale: Vec3::new(1.0, 1.0, 1.0),
     };
 
@@ -83,7 +81,9 @@ fn main() {
         .get_resource_mut::<ActiveCamera>()
         .unwrap()
         .set(flying_camera);
+
     engine.schedule.add_systems((
+        initialize_flying_camera_rotation,
         apply_orbit_camera_input,
         apply_flying_camera_input,
         apply_flying_camera_movement,
