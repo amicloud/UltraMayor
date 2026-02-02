@@ -135,7 +135,7 @@ fn main() {
             );
 
             let scale = 100.0;
-            let collider = engine
+            let _collider = engine
                 .collider_from_render_body(*render_body_handle, CollisionLayer::Default)
                 .expect("Render body AABB not found");
             // Spawn test objects
