@@ -15,9 +15,33 @@ pub enum UniformValue {
     },
 }
 
+#[derive(Clone, Copy, Debug)]
+pub enum VertexAttribType {
+    Float32,
+    Vec2,
+    Vec3,
+    Vec4,
+    #[allow(dead_code)]
+    Mat4,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub enum InputRate {
+    PerVertex,
+    PerInstance,
+}
+
+pub struct ShaderAttrib {
+    pub name: String,
+    pub location: u32,
+    pub ty: VertexAttribType,
+    pub rate: InputRate, // PerVertex | PerInstance
+}
+
 pub struct Shader {
     pub program: glow::Program,
     pub uniforms: HashMap<String, glow::UniformLocation>,
+    pub attributes: Vec<ShaderAttrib>,
 }
 
 impl Hash for Shader {
@@ -83,7 +107,63 @@ impl Shader {
                 }
             }
 
-            let shader = Shader { program, uniforms };
+            let mut attributes = Vec::new();
+            let attrib_count = gl.get_active_attributes(program) as i32;
+            for i in 0..attrib_count {
+                if let Some(info) = gl.get_active_attribute(program, i as u32) {
+                    let raw_name = info.name;
+                    let name = raw_name.trim_end_matches("[0]").to_string();
+                    let Some(location) = gl.get_attrib_location(program, &name) else {
+                        continue;
+                    };
+
+                    let rate = if name.starts_with("instance_") {
+                        InputRate::PerInstance
+                    } else {
+                        InputRate::PerVertex
+                    };
+
+                    match info.atype {
+                        glow::FLOAT => attributes.push(ShaderAttrib {
+                            name: name.clone(),
+                            location,
+                            ty: VertexAttribType::Float32,
+                            rate,
+                        }),
+                        glow::FLOAT_VEC2 => attributes.push(ShaderAttrib {
+                            name: name.clone(),
+                            location,
+                            ty: VertexAttribType::Vec2,
+                            rate,
+                        }),
+                        glow::FLOAT_VEC3 => attributes.push(ShaderAttrib {
+                            name: name.clone(),
+                            location,
+                            ty: VertexAttribType::Vec3,
+                            rate,
+                        }),
+                        glow::FLOAT_VEC4 => attributes.push(ShaderAttrib {
+                            name: name.clone(),
+                            location,
+                            ty: VertexAttribType::Vec4,
+                            rate,
+                        }),
+                        glow::FLOAT_MAT4 => {
+                            for col in 0..4 {
+                                attributes.push(ShaderAttrib {
+                                    name: format!("{}_col{}", name, col),
+                                    location: location + col,
+                                    ty: VertexAttribType::Vec4,
+                                    rate,
+                                });
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+            }
+
+            let shader = Shader { program, uniforms , attributes };
 
             gl.delete_shader(vertex_shader);
             gl.delete_shader(fragment_shader);

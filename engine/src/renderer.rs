@@ -1,24 +1,38 @@
+use crate::frustum::Frustum;
 use crate::handles::MaterialHandle;
 use crate::handles::MeshHandle;
+use crate::handles::ShaderHandle;
 use crate::mesh::Mesh;
+use crate::mesh::Vertex;
 use crate::render_instance::RenderInstance;
 use crate::render_resource_manager::RenderResourceManager;
+use crate::shader::InputRate::PerInstance;
+use crate::shader::InputRate::PerVertex;
 use crate::shader::UniformValue;
+use crate::shader::VertexAttribType;
+use std::collections::HashMap;
+use std::mem::offset_of;
 use std::rc::Rc;
-// use crate::render_texture::RenderTexture;
 use glam::{Mat4, Vec3};
 use glow::Context as GlowContext;
 use glow::HasContext;
+
 pub struct Renderer {
     gl: Rc<GlowContext>,
-    // displayed_texture: RenderTexture,
-    // next_texture: RenderTexture,
     frames_rendered: u64,
+    vao_cache: HashMap<VaoKey, glow::VertexArray>,
 }
 pub struct RenderParams {
     pub width: u32,
     pub height: u32,
 }
+
+#[derive(Eq, Hash, PartialEq)]
+struct VaoKey {
+    mesh: MeshHandle,
+    shader: ShaderHandle,
+}
+
 
 /// Precomputed camera data required by the renderer.
 pub struct CameraRenderData {
@@ -33,6 +47,110 @@ impl Renderer {
         x.max(y).max(z)
     }
 
+    fn get_or_create_vao(
+        &mut self,
+        mesh: &MeshHandle,
+        shader: &ShaderHandle,
+        render_data_manager: &RenderResourceManager,
+    ) -> glow::VertexArray {
+        let key = VaoKey {
+            mesh: *mesh,
+            shader: *shader,
+        };
+
+        if let Some(vao) = self.vao_cache.get(&key) {
+            return *vao;
+        }
+
+        unsafe {
+            let gl = &self.gl;
+            let vao = gl.create_vertex_array().unwrap();
+            gl.bind_vertex_array(Some(vao));
+
+            let mesh_data = render_data_manager.mesh_manager.get_mesh(*mesh).unwrap();
+            gl.bind_buffer(glow::ARRAY_BUFFER, Some(mesh_data.vbo.unwrap()));
+            gl.bind_buffer(glow::ELEMENT_ARRAY_BUFFER, Some(mesh_data.ebo.unwrap()));
+
+            let vertex_stride = crate::mesh::Vertex::stride();
+
+            let instance_offset_for = |name: &str| -> Option<i32> {
+                if let Some(suffix) = name.strip_prefix("instance_model_col") {
+                    if let Ok(index) = suffix.parse::<i32>() {
+                        if (0..4).contains(&index) {
+                            return Some(index * 16);
+                        }
+                    }
+                }
+                None
+            };
+
+            for attrib in &render_data_manager.shader_manager.get_shader(*shader).unwrap().attributes {
+                let location = attrib.location;
+                let divisor = match attrib.rate {
+                    PerVertex => 0,
+                    PerInstance => 1,
+                };
+
+                match attrib.rate {
+                    PerInstance => {
+                        if let Some(offset) = instance_offset_for(&attrib.name) {
+                            gl.bind_buffer(glow::ARRAY_BUFFER, Some(mesh_data.instance_vbo.unwrap()));
+                            gl.enable_vertex_attrib_array(location);
+                            gl.vertex_attrib_pointer_f32(
+                                location,
+                                4,
+                                glow::FLOAT,
+                                false,
+                                64,
+                                offset,
+                            );
+                            gl.vertex_attrib_divisor(location, divisor);
+                        }
+                    }
+                    PerVertex => {
+                        if let Some(offset) = {
+                            let name: &str = &attrib.name;
+                            match name {
+                                "position" => Some(offset_of!(Vertex, position) as i32),
+                                "normal" => Some(offset_of!(Vertex, normal) as i32),
+                                "barycentric" => Some(offset_of!(Vertex, barycentric) as i32),
+                                "uv_albedo" => Some(offset_of!(Vertex, uv_albedo) as i32),
+                                "uv_normal" => Some(offset_of!(Vertex, uv_normal) as i32),
+                                "tangent" => Some(offset_of!(Vertex, tangent) as i32),
+                                _ => None,
+                            }
+                        } {
+                            gl.bind_buffer(glow::ARRAY_BUFFER, Some(mesh_data.vbo.unwrap()));
+                            gl.enable_vertex_attrib_array(location);
+                            let (size, ty) = match attrib.ty {
+                                VertexAttribType::Float32 => (1, glow::FLOAT),
+                                VertexAttribType::Vec2 => (2, glow::FLOAT),
+                                VertexAttribType::Vec3 => (3, glow::FLOAT),
+                                VertexAttribType::Vec4 => (4, glow::FLOAT),
+                                VertexAttribType::Mat4 => {
+                                    continue;
+                                }
+                            };
+                            gl.vertex_attrib_pointer_f32(
+                                location,
+                                size,
+                                ty,
+                                false,
+                                vertex_stride,
+                                offset,
+                            );
+                            gl.vertex_attrib_divisor(location, divisor);
+                        }
+                    }
+                }
+            }
+
+            gl.bind_vertex_array(None);
+            self.vao_cache.insert(key, vao);
+            vao
+        }
+    }
+
     pub fn render(
         &mut self,
         render_params: RenderParams,
@@ -41,7 +159,7 @@ impl Renderer {
         camera: Option<CameraRenderData>,
     ) {
         unsafe {
-            let gl = &self.gl;
+            let gl = &self.gl.clone();
             let current_time = std::time::Instant::now();
             let mut draw_calls = 0;
 
@@ -79,7 +197,7 @@ impl Renderer {
             // ------------------------------------------------------------
             // PASS 1: Frustum culling
             // ------------------------------------------------------------
-            let frustum = crate::frustum::Frustum::from_view_proj(&view_proj);
+            let frustum = Frustum::from_view_proj(&view_proj);
 
             let mut visible_instances: Vec<&RenderInstance> = Vec::new();
 
@@ -182,16 +300,26 @@ impl Renderer {
 
                 // Draw each mesh
                 for (mesh_id, matrices) in instances_by_mesh {
-                    let mesh = render_data_manager
-                        .mesh_manager
-                        .get_mesh_mut(mesh_id)
-                        .expect("Mesh not found");
-                    mesh.update_instance_buffer(&matrices, gl);
+                    let vao = Self::get_or_create_vao(
+                        self,
+                        &mesh_id,
+                        &material.desc.shader,
+                        render_data_manager,
+                    );
 
-                    gl.bind_vertex_array(mesh.vao);
+                    let index_count = {
+                        let mesh = render_data_manager
+                            .mesh_manager
+                            .get_mesh_mut(mesh_id)
+                            .expect("Mesh not found");
+                        mesh.update_instance_buffer(&matrices, gl);
+                        mesh.indices.len() as i32
+                    };
+
+                    gl.bind_vertex_array(Some(vao));
                     gl.draw_elements_instanced(
                         glow::TRIANGLES,
-                        mesh.indices.len() as i32,
+                        index_count,
                         glow::UNSIGNED_INT,
                         0,
                         matrices.len() as i32,
@@ -234,6 +362,7 @@ impl Renderer {
             let renderer = Self {
                 gl,
                 frames_rendered: 0,
+                vao_cache: HashMap::new(),
             };
             renderer
         }
@@ -243,9 +372,6 @@ impl Renderer {
     #[allow(dead_code)]
     pub fn delete_mesh_gpu(&self, mesh: &mut Mesh) {
         unsafe {
-            if let Some(vao) = mesh.vao.take() {
-                self.gl.delete_vertex_array(vao);
-            }
             if let Some(vbo) = mesh.vbo.take() {
                 self.gl.delete_buffer(vbo);
             }

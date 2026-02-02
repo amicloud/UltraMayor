@@ -4,7 +4,7 @@ use approx::relative_eq;
 use bytemuck::{Pod, Zeroable};
 use glam::Vec3;
 use glow::HasContext;
-use std::{hash::Hash, hash::Hasher};
+use std::hash::{Hash, Hasher};
 
 use crate::handles::MeshHandle;
 
@@ -52,6 +52,10 @@ impl Hash for Vertex {
 }
 
 impl Vertex {
+    pub(crate) fn stride() -> i32 {
+        std::mem::size_of::<Vertex>() as i32
+    }
+
     fn rounded_bits(f: f32, decimal_places: u32) -> u32 {
         // Calculate the scaling factor based on desired decimal places
         let scale = 10f32.powi(decimal_places as i32);
@@ -124,23 +128,23 @@ impl AABB {
     }
 }
 
-#[derive(Default, Clone)]
+#[derive(Clone, Default)]
 pub struct Mesh {
     pub id: MeshHandle,
     pub vertices: Vec<Vertex>,
     pub indices: Vec<u32>,
+
+    // Bounds
     pub aabb: AABB,
-    // Bounding sphere
     pub sphere_center: Vec3,
     pub sphere_radius: f32,
 
     // GPU handles
-    pub vao: Option<glow::VertexArray>,
     pub vbo: Option<glow::Buffer>,
     pub ebo: Option<glow::Buffer>,
+    pub instance_vbo: Option<glow::Buffer>,
 
     // Instancing
-    pub instance_vbo: Option<glow::Buffer>,
     pub instance_count: usize,
 }
 
@@ -150,18 +154,16 @@ pub struct GltfPrimitiveMesh {
     pub material_index: Option<usize>,
 }
 
+
 impl Mesh {
     pub fn upload_to_gpu(&mut self, gl: &glow::Context) {
         unsafe {
             // --- Create GPU objects ---
-            let vao = gl.create_vertex_array().unwrap();
             let vbo = gl.create_buffer().unwrap();
             let ebo = gl.create_buffer().unwrap();
             let instance_vbo = gl.create_buffer().unwrap();
 
-            gl.bind_vertex_array(Some(vao));
-
-            // --- Vertex buffer ---
+            // Upload vertex data
             gl.bind_buffer(glow::ARRAY_BUFFER, Some(vbo));
             gl.buffer_data_u8_slice(
                 glow::ARRAY_BUFFER,
@@ -169,7 +171,7 @@ impl Mesh {
                 glow::STATIC_DRAW,
             );
 
-            // --- Index buffer ---
+            // Upload index data
             gl.bind_buffer(glow::ELEMENT_ARRAY_BUFFER, Some(ebo));
             gl.buffer_data_u8_slice(
                 glow::ELEMENT_ARRAY_BUFFER,
@@ -177,63 +179,12 @@ impl Mesh {
                 glow::STATIC_DRAW,
             );
 
-            let stride = std::mem::size_of::<Vertex>() as i32;
-
-            let position_offset = 0;
-            let normal_offset = 3;
-            let bary_offset = normal_offset + 3;
-            let uv_albedo_offset = bary_offset + 3;
-            let uv_normal_offset = uv_albedo_offset + 2;
-            let tangent_offset = uv_normal_offset + 2;
-
-            gl.enable_vertex_attrib_array(0);
-            gl.vertex_attrib_pointer_f32(0, 3, glow::FLOAT, false, stride, position_offset * 4);
-
-            gl.enable_vertex_attrib_array(1);
-            gl.vertex_attrib_pointer_f32(1, 3, glow::FLOAT, false, stride, normal_offset * 4);
-
-            gl.enable_vertex_attrib_array(2);
-            gl.vertex_attrib_pointer_f32(2, 3, glow::FLOAT, false, stride, bary_offset * 4);
-
-            gl.enable_vertex_attrib_array(3);
-            gl.vertex_attrib_pointer_f32(3, 2, glow::FLOAT, false, stride, uv_albedo_offset * 4);
-
-            gl.enable_vertex_attrib_array(4);
-            gl.vertex_attrib_pointer_f32(4, 2, glow::FLOAT, false, stride, uv_normal_offset * 4);
-
-            gl.enable_vertex_attrib_array(5);
-            gl.vertex_attrib_pointer_f32(5, 4, glow::FLOAT, false, stride, tangent_offset * 4);
-
-            // --- Instance buffer ---
+            // Allocate empty instance buffer (resized on update)
             gl.bind_buffer(glow::ARRAY_BUFFER, Some(instance_vbo));
-            let max_instances = 10000;
-            gl.buffer_data_size(
-                glow::ARRAY_BUFFER,
-                (max_instances * 16 * 4) as i32, // 16 floats per matrix * 4 bytes
-                glow::DYNAMIC_DRAW,
-            );
-
-            let mat_stride = 16 * 4; // bytes
-            for i in 0..4 {
-                let loc = 6 + i; // attributes 6,7,8,9
-                gl.enable_vertex_attrib_array(loc);
-                gl.vertex_attrib_pointer_f32(
-                    loc,
-                    4,
-                    glow::FLOAT,
-                    false,
-                    mat_stride,
-                    (i * 4 * 4) as i32,
-                );
-                gl.vertex_attrib_divisor(loc, 1);
-            }
-
-            // --- Unbind ---
-            gl.bind_vertex_array(None);
+            gl.buffer_data_size(glow::ARRAY_BUFFER, 0, glow::DYNAMIC_DRAW);
             gl.bind_buffer(glow::ARRAY_BUFFER, None);
             gl.bind_buffer(glow::ELEMENT_ARRAY_BUFFER, None);
 
-            self.vao = Some(vao);
             self.vbo = Some(vbo);
             self.ebo = Some(ebo);
             self.instance_vbo = Some(instance_vbo);
@@ -252,6 +203,8 @@ impl Mesh {
             gl.bind_buffer(glow::ARRAY_BUFFER, Some(instance_buf));
 
             let byte_len = (instance_matrices.len() * 16 * 4) as i32;
+
+            gl.buffer_data_size(glow::ARRAY_BUFFER, byte_len, glow::DYNAMIC_DRAW);
 
             let ptr = gl.map_buffer_range(
                 glow::ARRAY_BUFFER,
