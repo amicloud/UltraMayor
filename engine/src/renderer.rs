@@ -281,7 +281,7 @@ impl Renderer {
                     let tex = render_data_manager
                         .texture_manager
                         .get_texture(*handle)
-                        .expect("Texture missing");
+        .unwrap_or_else(|| render_data_manager.texture_manager.get_texture(render_data_manager.texture_manager.default_normal_map).unwrap()); 
 
                     gl.active_texture(glow::TEXTURE0 + *unit);
                     gl.bind_texture(glow::TEXTURE_2D, tex.gl_tex);
