@@ -110,7 +110,7 @@ fn main() {
         .unwrap();
 
     let t_range = 2.0;
-    for _ in 0..1000 {
+    for _ in 0..100 {
         for render_body_handle in &assets {
             // Random position
             let pos = Vec3::new(

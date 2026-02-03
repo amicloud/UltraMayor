@@ -94,11 +94,12 @@ impl Engine {
         // Engine-only systems. Game code adds its own systems to this schedule.
         schedule.add_systems(
             (
-                PhysicsSystem::apply_impulses,
-                PhysicsSystem::update_bodies,
                 MovementSystem::update,
                 CollisionSystem::update_world_aabb_cache,
-                CollisionSystem::do_aabb_collisions,
+                CollisionSystem::generate_contacts,
+                CollisionSystem::resolve_contacts,
+                PhysicsSystem::apply_impulses,
+                PhysicsSystem::update_bodies,
                 RenderSystem::extract_render_data,
             )
                 .chain(),

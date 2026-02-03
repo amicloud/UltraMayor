@@ -2,8 +2,7 @@ use bevy_ecs::prelude::{Changed, Entity, Query, Res, ResMut, With};
 use glam::Vec3;
 
 use crate::{
-    collider_component::ColliderComponent, mesh::AABB, physics_resource::PhysicsResource,
-    TransformComponent,
+    TransformComponent, collider_component::ColliderComponent, mesh::AABB, physics_resource::{Contact, Impulse, PhysicsResource}
 };
 
 #[derive(Default)]
@@ -23,16 +22,17 @@ impl CollisionSystem {
         }
     }
 
-    pub fn do_aabb_collisions(
+    pub fn generate_contacts(
         moving_query: Query<
             (Entity, &ColliderComponent, &TransformComponent),
             Changed<TransformComponent>,
         >,
         all_query: Query<(Entity, &ColliderComponent), With<ColliderComponent>>,
-        phys: Res<PhysicsResource>,
+        mut phys: ResMut<PhysicsResource>,
     ) {
         // Collect moving entities
         let moving_entities: Vec<Entity> = moving_query.iter().map(|(e, _, _)| e).collect();
+        let mut contacts = Vec::new();
 
         // Iterate over moving entities only
         for &entity_a in &moving_entities {
@@ -52,12 +52,66 @@ impl CollisionSystem {
 
                 if aabb_intersects(aabb_a, aabb_b) {
                     println!(
-                        "Collision detected between Entity {:?} and Entity {:?}",
+                        "Contact detected between Entity {:?} and Entity {:?}",
                         entity_a, entity_b
                     );
+                    // Simple approximation: normal along the largest penetration axis
+                    let delta = (aabb_b.min + aabb_b.max) * 0.5 - (aabb_a.min + aabb_a.max) * 0.5;
+                    let overlap_x = (aabb_a.max.x - aabb_a.min.x + aabb_b.max.x - aabb_b.min.x)
+                        * 0.5
+                        - delta.x.abs();
+                    let overlap_y = (aabb_a.max.y - aabb_a.min.y + aabb_b.max.y - aabb_b.min.y)
+                        * 0.5
+                        - delta.y.abs();
+                    let overlap_z = (aabb_a.max.z - aabb_a.min.z + aabb_b.max.z - aabb_b.min.z)
+                        * 0.5
+                        - delta.z.abs();
+
+                    let (penetration, normal) = if overlap_x < overlap_y && overlap_x < overlap_z {
+                        (overlap_x, Vec3::new(delta.x.signum(), 0.0, 0.0))
+                    } else if overlap_y < overlap_z {
+                        (overlap_y, Vec3::new(0.0, delta.y.signum(), 0.0))
+                    } else {
+                        (overlap_z, Vec3::new(0.0, 0.0, delta.z.signum()))
+                    };
+
+                    contacts.push(Contact {
+                        entity_a,
+                        entity_b,
+                        normal,
+                        penetration,
+                    });
                 }
             }
         }
+
+        for contact in contacts {
+            phys.add_contact(contact);
+        }
+    }
+
+    pub fn resolve_contacts(
+        mut phys: ResMut<PhysicsResource>
+    ) {
+        let mut impulses = Vec::new();
+        for contact in phys.contacts.iter() {
+            // Calculate impulse
+            let impulse = contact.normal * contact.penetration;
+            impulses.push(Impulse {
+                entity: contact.entity_a,
+                linear: -impulse,
+                angular: Vec3::ZERO,
+            });
+            impulses.push(Impulse {
+                entity: contact.entity_b,
+                linear: impulse,
+                angular: Vec3::ZERO,
+            });
+        }
+        for impulse in impulses {
+            phys.add_impulse(impulse.entity, impulse.linear, impulse.angular);
+        }
+        phys.contacts.clear();
     }
 }
 
