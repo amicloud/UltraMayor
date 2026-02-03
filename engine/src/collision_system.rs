@@ -109,7 +109,6 @@ impl CollisionSystem {
                             entity_b,
                             mesh_b,
                             transform_b,
-                            aabb_b,
                             &render_resources,
                         ) {
                             contacts.push(contact);
@@ -126,7 +125,6 @@ impl CollisionSystem {
                             entity_a,
                             mesh_a,
                             transform_a,
-                            aabb_a,
                             &render_resources,
                         ) {
                             contacts.push(contact);
@@ -149,6 +147,7 @@ impl CollisionSystem {
     ) {
         let mut impulses = Vec::new();
         let mut corrections: HashMap<Entity, Vec3> = HashMap::new();
+        println!("Number of contacts to resolve: {}", phys.contacts.len());
         for contact in phys.contacts.iter() {
             let (vel_a, phys_a) = query
                 .get(contact.entity_a)
@@ -173,6 +172,7 @@ impl CollisionSystem {
             let inv_mass_sum = inv_mass_a + inv_mass_b;
 
             if inv_mass_sum == 0.0 {
+                println!("Both entities have infinite mass, skipping contact resolution.");
                 continue;
             }
 
@@ -191,6 +191,7 @@ impl CollisionSystem {
             if vel_along_normal.abs() < resting_threshold
                 && contact.penetration <= penetration_slop
             {
+                println!("Resting contact detected, skipping impulse resolution.");
                 continue;
             }
             let effective_restitution = if vel_along_normal.abs() < resting_threshold {
@@ -203,6 +204,7 @@ impl CollisionSystem {
             if vel_along_normal < -resting_threshold {
                 normal_impulse = (-(1.0 + effective_restitution) * vel_along_normal) / inv_mass_sum;
                 let impulse = contact.normal * normal_impulse;
+                println!("Applying normal impulse: {:?}", impulse);
                 impulses.push(Impulse {
                     entity: contact.entity_a,
                     linear: -impulse,
@@ -213,6 +215,8 @@ impl CollisionSystem {
                     linear: impulse,
                     angular: Vec3::ZERO,
                 });
+            } else {
+                println!("No normal impulse applied for non-colliding contact.");
             }
 
             if normal_impulse > 0.0 {
@@ -232,6 +236,7 @@ impl CollisionSystem {
                     let max_friction = friction * normal_impulse;
                     let friction_impulse = jt.clamp(-max_friction, max_friction);
                     let impulse = tangent_dir * friction_impulse;
+                    println!("Applying friction impulse: {:?}", impulse);
                     impulses.push(Impulse {
                         entity: contact.entity_a,
                         linear: -impulse,
@@ -243,11 +248,14 @@ impl CollisionSystem {
                         angular: Vec3::ZERO,
                     });
                 }
+            } else {
+                println!("No normal impulse applied, skipping friction resolution.");
             }
 
             let correction_percent = 0.2;
             let penetration = (contact.penetration - penetration_slop).max(0.0);
             if penetration > 0.0 {
+                println!("Applying positional correction for penetration: {}", penetration);
                 let correction =
                     contact.normal * (penetration * correction_percent / inv_mass_sum);
 
@@ -262,6 +270,7 @@ impl CollisionSystem {
             }
         }
         for impulse in impulses {
+            println!("Adding impulse...");
             phys.add_impulse(impulse.entity, impulse.linear, impulse.angular);
         }
         for (entity, correction) in corrections {
@@ -352,7 +361,6 @@ fn box_mesh_contact(
     mesh_entity: Entity,
     mesh_collider: &MeshCollider,
     mesh_transform: &TransformComponent,
-    mesh_aabb_world: &AABB,
     render_resources: &RenderResourceManager,
 ) -> Option<Contact> {
     let render_body = render_resources
@@ -376,20 +384,21 @@ fn box_mesh_contact(
             continue;
         }
 
-        let mut normal_world = mesh_world.transform_vector3(hits[0].1);
+            let (tri, hit) = &hits[0];
+            let mut normal_world = mesh_world.transform_vector3(hit.normal);
         let normal_len = normal_world.length();
         if normal_len <= f32::EPSILON {
             continue;
         }
+            let penetration = hit.penetration * normal_len;
         normal_world /= normal_len;
 
-        let center_delta = (mesh_aabb_world.min + mesh_aabb_world.max) * 0.5
-            - (box_aabb_world.min + box_aabb_world.max) * 0.5;
-        if normal_world.dot(center_delta) < 0.0 {
-            normal_world = -normal_world;
-        }
+            let box_center_world = (box_aabb_world.min + box_aabb_world.max) * 0.5;
+            let tri_point_world = mesh_world.transform_point3(tri.v0);
+            if (box_center_world - tri_point_world).dot(normal_world) > 0.0 {
+                normal_world = -normal_world;
+            }
 
-        let penetration = penetration_depth(box_aabb_world, mesh_aabb_world);
         let contact = Contact {
             entity_a: box_entity,
             entity_b: mesh_entity,
@@ -404,18 +413,6 @@ fn box_mesh_contact(
     }
 
     None
-}
-
-fn penetration_depth(aabb_a: &AABB, aabb_b: &AABB) -> f32 {
-    let delta = (aabb_b.min + aabb_b.max) * 0.5 - (aabb_a.min + aabb_a.max) * 0.5;
-    let overlap_x = (aabb_a.max.x - aabb_a.min.x + aabb_b.max.x - aabb_b.min.x) * 0.5
-        - delta.x.abs();
-    let overlap_y = (aabb_a.max.y - aabb_a.min.y + aabb_b.max.y - aabb_b.min.y) * 0.5
-        - delta.y.abs();
-    let overlap_z = (aabb_a.max.z - aabb_a.min.z + aabb_b.max.z - aabb_b.min.z) * 0.5
-        - delta.z.abs();
-
-    overlap_x.min(overlap_y).min(overlap_z).max(0.0)
 }
 
 fn render_body_local_aabb(

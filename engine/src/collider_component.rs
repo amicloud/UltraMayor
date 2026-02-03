@@ -38,6 +38,12 @@ impl Triangle {
     }
 }
 
+#[derive(Clone, Copy)]
+pub struct CollisionHit {
+    pub normal: Vec3,
+    pub penetration: f32,
+}
+
 #[derive(Clone, Debug)]
 pub struct BVHNode {
     pub aabb: AABB,
@@ -51,7 +57,7 @@ impl BVHNode {
         &self,
         collider: &C,
         collider_transform: &Mat4,
-        hits: &mut Vec<(Triangle, Vec3)>,
+        hits: &mut Vec<(Triangle, CollisionHit)>,
     ) {
         if !aabb_intersects(&self.aabb, &collider.aabb(collider_transform)) {
             return;
@@ -59,9 +65,8 @@ impl BVHNode {
 
         if self.left.is_none() && self.right.is_none() {
             for tri in &self.triangles {
-                if let Some(normal) = collider.collide_triangle(tri, collider_transform) {
-                    println!("Collision detected with triangle: {:?}, normal: {:?}", tri, normal);
-                    hits.push((tri.clone(), normal));
+                if let Some(hit) = collider.collide_triangle(tri, collider_transform) {
+                    hits.push((tri.clone(), hit));
                 }
             }
         } else {
@@ -124,7 +129,7 @@ impl BVHNode {
 
 pub trait Collider {
     fn aabb(&self, transform: &Mat4) -> AABB;
-    fn collide_triangle(&self, tri: &Triangle, transform: &Mat4) -> Option<Vec3>;
+    fn collide_triangle(&self, tri: &Triangle, transform: &Mat4) -> Option<CollisionHit>;
 }
 
 #[derive(Clone, Copy, Component)]
@@ -151,14 +156,33 @@ impl Collider for BoxCollider {
         transform_aabb(self.aabb, transform)
     }
 
-    fn collide_triangle(&self, tri: &Triangle, transform: &Mat4) -> Option<Vec3> {
+    fn collide_triangle(&self, tri: &Triangle, transform: &Mat4) -> Option<CollisionHit> {
         let collider_aabb = self.aabb(transform);
         let tri_aabb = tri.aabb();
         if !aabb_intersects(&collider_aabb, &tri_aabb) {
             return None;
         }
+        let normal = tri.normal()?;
 
-        tri.normal()
+        let corners = aabb_corners(&collider_aabb);
+        let mut min_d = f32::INFINITY;
+        let mut max_d = f32::NEG_INFINITY;
+        for corner in &corners {
+            let d = (*corner - tri.v0).dot(normal);
+            min_d = min_d.min(d);
+            max_d = max_d.max(d);
+        }
+
+        if min_d > 0.0 || max_d < 0.0 {
+            return None;
+        }
+
+        let penetration = (-min_d).max(0.0);
+        if penetration <= 0.0 {
+            return None;
+        }
+
+        Some(CollisionHit { normal, penetration })
     }
 }
 
@@ -205,6 +229,21 @@ fn transform_aabb(local: AABB, transform: &Mat4) -> AABB {
         min: world_min,
         max: world_max,
     }
+}
+
+fn aabb_corners(aabb: &AABB) -> [Vec3; 8] {
+    let min = aabb.min;
+    let max = aabb.max;
+    [
+        Vec3::new(min.x, min.y, min.z),
+        Vec3::new(min.x, min.y, max.z),
+        Vec3::new(min.x, max.y, min.z),
+        Vec3::new(min.x, max.y, max.z),
+        Vec3::new(max.x, min.y, min.z),
+        Vec3::new(max.x, min.y, max.z),
+        Vec3::new(max.x, max.y, min.z),
+        Vec3::new(max.x, max.y, max.z),
+    ]
 }
 
 fn aabb_intersects(a: &AABB, b: &AABB) -> bool {

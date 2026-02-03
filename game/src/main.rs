@@ -150,7 +150,7 @@ fn main() {
 
     let t_range = 2.0;
 
-    for _ in 0..10 {
+    for _ in 0..1 {
         for render_body_handle in &assets {
             // Random position
             let pos = Vec3::new(
@@ -255,7 +255,7 @@ fn main() {
         angular: Vec3::new(0.0, 0.0, 0.0),
     });
 
-    let ground_scale = 1.0;
+    let ground_scale = 0.1;
     let ground_collider = engine
         .mesh_collider_from_render_body(ground, CollisionLayer::Default)
         .expect("Render body not found");
