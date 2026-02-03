@@ -635,32 +635,37 @@ fn box_mesh_contact_at_transform(
         return None;
     }
 
-    let (tri, hit) = &hits[0];
-    let mut normal_world = mesh_world.transform_vector3(hit.normal);
-    let normal_len = normal_world.length();
-    if normal_len <= f32::EPSILON {
-        return None;
-    }
-    let penetration = hit.penetration * normal_len;
-    normal_world /= normal_len;
+    let mut best_contact: Option<Contact> = None;
+    let mut best_penetration = 0.0;
+    for (tri, hit) in hits {
+        let mut normal_world = mesh_world.transform_vector3(hit.normal);
+        let normal_len = normal_world.length();
+        if normal_len <= f32::EPSILON {
+            continue;
+        }
+        let penetration = hit.penetration * normal_len;
+        normal_world /= normal_len;
 
-    let box_center_world = (box_aabb_world.min + box_aabb_world.max) * 0.5;
-    let tri_point_world = mesh_world.transform_point3(tri.v0);
-    if (box_center_world - tri_point_world).dot(normal_world) > 0.0 {
-        normal_world = -normal_world;
+        let box_center_world = (box_aabb_world.min + box_aabb_world.max) * 0.5;
+        let tri_point_world = mesh_world.transform_point3(tri.v0);
+        if (box_center_world - tri_point_world).dot(normal_world) > 0.0 {
+            normal_world = -normal_world;
+        }
+
+        let contact = Contact {
+            entity_a: box_entity,
+            entity_b: mesh_entity,
+            normal: normal_world,
+            penetration,
+        };
+
+        if contact.penetration > best_penetration {
+            best_penetration = contact.penetration;
+            best_contact = Some(contact);
+        }
     }
 
-    let contact = Contact {
-        entity_a: box_entity,
-        entity_b: mesh_entity,
-        normal: normal_world,
-        penetration,
-    };
-    println!(
-        "Box-Mesh collision detected: Box Entity {:?}, Mesh Entity {:?}, Normal {:?}, Penetration {}",
-        box_entity, mesh_entity, contact.normal, contact.penetration
-    );
-    Some(contact)
+    best_contact
 }
 
 fn swept_aabb(aabb: &AABB, delta: Vec3) -> AABB {

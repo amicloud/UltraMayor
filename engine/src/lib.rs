@@ -357,7 +357,7 @@ impl Engine {
         combined
     }
 
-    pub fn collider_from_render_body(
+    pub fn box_collider_from_render_body(
         &self,
         render_body_id: RenderBodyHandle,
         layer: CollisionLayer,

@@ -150,7 +150,7 @@ fn main() {
 
     let t_range = 2.0;
 
-    for _ in 0..1 {
+    for _ in 0..100 {
         for render_body_handle in &assets {
             // Random position
             let pos = Vec3::new(
@@ -176,7 +176,7 @@ fn main() {
 
             let scale = 100.0;
             let collider = engine
-                .collider_from_render_body(*render_body_handle, CollisionLayer::Default)
+                .box_collider_from_render_body(*render_body_handle, CollisionLayer::Default)
                 .expect("Render body AABB not found");
             // Spawn test objects
             engine.world.spawn((
@@ -226,7 +226,7 @@ fn main() {
     antique_camera_transform.position.y += 50.0;
 
     let antique_collider = engine
-        .collider_from_render_body(antique_camera, CollisionLayer::Default)
+        .box_collider_from_render_body(antique_camera, CollisionLayer::Default)
         .expect("Render body AABB not found");
     // let phys_cam = engine
     //     .world
@@ -259,31 +259,31 @@ fn main() {
     let ground_collider = engine
         .mesh_collider_from_render_body(ground, CollisionLayer::Default)
         .expect("Render body not found");
-    // engine.world.spawn((
-    //     TransformComponent {
-    //         position: Vec3::new(0.0, 0.0, -300.0),
-    //         rotation: Quat::IDENTITY,
-    //         scale: Vec3::new(ground_scale, ground_scale, 1.0),
-    //     },
-    //     RenderBodyComponent {
-    //         render_body_id: ground,
-    //     },
-    //     ground_collider,
-    // ));
-
-    let monkey_ball_platform = engine.load_model("resources/models/platform/platform.obj");
-    let money_ball_collider = engine.mesh_collider_from_render_body(monkey_ball_platform.unwrap(), CollisionLayer::Default)
-        .expect("Render body AABB not found");
     engine.world.spawn((
         TransformComponent {
-            position: Vec3::new(20.0, 0.0, 0.0),
+            position: Vec3::new(0.0, 0.0, -300.0),
             rotation: Quat::IDENTITY,
-            scale: Vec3::new(10.0,10.0,10.0),
+            scale: Vec3::new(ground_scale, ground_scale, 1.0),
         },
         RenderBodyComponent {
-            render_body_id: monkey_ball_platform.unwrap(),
+            render_body_id: ground,
         },
-        money_ball_collider,
+        ground_collider,
     ));
+
+    // let monkey_ball_platform = engine.load_model("resources/models/platform/platform.obj");
+    // let money_ball_collider = engine.mesh_collider_from_render_body(monkey_ball_platform.unwrap(), CollisionLayer::Default)
+    //     .expect("Render body AABB not found");
+    // engine.world.spawn((
+    //     TransformComponent {
+    //         position: Vec3::new(20.0, 0.0, 0.0),
+    //         rotation: Quat::IDENTITY,
+    //         scale: Vec3::new(10.0,10.0,10.0),
+    //     },
+    //     RenderBodyComponent {
+    //         render_body_id: monkey_ball_platform.unwrap(),
+    //     },
+    //     money_ball_collider,
+    // ));
     engine.run();
 }
