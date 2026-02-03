@@ -53,6 +53,7 @@ impl CollisionSystem {
             (
                 Entity,
                 &TransformComponent,
+                Option<&VelocityComponent>,
                 Option<&BoxCollider>,
                 Option<&MeshCollider>,
             ),
@@ -61,6 +62,7 @@ impl CollisionSystem {
         all_query: Query<(
             Entity,
             &TransformComponent,
+            Option<&VelocityComponent>,
             Option<&BoxCollider>,
             Option<&MeshCollider>,
         )>,
@@ -68,7 +70,8 @@ impl CollisionSystem {
         mut phys: ResMut<PhysicsResource>,
     ) {
         // Collect moving entities
-        let moving_entities: Vec<Entity> = moving_query.iter().map(|(e, _, _, _)| e).collect();
+        let moving_entities: Vec<Entity> =
+            moving_query.iter().map(|(e, _, _, _, _)| e).collect();
         let mut contacts = Vec::new();
 
         // Iterate over moving entities only
@@ -77,12 +80,12 @@ impl CollisionSystem {
                 continue;
             };
 
-            let Ok((_, transform_a, box_a, mesh_a)) = moving_query.get(entity_a) else {
+            let Ok((_, transform_a, velocity_a, box_a, mesh_a)) = moving_query.get(entity_a) else {
                 continue;
             };
 
             // Compare against all colliders (moving + static)
-            for (entity_b, transform_b, box_b, mesh_b) in &all_query {
+            for (entity_b, transform_b, velocity_b, box_b, mesh_b) in &all_query {
                 if entity_a == entity_b {
                     continue;
                 } // skip self
@@ -91,7 +94,15 @@ impl CollisionSystem {
                     continue;
                 };
 
-                if aabb_intersects(aabb_a, aabb_b) {
+                let mut aabb_a_swept = *aabb_a;
+                if let Some(velocity) = velocity_a {
+                    let delta = velocity.translational * fixed_dt();
+                    if delta.length_squared() > 0.0 {
+                        aabb_a_swept = swept_aabb(aabb_a, delta);
+                    }
+                }
+
+                if aabb_intersects(&aabb_a_swept, aabb_b) {
                     if box_a.is_some() && box_b.is_some() {
                         if let Some(contact) = box_box_contact(entity_a, aabb_a, entity_b, aabb_b)
                         {
@@ -105,7 +116,7 @@ impl CollisionSystem {
                             entity_a,
                             box_a,
                             transform_a,
-                            aabb_a,
+                            velocity_a,
                             entity_b,
                             mesh_b,
                             transform_b,
@@ -121,7 +132,7 @@ impl CollisionSystem {
                             entity_b,
                             box_b,
                             transform_b,
-                            aabb_b,
+                            velocity_b,
                             entity_a,
                             mesh_a,
                             transform_a,
@@ -357,7 +368,7 @@ fn box_mesh_contact(
     box_entity: Entity,
     box_collider: &BoxCollider,
     box_transform: &TransformComponent,
-    box_aabb_world: &AABB,
+    box_velocity: Option<&VelocityComponent>,
     mesh_entity: Entity,
     mesh_collider: &MeshCollider,
     mesh_transform: &TransformComponent,
@@ -367,6 +378,7 @@ fn box_mesh_contact(
         .render_body_manager
         .get_render_body(mesh_collider.render_body_id)?;
 
+    let box_aabb_world = transform_aabb(box_collider.aabb, box_transform);
     let box_world = box_transform.to_mat4();
     let mesh_entity_world = mesh_transform.to_mat4();
 
@@ -376,43 +388,116 @@ fn box_mesh_contact(
 
         let mesh_world = mesh_entity_world * part.local_transform;
         let mesh_world_inv = mesh_world.try_inverse()?;
-        let collider_in_mesh_space = mesh_world_inv * box_world;
-
-        let mut hits = Vec::new();
-        bvh.query_collider(box_collider, &collider_in_mesh_space, &mut hits);
-        if hits.is_empty() {
-            continue;
+        if let Some(contact) = box_mesh_contact_at_transform(
+            box_entity,
+            mesh_entity,
+            box_collider,
+            box_transform,
+            box_world,
+            &mesh_world,
+            &mesh_world_inv,
+            bvh,
+        ) {
+            return Some(contact);
         }
 
-            let (tri, hit) = &hits[0];
-            let mut normal_world = mesh_world.transform_vector3(hit.normal);
-        let normal_len = normal_world.length();
-        if normal_len <= f32::EPSILON {
-            continue;
-        }
-            let penetration = hit.penetration * normal_len;
-        normal_world /= normal_len;
+        if let Some(velocity) = box_velocity {
+            let delta = velocity.translational * fixed_dt();
+            let distance = delta.length();
+            if distance > 0.0 {
+                let step = (box_aabb_world.max - box_aabb_world.min)
+                    .abs()
+                    .min_element()
+                    .max(0.01)
+                    * 0.5;
+                let steps = ((distance / step).ceil() as i32).clamp(1, 20);
 
-            let box_center_world = (box_aabb_world.min + box_aabb_world.max) * 0.5;
-            let tri_point_world = mesh_world.transform_point3(tri.v0);
-            if (box_center_world - tri_point_world).dot(normal_world) > 0.0 {
-                normal_world = -normal_world;
+                for i in 1..=steps {
+                    let t = i as f32 / steps as f32;
+                    let swept_position = box_transform.position + delta * t;
+                    let swept_transform = TransformComponent {
+                        position: swept_position,
+                        rotation: box_transform.rotation,
+                        scale: box_transform.scale,
+                    };
+                    let swept_world = swept_transform.to_mat4();
+                    if let Some(contact) = box_mesh_contact_at_transform(
+                        box_entity,
+                        mesh_entity,
+                        box_collider,
+                        &swept_transform,
+                        swept_world,
+                        &mesh_world,
+                        &mesh_world_inv,
+                        bvh,
+                    ) {
+                        return Some(contact);
+                    }
+                }
             }
-
-        let contact = Contact {
-            entity_a: box_entity,
-            entity_b: mesh_entity,
-            normal: normal_world,
-            penetration,
-        };
-        println!(
-            "Box-Mesh collision detected: Box Entity {:?}, Mesh Entity {:?}, Normal {:?}, Penetration {}",
-            box_entity, mesh_entity, contact.normal, contact.penetration
-        );
-        return Some(contact);
+        }
     }
 
     None
+}
+
+fn box_mesh_contact_at_transform(
+    box_entity: Entity,
+    mesh_entity: Entity,
+    box_collider: &BoxCollider,
+    box_transform: &TransformComponent,
+    box_world: Mat4,
+    mesh_world: &Mat4,
+    mesh_world_inv: &Mat4,
+    bvh: &crate::collider_component::BVHNode,
+) -> Option<Contact> {
+    let box_aabb_world = transform_aabb(box_collider.aabb, box_transform);
+    let collider_in_mesh_space = *mesh_world_inv * box_world;
+    let mut hits = Vec::new();
+    bvh.query_collider(box_collider, &collider_in_mesh_space, &mut hits);
+    if hits.is_empty() {
+        return None;
+    }
+
+    let (tri, hit) = &hits[0];
+    let mut normal_world = mesh_world.transform_vector3(hit.normal);
+    let normal_len = normal_world.length();
+    if normal_len <= f32::EPSILON {
+        return None;
+    }
+    let penetration = hit.penetration * normal_len;
+    normal_world /= normal_len;
+
+    let box_center_world = (box_aabb_world.min + box_aabb_world.max) * 0.5;
+    let tri_point_world = mesh_world.transform_point3(tri.v0);
+    if (box_center_world - tri_point_world).dot(normal_world) > 0.0 {
+        normal_world = -normal_world;
+    }
+
+    let contact = Contact {
+        entity_a: box_entity,
+        entity_b: mesh_entity,
+        normal: normal_world,
+        penetration,
+    };
+    println!(
+        "Box-Mesh collision detected: Box Entity {:?}, Mesh Entity {:?}, Normal {:?}, Penetration {}",
+        box_entity, mesh_entity, contact.normal, contact.penetration
+    );
+    Some(contact)
+}
+
+fn swept_aabb(aabb: &AABB, delta: Vec3) -> AABB {
+    let moved_min = aabb.min + delta;
+    let moved_max = aabb.max + delta;
+    AABB {
+        min: aabb.min.min(moved_min),
+        max: aabb.max.max(moved_max),
+    }
+}
+
+fn fixed_dt() -> f32 {
+    1.0 / 60.0
 }
 
 fn render_body_local_aabb(
