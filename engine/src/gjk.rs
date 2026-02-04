@@ -300,6 +300,15 @@ mod tests {
 		.to_mat4()
 	}
 
+	fn transform_at_with_rotation(position: Vec3, rotation: Quat) -> Mat4 {
+		TransformComponent {
+			position,
+			rotation,
+			scale: Vec3::ONE,
+		}
+		.to_mat4()
+	}
+
 	#[test]
 	fn gjk_intersects_overlapping_cubes() {
 		let cube = ConvexCollider::cube(2.0, CollisionLayer::Default);
@@ -415,6 +424,111 @@ mod tests {
 		let b_transform = transform_at(Vec3::new(3.1, 0.0, 0.0));
 
 		let result = gjk_intersect(&cuboid, a_transform, &sphere, b_transform);
+		assert_eq!(result, GjkResult::NoIntersection);
+	}
+
+	#[test]
+	fn gjk_intersects_rotated_cuboids() {
+		let aabb = AABB {
+			min: Vec3::new(-3.0, -0.25, -0.25),
+			max: Vec3::new(3.0, 0.25, 0.25),
+		};
+		let cuboid = ConvexCollider::cuboid(aabb, CollisionLayer::Default);
+		let a_transform = transform_at_with_rotation(Vec3::ZERO, Quat::from_rotation_z(0.0));
+		let b_transform =
+			transform_at_with_rotation(Vec3::new(0.0, 1.0, 0.0), Quat::from_rotation_z(90.0_f32.to_radians()));
+
+		let result = gjk_intersect(&cuboid, a_transform, &cuboid, b_transform);
+		match result {
+			GjkResult::Intersection(hit) => {
+				assert!(!hit.simplex.is_empty());
+			}
+			_ => panic!("Expected intersection."),
+		}
+	}
+
+	#[test]
+	fn gjk_no_intersection_rotated_cuboids() {
+		let aabb = AABB {
+			min: Vec3::new(-2.0, -1.0, -0.5),
+			max: Vec3::new(2.0, 1.0, 0.5),
+		};
+		let cuboid = ConvexCollider::cuboid(aabb, CollisionLayer::Default);
+		let a_transform = transform_at_with_rotation(Vec3::ZERO, Quat::from_rotation_z(0.0));
+		let b_transform =
+			transform_at_with_rotation(Vec3::new(6.0, 0.0, 0.0), Quat::from_rotation_z(45.0_f32.to_radians()));
+
+		let result = gjk_intersect(&cuboid, a_transform, &cuboid, b_transform);
+		assert_eq!(result, GjkResult::NoIntersection);
+	}
+
+	#[test]
+	fn gjk_intersects_x_rotated_cuboids() {
+		let aabb = AABB {
+			min: Vec3::new(-0.25, -3.0, -0.25),
+			max: Vec3::new(0.25, 3.0, 0.25),
+		};
+		let cuboid = ConvexCollider::cuboid(aabb, CollisionLayer::Default);
+		let a_transform = transform_at_with_rotation(Vec3::ZERO, Quat::from_rotation_x(0.0));
+		let b_transform =
+			transform_at_with_rotation(Vec3::new(0.0, 0.0, 1.0), Quat::from_rotation_x(90.0_f32.to_radians()));
+
+		let result = gjk_intersect(&cuboid, a_transform, &cuboid, b_transform);
+		match result {
+			GjkResult::Intersection(hit) => {
+				assert!(!hit.simplex.is_empty());
+			}
+			_ => panic!("Expected intersection."),
+		}
+	}
+
+	#[test]
+	fn gjk_no_intersection_x_rotated_cuboids() {
+		let aabb = AABB {
+			min: Vec3::new(-2.0, -1.0, -0.5),
+			max: Vec3::new(2.0, 1.0, 0.5),
+		};
+		let cuboid = ConvexCollider::cuboid(aabb, CollisionLayer::Default);
+		let a_transform = transform_at_with_rotation(Vec3::ZERO, Quat::from_rotation_x(0.0));
+		let b_transform =
+			transform_at_with_rotation(Vec3::new(0.0, 0.0, 3.0), Quat::from_rotation_x(30.0_f32.to_radians()));
+
+		let result = gjk_intersect(&cuboid, a_transform, &cuboid, b_transform);
+		assert_eq!(result, GjkResult::NoIntersection);
+	}
+
+	#[test]
+	fn gjk_intersects_y_rotated_cuboids() {
+		let aabb = AABB {
+			min: Vec3::new(-0.25, -0.25, -3.0),
+			max: Vec3::new(0.25, 0.25, 3.0),
+		};
+		let cuboid = ConvexCollider::cuboid(aabb, CollisionLayer::Default);
+		let a_transform = transform_at_with_rotation(Vec3::ZERO, Quat::from_rotation_y(0.0));
+		let b_transform =
+			transform_at_with_rotation(Vec3::new(1.0, 0.0, 0.0), Quat::from_rotation_y(90.0_f32.to_radians()));
+
+		let result = gjk_intersect(&cuboid, a_transform, &cuboid, b_transform);
+		match result {
+			GjkResult::Intersection(hit) => {
+				assert!(!hit.simplex.is_empty());
+			}
+			_ => panic!("Expected intersection."),
+		}
+	}
+
+	#[test]
+	fn gjk_no_intersection_y_rotated_cuboids() {
+		let aabb = AABB {
+			min: Vec3::new(-2.0, -1.0, -0.5),
+			max: Vec3::new(2.0, 1.0, 0.5),
+		};
+		let cuboid = ConvexCollider::cuboid(aabb, CollisionLayer::Default);
+		let a_transform = transform_at_with_rotation(Vec3::ZERO, Quat::from_rotation_y(0.0));
+		let b_transform =
+			transform_at_with_rotation(Vec3::new(6.0, 0.0, 0.0), Quat::from_rotation_y(30.0_f32.to_radians()));
+
+		let result = gjk_intersect(&cuboid, a_transform, &cuboid, b_transform);
 		assert_eq!(result, GjkResult::NoIntersection);
 	}
 
