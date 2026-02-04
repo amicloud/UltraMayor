@@ -12,6 +12,8 @@ pub enum CollisionLayer {
     Environment,
 }
 
+const SUPPORT_EPSILON: f32 = 1e-6;
+
 
 #[derive(Clone, Debug)]
 pub struct Triangle {
@@ -180,6 +182,31 @@ impl ConvexCollider {
             ConvexShape::Sphere { radius } => Some(radius),
             _ => None,
         }
+    }
+
+    pub fn support(&self, transform: Mat4, dir_world: Vec3) -> Vec3 {
+        let local_dir = if dir_world.length_squared() <= SUPPORT_EPSILON {
+            Vec3::ZERO
+        } else {
+            transform.inverse().transform_vector3(dir_world)
+        };
+
+        let local_point = match self.shape {
+            ConvexShape::Cuboid { aabb } => Vec3::new(
+                if local_dir.x >= 0.0 { aabb.max.x } else { aabb.min.x },
+                if local_dir.y >= 0.0 { aabb.max.y } else { aabb.min.y },
+                if local_dir.z >= 0.0 { aabb.max.z } else { aabb.min.z },
+            ),
+            ConvexShape::Sphere { radius } => {
+                if local_dir.length_squared() <= SUPPORT_EPSILON {
+                    Vec3::ZERO
+                } else {
+                    local_dir.normalize() * radius
+                }
+            }
+        };
+
+        transform.transform_point3(local_point)
     }
 }
 

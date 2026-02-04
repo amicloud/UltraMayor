@@ -3,7 +3,7 @@
 
 use glam::{Mat4, Vec3};
 
-use crate::collider_component::{ConvexCollider, ConvexShape};
+use crate::collider_component::ConvexCollider;
 
 const DEFAULT_MAX_ITERATIONS: usize = 32;
 const EPSILON: f32 = 1e-6;
@@ -82,36 +82,9 @@ fn support_minkowski(
 	b_transform: Mat4,
 	dir: Vec3,
 ) -> Vec3 {
-	let p1 = support_collider(a, a_transform, dir);
-	let p2 = support_collider(b, b_transform, -dir);
+	let p1 = a.support(a_transform, dir);
+	let p2 = b.support(b_transform, -dir);
 	p1 - p2
-}
-
-fn support_collider(collider: &ConvexCollider, transform: Mat4, dir_world: Vec3) -> Vec3 {
-	let local_dir = world_direction_to_local(transform, dir_world);
-	let local_point = match collider.shape {
-		ConvexShape::Cuboid { aabb } => Vec3::new(
-			if local_dir.x >= 0.0 { aabb.max.x } else { aabb.min.x },
-			if local_dir.y >= 0.0 { aabb.max.y } else { aabb.min.y },
-			if local_dir.z >= 0.0 { aabb.max.z } else { aabb.min.z },
-		),
-		ConvexShape::Sphere { radius } => {
-			if local_dir.length_squared() <= EPSILON {
-				Vec3::ZERO
-			} else {
-				local_dir.normalize() * radius
-			}
-		}
-	};
-
-	transform.transform_point3(local_point)
-}
-
-fn world_direction_to_local(transform: Mat4, dir_world: Vec3) -> Vec3 {
-	if dir_world.length_squared() <= EPSILON {
-		return Vec3::ZERO;
-	}
-	transform.inverse().transform_vector3(dir_world)
 }
 
 fn handle_simplex(simplex: &mut Vec<Vec3>, dir: &mut Vec3) -> bool {
