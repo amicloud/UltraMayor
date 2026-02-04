@@ -4,7 +4,7 @@ use glam::{Mat4, Vec3};
 use crate::handles::RenderBodyHandle;
 use crate::mesh::AABB;
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub enum CollisionLayer {
     Default,
     Player,
@@ -132,57 +132,132 @@ pub trait Collider {
     fn collide_triangle(&self, tri: &Triangle, transform: &Mat4) -> Option<CollisionHit>;
 }
 
-#[derive(Clone, Copy, Component)]
-pub struct BoxCollider {
-    pub aabb: AABB,
+#[derive(Clone, Copy, Debug)]
+pub enum ConvexShape {
+    Cuboid { aabb: AABB },
+    Sphere { radius: f32 },
+}
+
+#[derive(Clone, Copy, Component, Debug)]
+pub struct ConvexCollider {
+    pub shape: ConvexShape,
     pub layer: CollisionLayer,
 }
 
-impl BoxCollider {
-    pub fn new(aabb: AABB, layer: CollisionLayer) -> Self {
-        Self { aabb, layer }
+impl ConvexCollider {
+    pub fn cuboid(aabb: AABB, layer: CollisionLayer) -> Self {
+        Self {
+            shape: ConvexShape::Cuboid { aabb },
+            layer,
+        }
     }
 
-    #[allow(dead_code)]
-    pub fn intersects(&self, other: &BoxCollider) -> bool {
-        (self.aabb.min.x <= other.aabb.max.x && self.aabb.max.x >= other.aabb.min.x)
-            && (self.aabb.min.y <= other.aabb.max.y && self.aabb.max.y >= other.aabb.min.y)
-            && (self.aabb.min.z <= other.aabb.max.z && self.aabb.max.z >= other.aabb.min.z)
+    pub fn cube(size: f32, layer: CollisionLayer) -> Self {
+        let half = size * 0.5;
+        let aabb = AABB {
+            min: Vec3::splat(-half),
+            max: Vec3::splat(half),
+        };
+        Self::cuboid(aabb, layer)
+    }
+
+    pub fn sphere(radius: f32, layer: CollisionLayer) -> Self {
+        Self {
+            shape: ConvexShape::Sphere { radius },
+            layer,
+        }
+    }
+
+    pub fn as_cuboid(&self) -> Option<AABB> {
+        match self.shape {
+            ConvexShape::Cuboid { aabb } => Some(aabb),
+            _ => None,
+        }
+    }
+
+    pub fn as_sphere_radius(&self) -> Option<f32> {
+        match self.shape {
+            ConvexShape::Sphere { radius } => Some(radius),
+            _ => None,
+        }
     }
 }
 
-impl Collider for BoxCollider {
+impl Collider for ConvexCollider {
     fn aabb(&self, transform: &Mat4) -> AABB {
-        transform_aabb(self.aabb, transform)
+        match self.shape {
+            ConvexShape::Cuboid { aabb } => transform_aabb(aabb, transform),
+            ConvexShape::Sphere { radius } => {
+                let center = transform.transform_point3(Vec3::ZERO);
+                let scale = max_scale(transform);
+                let radius = radius * scale;
+                AABB {
+                    min: center - Vec3::splat(radius),
+                    max: center + Vec3::splat(radius),
+                }
+            }
+        }
     }
 
     fn collide_triangle(&self, tri: &Triangle, transform: &Mat4) -> Option<CollisionHit> {
-        let collider_aabb = self.aabb(transform);
-        let tri_aabb = tri.aabb();
-        if !aabb_intersects(&collider_aabb, &tri_aabb) {
-            return None;
-        }
-        let normal = tri.normal()?;
+        match self.shape {
+            ConvexShape::Cuboid { .. } => {
+                let collider_aabb = self.aabb(transform);
+                let tri_aabb = tri.aabb();
+                if !aabb_intersects(&collider_aabb, &tri_aabb) {
+                    return None;
+                }
+                let normal = tri.normal()?;
 
-        let corners = aabb_corners(&collider_aabb);
-        let mut min_d = f32::INFINITY;
-        let mut max_d = f32::NEG_INFINITY;
-        for corner in &corners {
-            let d = (*corner - tri.v0).dot(normal);
-            min_d = min_d.min(d);
-            max_d = max_d.max(d);
-        }
+                let corners = aabb_corners(&collider_aabb);
+                let mut min_d = f32::INFINITY;
+                let mut max_d = f32::NEG_INFINITY;
+                for corner in &corners {
+                    let d = (*corner - tri.v0).dot(normal);
+                    min_d = min_d.min(d);
+                    max_d = max_d.max(d);
+                }
 
-        if min_d > 0.0 || max_d < 0.0 {
-            return None;
-        }
+                if min_d > 0.0 || max_d < 0.0 {
+                    return None;
+                }
 
-        let penetration = (-min_d).max(0.0);
-        if penetration <= 0.0 {
-            return None;
-        }
+                let penetration = (-min_d).max(0.0);
+                if penetration <= 0.0 {
+                    return None;
+                }
 
-        Some(CollisionHit { normal, penetration })
+                Some(CollisionHit { normal, penetration })
+            }
+            ConvexShape::Sphere { radius } => {
+                let center = transform.transform_point3(Vec3::ZERO);
+                let scale = max_scale(transform);
+                let radius = radius * scale;
+                if radius <= f32::EPSILON {
+                    return None;
+                }
+
+                let closest = closest_point_on_triangle(center, tri);
+                let delta = center - closest;
+                let dist_sq = delta.length_squared();
+                let radius_sq = radius * radius;
+                if dist_sq > radius_sq {
+                    return None;
+                }
+
+                let dist = dist_sq.sqrt();
+                let normal = if dist > f32::EPSILON {
+                    delta / dist
+                } else {
+                    tri.normal().unwrap_or(Vec3::Z)
+                };
+
+                Some(CollisionHit {
+                    normal,
+                    penetration: radius - dist,
+                })
+            }
+        }
     }
 }
 
@@ -201,58 +276,7 @@ impl MeshCollider {
     }
 }
 
-#[derive(Clone, Copy, Component)]
-pub struct SphereCollider {
-    pub radius: f32,
-    pub layer: CollisionLayer,
-}
-
-impl SphereCollider {
-    pub fn new(radius: f32, layer: CollisionLayer) -> Self {
-        Self { radius, layer }
-    }
-}
-
-impl Collider for SphereCollider {
-    fn aabb(&self, transform: &Mat4) -> AABB {
-        let center = transform.transform_point3(Vec3::ZERO);
-        let scale = max_scale(transform);
-        let radius = self.radius * scale;
-        AABB {
-            min: center - Vec3::splat(radius),
-            max: center + Vec3::splat(radius),
-        }
-    }
-
-    fn collide_triangle(&self, tri: &Triangle, transform: &Mat4) -> Option<CollisionHit> {
-        let center = transform.transform_point3(Vec3::ZERO);
-        let scale = max_scale(transform);
-        let radius = self.radius * scale;
-        if radius <= f32::EPSILON {
-            return None;
-        }
-
-        let closest = closest_point_on_triangle(center, tri);
-        let delta = center - closest;
-        let dist_sq = delta.length_squared();
-        let radius_sq = radius * radius;
-        if dist_sq > radius_sq {
-            return None;
-        }
-
-        let dist = dist_sq.sqrt();
-        let normal = if dist > f32::EPSILON {
-            delta / dist
-        } else {
-            tri.normal().unwrap_or(Vec3::Z)
-        };
-
-        Some(CollisionHit {
-            normal,
-            penetration: radius - dist,
-        })
-    }
-}
+// Sphere collider is now represented by ConvexCollider::new_sphere.
 
 fn transform_aabb(local: AABB, transform: &Mat4) -> AABB {
     let min = local.min;

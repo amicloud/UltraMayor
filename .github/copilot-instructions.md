@@ -15,8 +15,6 @@
 
 ## Physics & collisions
 - Physics is currently fixed-step at 1/60s in `PhysicsSystem::update_bodies`; impulses should be added via `Engine::add_impulse` (queues into `PhysicsResource`). See [engine/src/physics_system.rs](../engine/src/physics_system.rs) and [engine/src/lib.rs](../engine/src/lib.rs).
-- Collisions are AABB-based. Use `Engine::collider_from_render_body(...)` to build colliders from render data; collisions use cached world AABBs in `PhysicsResource`. See [engine/src/collision_system.rs](../engine/src/collision_system.rs).
-- The physics system is largely unfinished. Collision -> Impulse resolution is not yet implemented.
 
 ## Settings & tests
 - User settings live in TOML under the OS config dir and are loaded/saved by `Settings` (tests rely on temp dirs + `serial_test`). See [game/src/settings.rs](../game/src/settings.rs).

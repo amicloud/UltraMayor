@@ -13,7 +13,7 @@ use crate::camera_controller::{
 };
 use bevy_ecs::schedule::IntoScheduleConfigs;
 use engine::{
-    ActiveCamera, BoxCollider, CameraComponent, CollisionLayer, Engine, RenderBodyComponent, SleepComponent, SphereCollider, TransformComponent, VelocityComponent, physics_component::{PhysicsComponent, PhysicsType}, physics_resource::Impulse
+    ActiveCamera, CameraComponent, CollisionLayer, ConvexCollider, Engine, RenderBodyComponent, SleepComponent, TransformComponent, VelocityComponent, physics_component::{PhysicsComponent, PhysicsType}, physics_resource::Impulse
 };
 use glam::{Quat, Vec3};
 use rand::random_range;
@@ -111,8 +111,7 @@ fn main() {
 
     let player_scale = 1.0;
     let player_start = Vec3::new(0.0, 0.0, 50.0);
-    let player_box_collider  =  engine.box_collider_from_render_body(player_render_body, CollisionLayer::Default);
-    let player_collider = SphereCollider::new(1.0, CollisionLayer::Player);
+    let player_collider = ConvexCollider::sphere(1.0, CollisionLayer::Player);
     engine.world.spawn((
         TransformComponent {
             position: player_start,
@@ -126,7 +125,7 @@ fn main() {
         RenderBodyComponent {
             render_body_id: player_render_body,
         },
-        player_box_collider.unwrap(),
+        player_collider,
         PhysicsComponent {
             mass: 1.0,
             physics_type: PhysicsType::Dynamic,
@@ -177,7 +176,8 @@ fn main() {
 
             let scale = 10.0;
             let collider = engine
-                .box_collider_from_render_body(*render_body_handle, CollisionLayer::Default)
+                .aabb_from_render_body(*render_body_handle)
+                .map(|aabb| ConvexCollider::cuboid(aabb, CollisionLayer::Default))
                 .expect("Render body AABB not found");
             // Spawn test objects
             engine.world.spawn((
@@ -227,7 +227,8 @@ fn main() {
     antique_camera_transform.position.y += 50.0;
 
     let antique_collider = engine
-        .box_collider_from_render_body(antique_camera, CollisionLayer::Default)
+        .aabb_from_render_body(antique_camera)
+        .map(|aabb| ConvexCollider::cuboid(aabb, CollisionLayer::Default))
         .expect("Render body AABB not found");
     // let phys_cam = engine
     //     .world

@@ -4,7 +4,7 @@ use std::collections::HashMap;
 
 use crate::{
     TransformComponent,
-    collider_component::{BoxCollider, Collider, MeshCollider, SphereCollider, Triangle},
+    collider_component::{Collider, ConvexCollider, ConvexShape, MeshCollider, Triangle},
     mesh::AABB,
     physics_component::{PhysicsComponent, PhysicsType},
     physics_resource::{Contact, Impulse, PhysicsResource},
@@ -21,8 +21,7 @@ impl CollisionSystem {
             (
                 Entity,
                 &TransformComponent,
-                Option<&BoxCollider>,
-                Option<&SphereCollider>,
+                Option<&ConvexCollider>,
                 Option<&MeshCollider>,
             ),
             Changed<TransformComponent>,
@@ -30,7 +29,7 @@ impl CollisionSystem {
         render_resources: Res<RenderResourceManager>,
         mut phys: ResMut<PhysicsResource>,
     ) {
-        for (entity, transform, box_collider, sphere_collider, mesh_collider) in &query {
+        for (entity, transform, convex_collider, mesh_collider) in &query {
             if let Some(mesh_collider) = mesh_collider {
                 if let Some(local_aabb) = render_body_local_aabb(
                     mesh_collider.render_body_id,
@@ -42,14 +41,8 @@ impl CollisionSystem {
                 }
             }
 
-            if let Some(box_collider) = box_collider {
-                let world_aabb = transform_aabb(box_collider.aabb, transform);
-                phys.world_aabbs.insert(entity, world_aabb);
-                continue;
-            }
-
-            if let Some(sphere_collider) = sphere_collider {
-                let world_aabb = sphere_collider.aabb(&transform.to_mat4());
+            if let Some(convex_collider) = convex_collider {
+                let world_aabb = convex_collider.aabb(&transform.to_mat4());
                 phys.world_aabbs.insert(entity, world_aabb);
             }
         }
@@ -61,8 +54,7 @@ impl CollisionSystem {
                 Entity,
                 &TransformComponent,
                 Option<&VelocityComponent>,
-                Option<&BoxCollider>,
-                Option<&SphereCollider>,
+                Option<&ConvexCollider>,
                 Option<&MeshCollider>,
             ),
             Changed<TransformComponent>,
@@ -71,8 +63,7 @@ impl CollisionSystem {
             Entity,
             &TransformComponent,
             Option<&VelocityComponent>,
-            Option<&BoxCollider>,
-            Option<&SphereCollider>,
+            Option<&ConvexCollider>,
             Option<&MeshCollider>,
         )>,
         render_resources: Res<RenderResourceManager>,
@@ -80,7 +71,7 @@ impl CollisionSystem {
     ) {
         // Collect moving entities
         let moving_entities: Vec<Entity> =
-            moving_query.iter().map(|(e, _, _, _, _, _)| e).collect();
+            moving_query.iter().map(|(e, _, _, _, _)| e).collect();
         let mut contacts = Vec::new();
 
         // Iterate over moving entities only
@@ -89,14 +80,14 @@ impl CollisionSystem {
                 continue;
             };
 
-            let Ok((_, transform_a, velocity_a, box_a, sphere_a, mesh_a)) =
+            let Ok((_, transform_a, velocity_a, convex_a, mesh_a)) =
                 moving_query.get(entity_a)
             else {
                 continue;
             };
 
             // Compare against all colliders (moving + static)
-            for (entity_b, transform_b, velocity_b, box_b, sphere_b, mesh_b) in &all_query {
+            for (entity_b, transform_b, velocity_b, convex_b, mesh_b) in &all_query {
                 if entity_a == entity_b {
                     continue;
                 } // skip self
@@ -114,76 +105,85 @@ impl CollisionSystem {
                 }
 
                 if aabb_intersects(&aabb_a_swept, aabb_b) {
-                    if box_a.is_some() && box_b.is_some() {
-                        if let Some(contact) = box_box_contact(entity_a, aabb_a, entity_b, aabb_b)
+                    if let (Some(convex_a), Some(convex_b)) = (convex_a, convex_b) {
+                        if matches!(convex_a.shape, ConvexShape::Cuboid { .. })
+                            && matches!(convex_b.shape, ConvexShape::Cuboid { .. })
                         {
-                            contacts.push(contact);
+                            if let Some(contact) =
+                                box_box_contact(entity_a, aabb_a, entity_b, aabb_b)
+                            {
+                                contacts.push(contact);
+                            }
+                            continue;
                         }
-                        continue;
                     }
 
-                    if let (Some(sphere_a), Some(mesh_b)) = (sphere_a, mesh_b) {
-                        if let Some(contact) = sphere_mesh_contact(
-                            entity_a,
-                            sphere_a,
-                            transform_a,
-                            velocity_a,
-                            entity_b,
-                            mesh_b,
-                            transform_b,
-                            &render_resources,
-                        ) {
-                            contacts.push(contact);
+                    if let (Some(convex_a), Some(mesh_b)) = (convex_a, mesh_b) {
+                        if matches!(convex_a.shape, ConvexShape::Sphere { .. }) {
+                            if let Some(contact) = sphere_mesh_contact(
+                                entity_a,
+                                convex_a,
+                                transform_a,
+                                velocity_a,
+                                entity_b,
+                                mesh_b,
+                                transform_b,
+                                &render_resources,
+                            ) {
+                                contacts.push(contact);
+                            }
+                            continue;
                         }
-                        continue;
+
+                        if matches!(convex_a.shape, ConvexShape::Cuboid { .. }) {
+                            if let Some(contact) = box_mesh_contact(
+                                entity_a,
+                                convex_a,
+                                transform_a,
+                                velocity_a,
+                                entity_b,
+                                mesh_b,
+                                transform_b,
+                                &render_resources,
+                            ) {
+                                contacts.push(contact);
+                            }
+                            continue;
+                        }
                     }
 
-                    if let (Some(mesh_a), Some(sphere_b)) = (mesh_a, sphere_b) {
-                        if let Some(contact) = sphere_mesh_contact(
-                            entity_b,
-                            sphere_b,
-                            transform_b,
-                            velocity_b,
-                            entity_a,
-                            mesh_a,
-                            transform_a,
-                            &render_resources,
-                        ) {
-                            contacts.push(contact);
+                    if let (Some(mesh_a), Some(convex_b)) = (mesh_a, convex_b) {
+                        if matches!(convex_b.shape, ConvexShape::Sphere { .. }) {
+                            if let Some(contact) = sphere_mesh_contact(
+                                entity_b,
+                                convex_b,
+                                transform_b,
+                                velocity_b,
+                                entity_a,
+                                mesh_a,
+                                transform_a,
+                                &render_resources,
+                            ) {
+                                contacts.push(contact);
+                            }
+                            continue;
                         }
-                        continue;
-                    }
 
-                    if let (Some(box_a), Some(mesh_b)) = (box_a, mesh_b) {
-                        if let Some(contact) = box_mesh_contact(
-                            entity_a,
-                            box_a,
-                            transform_a,
-                            velocity_a,
-                            entity_b,
-                            mesh_b,
-                            transform_b,
-                            &render_resources,
-                        ) {
-                            contacts.push(contact);
+                        if matches!(convex_b.shape, ConvexShape::Cuboid { .. }) {
+                            if let Some(contact) = box_mesh_contact(
+                                entity_b,
+                                convex_b,
+                                transform_b,
+                                velocity_b,
+                                entity_a,
+                                mesh_a,
+                                transform_a,
+                                &render_resources,
+                            ) {
+                                contacts.push(contact);
+                            }
+                            continue;
                         }
-                        continue;
-                    }
-
-                    if let (Some(mesh_a), Some(box_b)) = (mesh_a, box_b) {
-                        if let Some(contact) = box_mesh_contact(
-                            entity_b,
-                            box_b,
-                            transform_b,
-                            velocity_b,
-                            entity_a,
-                            mesh_a,
-                            transform_a,
-                            &render_resources,
-                        ) {
-                            contacts.push(contact);
-                        }
-                        continue;
                     }
                 }
             }
@@ -398,7 +398,7 @@ fn box_box_contact(
 
 fn box_mesh_contact(
     box_entity: Entity,
-    box_collider: &BoxCollider,
+    box_collider: &ConvexCollider,
     box_transform: &TransformComponent,
     box_velocity: Option<&VelocityComponent>,
     mesh_entity: Entity,
@@ -406,11 +406,14 @@ fn box_mesh_contact(
     mesh_transform: &TransformComponent,
     render_resources: &RenderResourceManager,
 ) -> Option<Contact> {
+    let Some(_) = box_collider.as_cuboid() else {
+        return None;
+    };
     let render_body = render_resources
         .render_body_manager
         .get_render_body(mesh_collider.render_body_id)?;
 
-    let box_aabb_world = transform_aabb(box_collider.aabb, box_transform);
+    let box_aabb_world = box_collider.aabb(&box_transform.to_mat4());
     let box_world = box_transform.to_mat4();
     let mesh_entity_world = mesh_transform.to_mat4();
 
@@ -475,7 +478,7 @@ fn box_mesh_contact(
 
 fn sphere_mesh_contact(
     sphere_entity: Entity,
-    sphere_collider: &SphereCollider,
+    sphere_collider: &ConvexCollider,
     sphere_transform: &TransformComponent,
     sphere_velocity: Option<&VelocityComponent>,
     mesh_entity: Entity,
@@ -483,6 +486,9 @@ fn sphere_mesh_contact(
     mesh_transform: &TransformComponent,
     render_resources: &RenderResourceManager,
 ) -> Option<Contact> {
+    let Some(radius) = sphere_collider.as_sphere_radius() else {
+        return None;
+    };
     let render_body = render_resources
         .render_body_manager
         .get_render_body(mesh_collider.render_body_id)?;
@@ -499,7 +505,7 @@ fn sphere_mesh_contact(
         if let Some(contact) = sphere_mesh_contact_at_transform(
             sphere_entity,
             mesh_entity,
-            sphere_collider,
+            radius,
             sphere_transform,
             sphere_world,
             &mesh_world,
@@ -513,7 +519,7 @@ fn sphere_mesh_contact(
             let delta = velocity.translational * fixed_dt();
             let distance = delta.length();
             if distance > 0.0 {
-                let step = (sphere_collider.radius * sphere_transform.scale.max_element())
+                let step = (radius * sphere_transform.scale.max_element())
                     .max(0.01)
                     * 0.5;
                 let steps = ((distance / step).ceil() as i32).clamp(1, 20);
@@ -530,7 +536,7 @@ fn sphere_mesh_contact(
                     if let Some(contact) = sphere_mesh_contact_at_transform(
                         sphere_entity,
                         mesh_entity,
-                        sphere_collider,
+                        radius,
                         &swept_transform,
                         swept_world,
                         &mesh_world,
@@ -550,14 +556,14 @@ fn sphere_mesh_contact(
 fn sphere_mesh_contact_at_transform(
     sphere_entity: Entity,
     mesh_entity: Entity,
-    sphere_collider: &SphereCollider,
+    radius: f32,
     sphere_transform: &TransformComponent,
     sphere_world: Mat4,
     mesh_world: &Mat4,
     mesh_world_inv: &Mat4,
     bvh: &crate::collider_component::BVHNode,
 ) -> Option<Contact> {
-    let sphere_aabb_mesh = sphere_aabb_in_mesh_space(sphere_collider, sphere_transform, mesh_world_inv);
+    let sphere_aabb_mesh = sphere_aabb_in_mesh_space(radius, sphere_transform, mesh_world_inv);
     let mut candidates = Vec::new();
     bvh_collect_triangles(bvh, &sphere_aabb_mesh, &mut candidates);
     if candidates.is_empty() {
@@ -565,7 +571,7 @@ fn sphere_mesh_contact_at_transform(
     }
 
     let sphere_center_world = sphere_world.transform_point3(Vec3::ZERO);
-    let radius_world = sphere_collider.radius * max_scale(&sphere_world);
+    let radius_world = radius * max_scale(&sphere_world);
     if radius_world <= f32::EPSILON {
         return None;
     }
@@ -620,14 +626,14 @@ fn sphere_mesh_contact_at_transform(
 fn box_mesh_contact_at_transform(
     box_entity: Entity,
     mesh_entity: Entity,
-    box_collider: &BoxCollider,
+    box_collider: &ConvexCollider,
     box_transform: &TransformComponent,
     box_world: Mat4,
     mesh_world: &Mat4,
     mesh_world_inv: &Mat4,
     bvh: &crate::collider_component::BVHNode,
 ) -> Option<Contact> {
-    let box_aabb_world = transform_aabb(box_collider.aabb, box_transform);
+    let box_aabb_world = box_collider.aabb(&box_transform.to_mat4());
     let collider_in_mesh_space = *mesh_world_inv * box_world;
     let mut hits = Vec::new();
     bvh.query_collider(box_collider, &collider_in_mesh_space, &mut hits);
@@ -704,12 +710,18 @@ fn bvh_collect_triangles(
 }
 
 fn sphere_aabb_in_mesh_space(
-    sphere: &SphereCollider,
+    radius: f32,
     sphere_transform: &TransformComponent,
     mesh_world_inv: &Mat4,
 ) -> AABB {
     let sphere_world = sphere_transform.to_mat4();
-    let world_aabb = sphere.aabb(&sphere_world);
+    let center = sphere_world.transform_point3(Vec3::ZERO);
+    let scale = max_scale(&sphere_world);
+    let radius = radius * scale;
+    let world_aabb = AABB {
+        min: center - Vec3::splat(radius),
+        max: center + Vec3::splat(radius),
+    };
     let corners = aabb_corners(&world_aabb);
     let mut min = mesh_world_inv.transform_point3(corners[0]);
     let mut max = min;
