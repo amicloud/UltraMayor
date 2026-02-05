@@ -422,7 +422,8 @@ fn convex_mesh_contact_at_transform(
         };
 
         let is_sphere = matches!(convex_collider.shape, ConvexShape::Sphere { .. });
-        let prefer_face_normal = is_sphere || is_face_center(&tri_world, closest_world);
+        let is_cuboid = matches!(convex_collider.shape, ConvexShape::Cuboid { .. });
+        let prefer_face_normal = is_sphere || is_cuboid || is_face_center(&tri_world, closest_world);
 
         let face_candidate = face_normal_world.and_then(|normal_world| {
             let mut normal = normal_world;

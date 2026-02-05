@@ -113,7 +113,7 @@ fn main() {
 
     let player_scale = 1.0;
     let player_start = Vec3::new(0.0, 0.0, 25.0);
-    let player_collider = ConvexCollider::sphere(1.0, CollisionLayer::Player);
+    let player_collider = ConvexCollider::cuboid(engine.aabb_from_render_body(player_render_body).unwrap(), CollisionLayer::Player);
     engine.world.spawn((
         TransformComponent {
             position: player_start,
