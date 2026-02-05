@@ -113,7 +113,7 @@ fn main() {
 
     let player_scale = 1.0;
     let player_start = Vec3::new(0.0, 0.0, 50.0);
-    let player_collider = ConvexCollider::sphere(1.0, CollisionLayer::Player);
+    let player_collider = ConvexCollider::cube(1.0, CollisionLayer::Player);
     engine.world.spawn((
         TransformComponent {
             position: player_start,
@@ -150,7 +150,7 @@ fn main() {
 
     let t_range = 2.0;
 
-    for _ in 0..300 {
+    for _ in 0..100 {
         for render_body_handle in &assets {
             // Random position
             let pos = Vec3::new(

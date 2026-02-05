@@ -233,64 +233,38 @@ impl Collider for ConvexCollider {
     }
 
     fn collide_triangle(&self, tri: &Triangle, transform: &Mat4) -> Option<CollisionHit> {
-        match self.shape {
-            ConvexShape::Cuboid { .. } => {
-                let collider_aabb = self.aabb(transform);
-                let tri_aabb = tri.aabb();
-                if !aabb_intersects(&collider_aabb, &tri_aabb) {
-                    return None;
-                }
-                let normal = tri.normal()?;
+        // Transform convex center into world space
+        let center = transform.transform_point3(Vec3::ZERO);
 
-                let corners = aabb_corners(&collider_aabb);
-                let mut min_d = f32::INFINITY;
-                let mut max_d = f32::NEG_INFINITY;
-                for corner in &corners {
-                    let d = (*corner - tri.v0).dot(normal);
-                    min_d = min_d.min(d);
-                    max_d = max_d.max(d);
-                }
+        // Step 1: Closest point on triangle to convex center
+        let closest = closest_point_on_triangle(center, tri);
 
-                if min_d > 0.0 || max_d < 0.0 {
-                    return None;
-                }
+        // Step 2: Direction from triangle to convex
+        let mut dir = center - closest;
+        let dist_sq = dir.length_squared();
 
-                let penetration = (-min_d).max(0.0);
-                if penetration <= 0.0 {
-                    return None;
-                }
-
-                Some(CollisionHit { normal, penetration })
-            }
-            ConvexShape::Sphere { radius } => {
-                let center = transform.transform_point3(Vec3::ZERO);
-                let scale = max_scale(transform);
-                let radius = radius * scale;
-                if radius <= f32::EPSILON {
-                    return None;
-                }
-
-                let closest = closest_point_on_triangle(center, tri);
-                let delta = center - closest;
-                let dist_sq = delta.length_squared();
-                let radius_sq = radius * radius;
-                if dist_sq > radius_sq {
-                    return None;
-                }
-
-                let dist = dist_sq.sqrt();
-                let normal = if dist > f32::EPSILON {
-                    delta / dist
-                } else {
-                    tri.normal().unwrap_or(Vec3::Z)
-                };
-
-                Some(CollisionHit {
-                    normal,
-                    penetration: radius - dist,
-                })
-            }
+        // Fallback: if center is exactly on triangle plane, use triangle normal
+        if dist_sq <= f32::EPSILON {
+            dir = tri.normal()?;
+        } else {
+            dir /= dist_sq.sqrt();
         }
+
+        // Step 3: Use your support function in world space
+        let support_world = self.support(*transform, -dir);
+
+        // Step 4: Compute penetration along normal
+        let penetration_vec = support_world - closest;
+        let penetration = penetration_vec.dot(dir);
+
+        if penetration <= 0.0 {
+            return None;
+        }
+
+        Some(CollisionHit {
+            normal: dir,
+            penetration,
+        })
     }
 }
 
