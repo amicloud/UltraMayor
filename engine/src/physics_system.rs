@@ -205,9 +205,11 @@ impl PhysicsSystem {
             0.0
         };
 
-        let baumgarte = 0.1;
-        let slop = 0.01;
-        let bias = (baumgarte / fixed_dt()) * (constraint.penetration - slop).max(0.0);
+        let baumgarte = 0.08;
+        let slop = 0.005;
+        let max_correction = 0.2;
+        let penetration_correction = (constraint.penetration - slop).clamp(0.0, max_correction);
+        let bias = (baumgarte / fixed_dt()) * penetration_correction;
 
         let impulse_mag = (-(1.0 + restitution) * rvn + bias) / inv_mass_sum;
         let new_lambda = (constraint.accumulated_lambda + impulse_mag).max(0.0);
@@ -262,7 +264,7 @@ impl PhysicsSystem {
         mut query: Query<(Option<&mut VelocityComponent>, Option<&PhysicsComponent>)>,
         mut phys: ResMut<PhysicsResource>,
     ) {
-        let iterations = 4;
+        let iterations = 8;
         let manifolds = Self::generate_manifolds_from_contacts(&phys.contacts);
         let mut constraints: Vec<Vec<ContactConstraint>> = manifolds
             .iter()

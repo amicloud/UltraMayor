@@ -112,8 +112,8 @@ fn main() {
         .unwrap();
 
     let player_scale = 1.0;
-    let player_start = Vec3::new(0.0, 0.0, 50.0);
-    let player_collider = ConvexCollider::cube(1.0, CollisionLayer::Player);
+    let player_start = Vec3::new(0.0, 0.0, 25.0);
+    let player_collider = ConvexCollider::sphere(1.0, CollisionLayer::Player);
     engine.world.spawn((
         TransformComponent {
             position: player_start,
@@ -150,13 +150,13 @@ fn main() {
 
     let t_range = 2.0;
 
-    for _ in 0..100 {
+    for _ in 0..10 {
         for render_body_handle in &assets {
             // Random position
             let pos = Vec3::new(
                 random_range(10.0..30.0),
                 random_range(-10.0..10.0),
-                random_range(50.0..100.0),
+                random_range(20.0..45.0),
             );
 
             // Random translational velocity
@@ -174,11 +174,7 @@ fn main() {
                 random_range(-1.0..1.0),
             );
 
-            let scale = 10.0;
-            let collider = engine
-                .aabb_from_render_body(*render_body_handle)
-                .map(|aabb| ConvexCollider::sphere_from_aabb(aabb, CollisionLayer::Default))
-                .expect("Render body AABB not found");
+            let scale = 1.0;
             // Spawn test objects
             engine.world.spawn((
                 TransformComponent {
@@ -191,9 +187,9 @@ fn main() {
                     angular,
                 },
                 RenderBodyComponent {
-                    render_body_id: *render_body_handle,
+                    render_body_id: *&player_render_body,
                 },
-                collider,
+                player_collider,
                 PhysicsComponent {
                     mass: 1.0,
                     physics_type: PhysicsType::Dynamic,
@@ -263,9 +259,9 @@ fn main() {
         .expect("Render body not found");
     engine.world.spawn((
         TransformComponent {
-            position: Vec3::new(0.0, 0.0, -300.0),
+            position: Vec3::new(0.0, 0.0, -200.0),
             rotation: Quat::IDENTITY,
-            scale: Vec3::new(ground_scale, ground_scale, 1.0),
+            scale: Vec3::new(ground_scale, ground_scale, ground_scale),
         },
         RenderBodyComponent {
             render_body_id: ground,

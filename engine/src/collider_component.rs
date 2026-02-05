@@ -341,7 +341,7 @@ fn max_scale(transform: &Mat4) -> f32 {
     x.max(y).max(z)
 }
 
-fn closest_point_on_triangle(p: Vec3, tri: &Triangle) -> Vec3 {
+pub(crate) fn closest_point_on_triangle(p: Vec3, tri: &Triangle) -> Vec3 {
     // Real-Time Collision Detection (Christer Ericson)
     let ab = tri.v1 - tri.v0;
     let ac = tri.v2 - tri.v0;
