@@ -6,9 +6,9 @@ mod action_manager;
 mod camera_component;
 mod collider_component;
 mod collision_system;
+pub mod epa;
 mod frustum;
 pub mod gjk;
-pub mod epa;
 mod handles;
 pub mod input;
 mod material;
@@ -52,7 +52,7 @@ use crate::input::InputStateResource;
 use crate::mesh::AABB;
 use crate::mesh_resource::MeshResource;
 use crate::movement_system::MovementSystem;
-use crate::physics_resource::Impulse;
+use crate::physics_component::PhysicsComponent;
 use crate::physics_resource::PhysicsResource;
 use crate::physics_system::PhysicsSystem;
 use crate::render_instance::RenderInstance;
@@ -101,8 +101,7 @@ impl Engine {
                 MovementSystem::update,
                 CollisionSystem::update_world_aabb_cache,
                 CollisionSystem::generate_contacts,
-                CollisionSystem::resolve_contacts,
-                PhysicsSystem::apply_impulses,
+                PhysicsSystem::resolve_contacts,
                 PhysicsSystem::update_bodies,
                 RenderSystem::extract_render_data,
             )
@@ -265,27 +264,30 @@ impl Engine {
         sdl2::video::Window,
         sdl2::EventPump,
         sdl2::video::GLContext,
-    ) { unsafe {
-        let sdl = sdl2::init().unwrap();
-        let video = sdl.video().unwrap();
-        let gl_attr = video.gl_attr();
-        gl_attr.set_context_profile(sdl2::video::GLProfile::Core);
-        gl_attr.set_context_version(3, 3);
-        gl_attr.set_depth_size(24);
-        gl_attr.set_context_flags().forward_compatible().set();
-        let window = video
-            .window("Engine", 1024, 769)
-            .opengl()
-            .resizable()
-            .build()
-            .unwrap();
-        let gl_context = window.gl_create_context().unwrap();
-        window.gl_make_current(&gl_context).unwrap();
-        let gl = glow::Context::from_loader_function(|s| video.gl_get_proc_address(s) as *const _);
-        let event_loop = sdl.event_pump().unwrap();
+    ) {
+        unsafe {
+            let sdl = sdl2::init().unwrap();
+            let video = sdl.video().unwrap();
+            let gl_attr = video.gl_attr();
+            gl_attr.set_context_profile(sdl2::video::GLProfile::Core);
+            gl_attr.set_context_version(3, 3);
+            gl_attr.set_depth_size(24);
+            gl_attr.set_context_flags().forward_compatible().set();
+            let window = video
+                .window("Engine", 1024, 769)
+                .opengl()
+                .resizable()
+                .build()
+                .unwrap();
+            let gl_context = window.gl_create_context().unwrap();
+            window.gl_make_current(&gl_context).unwrap();
+            let gl =
+                glow::Context::from_loader_function(|s| video.gl_get_proc_address(s) as *const _);
+            let event_loop = sdl.event_pump().unwrap();
 
-        (gl, window, event_loop, gl_context)
-    }}
+            (gl, window, event_loop, gl_context)
+        }
+    }
 
     /// Builds camera render data from the ECS world.
     /// Returns `None` if there is no active camera or if the camera entity is invalid.
@@ -321,13 +323,6 @@ impl Engine {
             view_proj: projection * view,
             position: transform.position,
         })
-    }
-
-    pub fn add_impulse(&mut self, impulse: Impulse) {
-        self.world
-            .get_resource_mut::<PhysicsResource>()
-            .unwrap()
-            .add_impulse(impulse.entity, impulse.linear, impulse.angular);
     }
 }
 
@@ -370,6 +365,15 @@ impl Engine {
             .get_render_body(render_body_id)?;
 
         Some(MeshCollider::new(render_body_id, layer))
+    }
+
+    pub fn do_fake_impulse(
+        velocity: &mut VelocityComponent,
+        physics: &PhysicsComponent,
+        impulse: glam::Vec3,
+    ) {
+        let delta_v = impulse / physics.mass;
+        velocity.translational += delta_v;
     }
 }
 

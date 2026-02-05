@@ -170,6 +170,12 @@ impl ConvexCollider {
         }
     }
 
+    pub fn sphere_from_aabb(aabb: AABB, layer: CollisionLayer) -> Self {
+        let center = (aabb.min + aabb.max) * 0.5;
+        let radius = (aabb.max - center).length();
+        Self::sphere(radius, layer)
+    }
+
     pub fn as_cuboid(&self) -> Option<AABB> {
         match self.shape {
             ConvexShape::Cuboid { aabb } => Some(aabb),

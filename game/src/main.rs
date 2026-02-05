@@ -13,7 +13,7 @@ use crate::camera_controller::{
 };
 use bevy_ecs::schedule::IntoScheduleConfigs;
 use engine::{
-    ActiveCamera, CameraComponent, CollisionLayer, ConvexCollider, Engine, RenderBodyComponent, SleepComponent, TransformComponent, VelocityComponent, physics_component::{PhysicsComponent, PhysicsType}, physics_resource::Impulse
+    ActiveCamera, CameraComponent, CollisionLayer, ConvexCollider, Engine, RenderBodyComponent, SleepComponent, TransformComponent, VelocityComponent, physics_component::{PhysicsComponent, PhysicsType},
 };
 use glam::{Quat, Vec3};
 use rand::random_range;
@@ -136,7 +136,7 @@ fn main() {
         },
         SleepComponent::default(),
         PlayerComponent {
-            impulse_strength: 1.0,
+            speed: 1.0,
         },
     ));
 
@@ -177,7 +177,7 @@ fn main() {
             let scale = 10.0;
             let collider = engine
                 .aabb_from_render_body(*render_body_handle)
-                .map(|aabb| ConvexCollider::cuboid(aabb, CollisionLayer::Default))
+                .map(|aabb| ConvexCollider::sphere_from_aabb(aabb, CollisionLayer::Default))
                 .expect("Render body AABB not found");
             // Spawn test objects
             engine.world.spawn((

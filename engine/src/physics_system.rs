@@ -1,5 +1,8 @@
+use std::collections::HashMap;
+
 use crate::movement_system::MovementSystem;
-use crate::physics_resource::PhysicsResource;
+use crate::physics_component::PhysicsType;
+use crate::physics_resource::{PhysicsResource};
 use crate::velocity_component::VelocityComponent;
 use crate::WorldBasis;
 use crate::{
@@ -7,6 +10,7 @@ use crate::{
     transform_component::TransformComponent,
 };
 use bevy_ecs::prelude::*;
+use glam::Vec3;
 pub struct PhysicsSystem {}
 
 impl PhysicsSystem {
@@ -52,33 +56,6 @@ impl PhysicsSystem {
         }
     }
 
-    pub fn apply_impulses(
-        mut query: Query<(
-            &mut VelocityComponent,
-            &PhysicsComponent,
-            Option<&mut SleepComponent>,
-        )>,
-        mut phys: ResMut<PhysicsResource>, // (entity, linear_impulse, angular_impulse)
-    ) {
-        for impulse in phys.impulses.drain(..) {
-            if let Ok((mut velocity, physics, sleep)) = query.get_mut(impulse.entity) {
-                if !matches!(
-                    physics.physics_type,
-                    crate::physics_component::PhysicsType::Dynamic
-                ) {
-                    continue;
-                }
-                if let Some(mut sleep) = sleep {
-                    if sleep.is_sleeping {
-                        sleep.is_sleeping = false;
-                        sleep.sleep_timer = 0.0;
-                    }
-                }
-                Self::apply_impulse(&mut velocity, physics, impulse.linear, impulse.angular);
-            }
-        }
-    }
-
     fn update_body(
         transform: &mut TransformComponent,
         velocity: &mut VelocityComponent,
@@ -102,14 +79,14 @@ impl PhysicsSystem {
         velocity.angular += (angular_drag_force / physics.mass) * delta_time;
     }
 
-    fn apply_impulse(
-        velocity: &mut VelocityComponent,
-        physics: &PhysicsComponent,
-        linear: glam::Vec3,
-        angular: glam::Vec3,
+    /// Resolves contacts from the collision system with PGR method.
+    pub fn resolve_contacts(
+        query: Query<(Option<&VelocityComponent>, Option<&PhysicsComponent>)>,
+        mut phys: ResMut<PhysicsResource>,
+        mut transforms: Query<&mut TransformComponent>,
     ) {
-        velocity.translational += linear / physics.mass;
-        velocity.angular += angular / physics.mass;
+        
+        phys.contacts.clear();
     }
 }
 
@@ -190,24 +167,4 @@ mod tests {
         assert_relative_eq!(transform.rotation.w, expected.w, epsilon = 1e-6);
     }
 
-    #[test]
-    fn apply_impulse_scales_by_mass() {
-        let mut velocity = VelocityComponent::default();
-        let mut physics = physics_component();
-        physics.mass = 2.0;
-
-        PhysicsSystem::apply_impulse(
-            &mut velocity,
-            &physics,
-            Vec3::new(2.0, 0.0, 0.0),
-            Vec3::new(0.0, 4.0, 0.0),
-        );
-
-        assert_relative_eq!(velocity.translational.x, 1.0, epsilon = 1e-6);
-        assert_relative_eq!(velocity.translational.y, 0.0, epsilon = 1e-6);
-        assert_relative_eq!(velocity.translational.z, 0.0, epsilon = 1e-6);
-        assert_relative_eq!(velocity.angular.x, 0.0, epsilon = 1e-6);
-        assert_relative_eq!(velocity.angular.y, 2.0, epsilon = 1e-6);
-        assert_relative_eq!(velocity.angular.z, 0.0, epsilon = 1e-6);
-    }
 }

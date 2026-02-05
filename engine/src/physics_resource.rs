@@ -4,12 +4,6 @@ use std::collections::HashMap;
 
 use crate::mesh::AABB;
 
-pub struct Impulse {
-    pub entity: Entity,
-    pub linear: Vec3,
-    pub angular: Vec3,
-}
-
 #[derive(Debug, Clone)]
 pub struct Contact {
     pub entity_a: Entity,
@@ -20,21 +14,20 @@ pub struct Contact {
 
 #[derive(Default, Resource)]
 pub struct PhysicsResource {
-    pub impulses: Vec<Impulse>,
     pub world_aabbs: HashMap<Entity, AABB>,
     pub contacts: Vec<Contact>,
 }
 
 impl PhysicsResource {
-    pub fn add_impulse(&mut self, entity: Entity, linear: Vec3, angular: Vec3) {
-        self.impulses.push(Impulse {
-            entity,
-            linear,
-            angular,
-        });
-    }
-
     pub fn add_contact(&mut self, contact: Contact) {
         self.contacts.push(contact);
     }
+
+    pub fn are_in_contact(&self, entity_a: Entity, entity_b: Entity) -> bool {
+        self.contacts.iter().any(|contact| {
+            (contact.entity_a == entity_a && contact.entity_b == entity_b)
+                || (contact.entity_a == entity_b && contact.entity_b == entity_a)
+        })
+    }
+
 }
