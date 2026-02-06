@@ -1126,4 +1126,51 @@ mod tests {
 
         assert_eq!(rotated.is_some(), rotated_scaled.is_some());
     }
+
+    #[test]
+    fn cuboid_cuboid_contact_unequal_lengths_intersect() {
+        let entity_a = Entity::from_bits(40);
+        let entity_b = Entity::from_bits(41);
+
+        let collider_a = ConvexCollider::cuboid(1.0, 1.0, 1.0, CollisionLayer::Default);
+        let collider_b = ConvexCollider::cuboid(2.0, 1.0, 1.0, CollisionLayer::Default);
+
+        let transform_a = make_transform(Vec3::ZERO, Quat::IDENTITY, Vec3::ONE);
+        let transform_b = make_transform(Vec3::new(1.0, 0.0, 0.0), Quat::IDENTITY, Vec3::ONE);
+
+        let contact = cuboid_cuboid_contact(
+            entity_a,
+            &collider_a,
+            &transform_a,
+            entity_b,
+            &collider_b,
+            &transform_b,
+        )
+        .expect("Expected overlap for unequal cuboids");
+
+        assert_relative_eq!(contact.penetration, 0.5, epsilon = 1e-4);
+    }
+
+    #[test]
+    fn cuboid_cuboid_contact_unequal_lengths_no_intersection() {
+        let entity_a = Entity::from_bits(42);
+        let entity_b = Entity::from_bits(43);
+
+        let collider_a = ConvexCollider::cuboid(1.0, 1.0, 1.0, CollisionLayer::Default);
+        let collider_b = ConvexCollider::cuboid(0.5, 1.0, 1.0, CollisionLayer::Default);
+
+        let transform_a = make_transform(Vec3::ZERO, Quat::IDENTITY, Vec3::ONE);
+        let transform_b = make_transform(Vec3::new(1.0, 0.0, 0.0), Quat::IDENTITY, Vec3::ONE);
+
+        let contact = cuboid_cuboid_contact(
+            entity_a,
+            &collider_a,
+            &transform_a,
+            entity_b,
+            &collider_b,
+            &transform_b,
+        );
+
+        assert!(contact.is_none());
+    }
 }
