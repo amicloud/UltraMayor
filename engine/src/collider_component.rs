@@ -21,30 +21,6 @@ pub struct Triangle {
     pub v2: Vec3,
 }
 
-impl Triangle {
-    fn aabb(&self) -> AABB {
-        let min = self.v0.min(self.v1).min(self.v2);
-        let max = self.v0.max(self.v1).max(self.v2);
-        AABB { min, max }
-    }
-
-    fn normal(&self) -> Option<Vec3> {
-        let n = (self.v1 - self.v0).cross(self.v2 - self.v0);
-        let len = n.length();
-        if len <= f32::EPSILON {
-            None
-        } else {
-            Some(n / len)
-        }
-    }
-}
-
-#[derive(Clone, Copy)]
-pub struct CollisionHit {
-    pub normal: Vec3,
-    pub penetration: f32,
-}
-
 #[derive(Clone, Debug)]
 pub struct BVHNode {
     pub aabb: AABB,
@@ -54,32 +30,6 @@ pub struct BVHNode {
 }
 
 impl BVHNode {
-    pub fn query_collider<C: Collider>(
-        &self,
-        collider: &C,
-        collider_transform: &Mat4,
-        hits: &mut Vec<(Triangle, CollisionHit)>,
-    ) {
-        if !aabb_intersects(&self.aabb, &collider.aabb(collider_transform)) {
-            return;
-        }
-
-        if self.left.is_none() && self.right.is_none() {
-            for tri in &self.triangles {
-                if let Some(hit) = collider.collide_triangle(tri, collider_transform) {
-                    hits.push((tri.clone(), hit));
-                }
-            }
-        } else {
-            if let Some(left) = &self.left {
-                left.query_collider(collider, collider_transform, hits);
-            }
-            if let Some(right) = &self.right {
-                right.query_collider(collider, collider_transform, hits);
-            }
-        }
-    }
-
     pub fn build(triangles: Vec<Triangle>, max_leaf_size: usize) -> Self {
         let mut min = triangles[0].v0;
         let mut max = triangles[0].v0;
@@ -129,12 +79,11 @@ impl BVHNode {
 
 pub trait Collider {
     fn aabb(&self, transform: &Mat4) -> AABB;
-    fn collide_triangle(&self, tri: &Triangle, transform: &Mat4) -> Option<CollisionHit>;
 }
 
 #[derive(Clone, Copy, Debug)]
 pub enum ConvexShape {
-    Cuboid { aabb: AABB },
+    Cuboid { length: f32, width: f32, height: f32 },
     Sphere { radius: f32 },
 }
 
@@ -145,20 +94,21 @@ pub struct ConvexCollider {
 }
 
 impl ConvexCollider {
-    pub fn cuboid(aabb: AABB, layer: CollisionLayer) -> Self {
+    pub fn cuboid(length: f32, width: f32, height: f32, layer: CollisionLayer) -> Self {
         Self {
-            shape: ConvexShape::Cuboid { aabb },
+            shape: ConvexShape::Cuboid { length, width, height },
             layer,
         }
     }
 
+    pub fn cuboid_from_aabb(aabb: AABB, layer: CollisionLayer) -> Self {
+        let size = aabb.max - aabb.min;
+        Self::cuboid(size.x, size.y, size.z, layer)
+    }
+
     pub fn cube(size: f32, layer: CollisionLayer) -> Self {
         let half = size * 0.5;
-        let aabb = AABB {
-            min: Vec3::splat(-half),
-            max: Vec3::splat(half),
-        };
-        Self::cuboid(aabb, layer)
+        Self::cuboid(size, size, size, layer)
     }
 
     pub fn sphere(radius: f32, layer: CollisionLayer) -> Self {
@@ -174,9 +124,9 @@ impl ConvexCollider {
         Self::sphere(radius, layer)
     }
 
-    pub fn as_cuboid(&self) -> Option<AABB> {
+    pub fn as_cuboid(&self) -> Option<(f32, f32, f32)> {
         match self.shape {
-            ConvexShape::Cuboid { aabb } => Some(aabb),
+            ConvexShape::Cuboid { length, width, height } => Some((length, width, height)),
             _ => None,
         }
     }
@@ -196,21 +146,21 @@ impl ConvexCollider {
         };
 
         let local_point = match self.shape {
-            ConvexShape::Cuboid { aabb } => Vec3::new(
+            ConvexShape::Cuboid { length, width, height } => Vec3::new(
                 if local_dir.x >= 0.0 {
-                    aabb.max.x
+                    length * 0.5
                 } else {
-                    aabb.min.x
+                    -length * 0.5
                 },
                 if local_dir.y >= 0.0 {
-                    aabb.max.y
+                    width * 0.5
                 } else {
-                    aabb.min.y
+                    -width * 0.5
                 },
                 if local_dir.z >= 0.0 {
-                    aabb.max.z
+                    height * 0.5
                 } else {
-                    aabb.min.z
+                    -height * 0.5
                 },
             ),
             ConvexShape::Sphere { radius } => {
@@ -229,7 +179,14 @@ impl ConvexCollider {
 impl Collider for ConvexCollider {
     fn aabb(&self, transform: &Mat4) -> AABB {
         match self.shape {
-            ConvexShape::Cuboid { aabb } => transform_aabb(aabb, transform),
+            ConvexShape::Cuboid { length, width, height } => {
+                let half_extents = Vec3::new(length * 0.5, width * 0.5, height * 0.5);
+                let local_aabb = AABB {
+                    min: -half_extents,
+                    max: half_extents,
+                };
+                transform_aabb(local_aabb, transform)
+            }
             ConvexShape::Sphere { radius } => {
                 let center = transform.transform_point3(Vec3::ZERO);
                 let scale = max_scale(transform);
@@ -240,41 +197,6 @@ impl Collider for ConvexCollider {
                 }
             }
         }
-    }
-
-    fn collide_triangle(&self, tri: &Triangle, transform: &Mat4) -> Option<CollisionHit> {
-        // Transform convex center into world space
-        let center = transform.transform_point3(Vec3::ZERO);
-
-        // Step 1: Closest point on triangle to convex center
-        let closest = closest_point_on_triangle(center, tri);
-
-        // Step 2: Direction from triangle to convex
-        let mut dir = center - closest;
-        let dist_sq = dir.length_squared();
-
-        // Fallback: if center is exactly on triangle plane, use triangle normal
-        if dist_sq <= f32::EPSILON {
-            dir = tri.normal()?;
-        } else {
-            dir /= dist_sq.sqrt();
-        }
-
-        // Step 3: Use your support function in world space
-        let support_world = self.support(*transform, -dir);
-
-        // Step 4: Compute penetration along normal
-        let penetration_vec = support_world - closest;
-        let penetration = penetration_vec.dot(dir);
-
-        if penetration <= 0.0 {
-            return None;
-        }
-
-        Some(CollisionHit {
-            normal: dir,
-            penetration,
-        })
     }
 }
 
@@ -321,27 +243,6 @@ fn transform_aabb(local: AABB, transform: &Mat4) -> AABB {
         min: world_min,
         max: world_max,
     }
-}
-
-fn aabb_corners(aabb: &AABB) -> [Vec3; 8] {
-    let min = aabb.min;
-    let max = aabb.max;
-    [
-        Vec3::new(min.x, min.y, min.z),
-        Vec3::new(min.x, min.y, max.z),
-        Vec3::new(min.x, max.y, min.z),
-        Vec3::new(min.x, max.y, max.z),
-        Vec3::new(max.x, min.y, min.z),
-        Vec3::new(max.x, min.y, max.z),
-        Vec3::new(max.x, max.y, min.z),
-        Vec3::new(max.x, max.y, max.z),
-    ]
-}
-
-fn aabb_intersects(a: &AABB, b: &AABB) -> bool {
-    (a.min.x <= b.max.x && a.max.x >= b.min.x)
-        && (a.min.y <= b.max.y && a.max.y >= b.min.y)
-        && (a.min.z <= b.max.z && a.max.z >= b.min.z)
 }
 
 fn max_scale(transform: &Mat4) -> f32 {

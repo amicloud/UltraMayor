@@ -340,7 +340,7 @@ mod tests {
             min: Vec3::splat(-2.0),
             max: Vec3::splat(1.0),
         };
-        let cuboid = ConvexCollider::cuboid(aabb, CollisionLayer::Default);
+        let cuboid = ConvexCollider::cuboid_from_aabb(aabb, CollisionLayer::Default);
         let a_transform = transform_at(Vec3::ZERO);
         let b_transform = transform_at(Vec3::new(1.0, 0.0, 0.0));
 
@@ -359,7 +359,7 @@ mod tests {
             min: Vec3::splat(-2.0),
             max: Vec3::splat(1.0),
         };
-        let cuboid = ConvexCollider::cuboid(aabb, CollisionLayer::Default);
+        let cuboid = ConvexCollider::cuboid_from_aabb(aabb, CollisionLayer::Default);
         let a_transform = transform_at(Vec3::ZERO);
         let b_transform = transform_at(Vec3::new(3.5, 0.0, 0.0));
 
@@ -373,7 +373,7 @@ mod tests {
             min: Vec3::splat(-1.0),
             max: Vec3::splat(1.0),
         };
-        let cuboid = ConvexCollider::cuboid(aabb, CollisionLayer::Default);
+        let cuboid = ConvexCollider::cuboid_from_aabb(aabb, CollisionLayer::Default);
         let sphere = ConvexCollider::sphere(1.5, CollisionLayer::Default);
         let a_transform = transform_at(Vec3::ZERO);
         let b_transform = transform_at(Vec3::new(1.0, 0.0, 0.0));
@@ -393,7 +393,7 @@ mod tests {
             min: Vec3::splat(-1.0),
             max: Vec3::splat(1.0),
         };
-        let cuboid = ConvexCollider::cuboid(aabb, CollisionLayer::Default);
+        let cuboid = ConvexCollider::cuboid_from_aabb(aabb, CollisionLayer::Default);
         let sphere = ConvexCollider::sphere(1.0, CollisionLayer::Default);
         let a_transform = transform_at(Vec3::ZERO);
         let b_transform = transform_at(Vec3::new(3.1, 0.0, 0.0));
@@ -408,7 +408,7 @@ mod tests {
             min: Vec3::new(-3.0, -0.25, -0.25),
             max: Vec3::new(3.0, 0.25, 0.25),
         };
-        let cuboid = ConvexCollider::cuboid(aabb, CollisionLayer::Default);
+        let cuboid = ConvexCollider::cuboid_from_aabb(aabb, CollisionLayer::Default);
         let a_transform = transform_at_with_rotation(Vec3::ZERO, Quat::from_rotation_z(0.0));
         let b_transform = transform_at_with_rotation(
             Vec3::new(0.0, 1.0, 0.0),
@@ -430,7 +430,7 @@ mod tests {
             min: Vec3::new(-2.0, -1.0, -0.5),
             max: Vec3::new(2.0, 1.0, 0.5),
         };
-        let cuboid = ConvexCollider::cuboid(aabb, CollisionLayer::Default);
+        let cuboid = ConvexCollider::cuboid_from_aabb(aabb, CollisionLayer::Default);
         let a_transform = transform_at_with_rotation(Vec3::ZERO, Quat::from_rotation_z(0.0));
         let b_transform = transform_at_with_rotation(
             Vec3::new(6.0, 0.0, 0.0),
@@ -447,7 +447,7 @@ mod tests {
             min: Vec3::new(-0.25, -3.0, -0.25),
             max: Vec3::new(0.25, 3.0, 0.25),
         };
-        let cuboid = ConvexCollider::cuboid(aabb, CollisionLayer::Default);
+        let cuboid = ConvexCollider::cuboid_from_aabb(aabb, CollisionLayer::Default);
         let a_transform = transform_at_with_rotation(Vec3::ZERO, Quat::from_rotation_x(0.0));
         let b_transform = transform_at_with_rotation(
             Vec3::new(0.0, 0.0, 1.0),
@@ -469,7 +469,7 @@ mod tests {
             min: Vec3::new(-2.0, -1.0, -0.5),
             max: Vec3::new(2.0, 1.0, 0.5),
         };
-        let cuboid = ConvexCollider::cuboid(aabb, CollisionLayer::Default);
+        let cuboid = ConvexCollider::cuboid_from_aabb(aabb, CollisionLayer::Default);
         let a_transform = transform_at_with_rotation(Vec3::ZERO, Quat::from_rotation_x(0.0));
         let b_transform = transform_at_with_rotation(
             Vec3::new(0.0, 0.0, 3.0),
@@ -486,7 +486,7 @@ mod tests {
             min: Vec3::new(-0.25, -0.25, -3.0),
             max: Vec3::new(0.25, 0.25, 3.0),
         };
-        let cuboid = ConvexCollider::cuboid(aabb, CollisionLayer::Default);
+        let cuboid = ConvexCollider::cuboid_from_aabb(aabb, CollisionLayer::Default);
         let a_transform = transform_at_with_rotation(Vec3::ZERO, Quat::from_rotation_y(0.0));
         let b_transform = transform_at_with_rotation(
             Vec3::new(1.0, 0.0, 0.0),
@@ -508,7 +508,7 @@ mod tests {
             min: Vec3::new(-2.0, -1.0, -0.5),
             max: Vec3::new(2.0, 1.0, 0.5),
         };
-        let cuboid = ConvexCollider::cuboid(aabb, CollisionLayer::Default);
+        let cuboid = ConvexCollider::cuboid_from_aabb(aabb, CollisionLayer::Default);
         let a_transform = transform_at_with_rotation(Vec3::ZERO, Quat::from_rotation_y(0.0));
         let b_transform = transform_at_with_rotation(
             Vec3::new(6.0, 0.0, 0.0),

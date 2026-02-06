@@ -351,7 +351,7 @@ mod tests {
     #[test]
     fn epa_sphere_vs_box() {
         let sphere = ConvexCollider::sphere(2.0, CollisionLayer::Default);
-        let box_collider = ConvexCollider::cuboid(
+        let box_collider = ConvexCollider::cuboid_from_aabb(
             AABB {
                 min: Vec3::splat(-1.0),
                 max: Vec3::splat(1.0),

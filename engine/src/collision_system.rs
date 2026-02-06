@@ -253,20 +253,29 @@ fn convex_convex_contact(
     let b_world = transform_b.to_mat4();
 
     // Fast path for sphere-sphere collisions
-    match collider_a.shape {
-        ConvexShape::Sphere { radius: ra } => match collider_b.shape {
-            ConvexShape::Sphere { radius: rb } => {
-                return sphere_sphere_contact(
-                    entity_a,
-                    a_world.transform_point3(Vec3::ZERO),
-                    ra,
-                    entity_b,
-                    b_world.transform_point3(Vec3::ZERO),
-                    rb,
-                );
-            }
-            _ => {}
-        },
+    match (collider_a.shape, collider_b.shape) {
+        (ConvexShape::Sphere { radius: ra }, ConvexShape::Sphere { radius: rb }) => {
+            return sphere_sphere_contact(
+                entity_a,
+                a_world.transform_point3(Vec3::ZERO),
+                ra,
+                entity_b,
+                b_world.transform_point3(Vec3::ZERO),
+                rb,
+            );
+        }
+        (
+            ConvexShape::Cuboid {
+                length: length_a,
+                width: width_a,
+                height: height_a,
+            },
+            ConvexShape::Cuboid {
+                length: length_b,
+                width: width_b,
+                height: height_b,
+            },
+        ) => {}
         _ => {}
     }
 
