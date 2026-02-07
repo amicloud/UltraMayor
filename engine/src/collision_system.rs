@@ -3,17 +3,9 @@ use glam::{Mat4, Vec3};
 use std::collections::{HashMap, HashSet};
 
 use crate::{
-    collider_component::{
-        closest_point_on_triangle, BVHNode, Collider, ConvexCollider, ConvexShape, MeshCollider,
-        Triangle,
-    },
-    epa::epa,
-    gjk::{gjk_intersect, GjkResult},
-    mesh::AABB,
-    physics_resource::{Contact, ContactManifold, PhysicsResource},
-    render_resource_manager::RenderResourceManager,
-    velocity_component::VelocityComponent,
-    TransformComponent,
+    TransformComponent, collider_component::{
+        BVHNode, Collider, ConvexCollider, ConvexShape, MeshCollider, Triangle, closest_point_on_triangle
+    }, epa::epa, gjk::{GjkResult, gjk_intersect}, mesh::AABB, physics_resource::{Contact, ContactManifold, PhysicsResource}, physics_system::delta_time, render_resource_manager::RenderResourceManager, velocity_component::VelocityComponent
 };
 
 #[derive(Default)]
@@ -229,7 +221,8 @@ fn manifold_merge_distance_pair(phys: &PhysicsResource, a: Entity, b: Entity) ->
         .map(|aabb| (aabb.max - aabb.min).length())
         .unwrap_or(0.0);
     let extent = extent_a.max(extent_b).max(0.01);
-    extent * 0.1
+    let merge_strenth = 0.5;
+    extent * merge_strenth
 }
 
 fn ordered_pair(a: Entity, b: Entity) -> (Entity, Entity) {
@@ -947,9 +940,6 @@ fn swept_aabb(aabb: &AABB, delta: Vec3) -> AABB {
     }
 }
 
-fn delta_time() -> f32 {
-    1.0 / 60.0
-}
 
 fn render_body_local_aabb(
     render_body_id: crate::handles::RenderBodyHandle,

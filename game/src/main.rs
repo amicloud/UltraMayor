@@ -102,7 +102,7 @@ fn main() {
         .unwrap();
 
 
-    let player_scale: Vec3 = Vec3::new(1.0, 1.0, 1.0);
+    let player_scale: Vec3 = Vec3::splat(1.0);
     let player_start = Vec3::new(5.0, 0.0, 25.0);
     let sphere_collider = ConvexCollider::sphere(player_scale.x, CollisionLayer::Player);
     let cuboid_collider = ConvexCollider::cuboid(
@@ -126,7 +126,7 @@ fn main() {
         PhysicsComponent {
             mass: 5.0,
             physics_type: PhysicsType::Dynamic,
-            friction: 0.3,
+            friction: 0.8,
             drag_coefficient: 0.1,
             angular_drag_coefficient: 0.1,
             restitution: 0.5,

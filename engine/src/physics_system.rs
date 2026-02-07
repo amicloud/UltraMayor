@@ -18,6 +18,10 @@ struct ContactManifold {
 }
 pub struct PhysicsSystem {}
 
+pub fn delta_time() -> f32 {
+    1.0 / 60.0
+}
+
 struct ContactConstraint {
     entity_a: Entity,
     entity_b: Entity,
@@ -27,7 +31,9 @@ struct ContactConstraint {
     accumulated_normal_lambda: f32,
     contact_point: Vec3, // world-space contact
 }
+
 const PGS_ITERATIONS: usize = 8;
+
 impl PhysicsSystem {
     pub fn integrate_motion(
         mut query: Query<(
@@ -37,7 +43,7 @@ impl PhysicsSystem {
             Option<&mut SleepComponent>,
         )>,
     ) {
-        let delta_time = 1.0 / 60.0; // Assuming a fixed time step of 1/60 seconds
+        let delta_time = delta_time();
         let g = WorldBasis::gravity_vector();
         for (mut transform, mut velocity, physics, mut sleep) in query.iter_mut() {
             if !matches!(
