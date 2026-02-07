@@ -101,8 +101,7 @@ impl Engine {
                 MovementSystem::update,
                 CollisionSystem::update_world_aabb_cache,
                 CollisionSystem::generate_contacts,
-                PhysicsSystem::pgs_solver,
-                PhysicsSystem::positional_correction_system,
+                PhysicsSystem::physics_solver,
                 PhysicsSystem::integrate_motion,
                 RenderSystem::extract_render_data,
             )

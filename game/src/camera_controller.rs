@@ -308,7 +308,7 @@ pub fn apply_player_movement_impulses(
 ) {
     let (camera_forward, camera_right) = if let Some(camera_entity) = active_camera.0 {
         if let Ok(camera_transform) = camera_query.get(camera_entity) {
-            let forward = camera_transform.rotation * Vec3::NEG_Z;
+            let forward = camera_transform.rotation * Vec3::NEG_Y;
             let right = camera_transform.rotation * Vec3::X;
             (forward, right)
         } else {
@@ -329,16 +329,16 @@ pub fn apply_player_movement_impulses(
 
     let mut move_dir = Vec3::ZERO;
     if input_state.key_held(Keycode::W) {
-        move_dir += forward;
+        move_dir -= right;
     }
     if input_state.key_held(Keycode::S) {
-        move_dir -= forward;
-    }
-    if input_state.key_held(Keycode::D) {
         move_dir += right;
     }
+    if input_state.key_held(Keycode::D) {
+        move_dir -= forward;
+    }
     if input_state.key_held(Keycode::A) {
-        move_dir -= right;
+        move_dir += forward;
     }
     if input_state.key_held(Keycode::Space) {
         move_dir += world_basis.up();
@@ -350,8 +350,8 @@ pub fn apply_player_movement_impulses(
 
     let move_dir = move_dir.normalize();
     for (entity, player, mut velocity) in &mut player_query {
-        velocity.angular += (move_dir * player.speed)/1.0;
-        velocity.angular = velocity.angular.clamp(Vec3::splat(-player.speed), Vec3::splat(player.speed));
+        velocity.angular += (move_dir * player.speed);
+       
     }
 }
 

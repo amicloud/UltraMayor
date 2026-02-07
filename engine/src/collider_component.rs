@@ -96,6 +96,10 @@ pub enum ConvexShape {
         v1: Vec3,
         v2: Vec3,
     },
+    Egg {
+        length: f32,
+        radius: f32,
+    },
 }
 
 #[derive(Clone, Copy, Component, Debug)]
@@ -128,6 +132,13 @@ impl ConvexCollider {
     pub fn sphere(radius: f32, layer: CollisionLayer) -> Self {
         Self {
             shape: ConvexShape::Sphere { radius },
+            layer,
+        }
+    }
+
+    pub fn egg(length: f32, radius: f32, layer: CollisionLayer) -> Self {
+        Self {
+            shape: ConvexShape::Egg { length, radius },
             layer,
         }
     }
@@ -213,6 +224,25 @@ impl ConvexCollider {
                 }
                 best
             }
+            ConvexShape::Egg { length, radius } => {
+                let half_length = length * 0.5;
+                let local_point = Vec3::new(
+                    if local_dir.x >= 0.0 {
+                        half_length
+                    } else {
+                        -half_length
+                    },
+                    0.0,
+                    0.0,
+                );
+                let dir_yz = Vec3::new(0.0, local_dir.y, local_dir.z);
+                if dir_yz.length_squared() > SUPPORT_EPSILON {
+                    let dir_yz_normalized = dir_yz.normalize();
+                    local_point + dir_yz_normalized * radius
+                } else {
+                    local_point
+                }
+            }
         };
 
         transform.transform_point3(local_point)
@@ -249,6 +279,14 @@ impl Collider for ConvexCollider {
                 let local_aabb = AABB {
                     min: local_min,
                     max: local_max,
+                };
+                transform_aabb(local_aabb, transform)
+            }
+            ConvexShape::Egg { length, radius } => {
+                let half_length = length * 0.5;
+                let local_aabb = AABB {
+                    min: Vec3::new(-half_length, -radius, -radius),
+                    max: Vec3::new(half_length, radius, radius),
                 };
                 transform_aabb(local_aabb, transform)
             }

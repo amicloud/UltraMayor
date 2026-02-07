@@ -10,7 +10,7 @@ use crate::{
 };
 use bevy_ecs::prelude::*;
 use glam::Vec3;
-
+use rayon::prelude::*;
 #[derive(Clone)]
 struct ContactManifold {
     normal: Vec3,
@@ -21,6 +21,8 @@ pub struct PhysicsSystem {}
 pub fn delta_time() -> f32 {
     1.0 / 60.0
 }
+
+const PAR_THRESHOLD: usize = 100;
 
 struct ContactConstraint {
     entity_a: Entity,
@@ -170,9 +172,9 @@ impl PhysicsSystem {
     fn solve_constraint(
         constraint: &mut ContactConstraint,
         query: &mut Query<(
+            &mut TransformComponent,
             Option<&mut VelocityComponent>,
             Option<&PhysicsComponent>,
-            &TransformComponent,
         )>,
     ) {
         let Ok([mut a, mut b]) = query.get_many_mut([constraint.entity_a, constraint.entity_b])
@@ -180,8 +182,8 @@ impl PhysicsSystem {
             return;
         };
 
-        let (vel_a_opt, phys_a_opt, transform_a) = (&mut a.0, a.1, &a.2);
-        let (vel_b_opt, phys_b_opt, transform_b) = (&mut b.0, b.1, &b.2);
+        let (transform_a, mut vel_a_opt, phys_a_opt) = (&mut a.0, a.1, a.2);
+        let (transform_b, mut vel_b_opt, phys_b_opt) = (&mut b.0, b.1, b.2);
 
         // --- Physics properties ---
         let (inv_mass_a, restitution_a, friction_a, inv_inertia_a) = physics_props(phys_a_opt);
@@ -306,15 +308,19 @@ impl PhysicsSystem {
 
     fn positional_correction(
         constraint: &ContactConstraint,
-        query: &mut Query<(&mut TransformComponent, Option<&PhysicsComponent>)>,
+        query: &mut Query<(
+            &mut TransformComponent,
+            Option<&mut VelocityComponent>,
+            Option<&PhysicsComponent>,
+        )>,
     ) {
         let Ok([mut a, mut b]) = query.get_many_mut([constraint.entity_a, constraint.entity_b])
         else {
             return;
         };
 
-        let (transform_a, phys_a) = (&mut a.0, a.1);
-        let (transform_b, phys_b) = (&mut b.0, b.1);
+        let (transform_a, _, phys_a) = (&mut a.0, a.1, a.2);
+        let (transform_b, _, phys_b) = (&mut b.0, b.1, b.2);
 
         let (inv_mass_a, _, _, _) = physics_props(phys_a);
         let (inv_mass_b, _, _, _) = physics_props(phys_b);
@@ -337,19 +343,26 @@ impl PhysicsSystem {
     }
 
     /// Resolves contacts from the collision system with PGS solver.
-    pub fn pgs_solver(
+    pub fn physics_solver(
         mut query: Query<(
+            &mut TransformComponent,
             Option<&mut VelocityComponent>,
             Option<&PhysicsComponent>,
-            &TransformComponent,
         )>,
         phys: ResMut<PhysicsResource>,
     ) {
         let manifolds = Self::generate_manifolds_from_contacts(&phys.contacts);
-        let mut constraints: Vec<Vec<ContactConstraint>> = manifolds
-            .iter()
-            .map(|m| Self::manifold_to_constraints(m))
-            .collect();
+        let mut constraints: Vec<Vec<ContactConstraint>> = if manifolds.len() >= PAR_THRESHOLD {
+            manifolds
+                .par_iter()
+                .map(Self::manifold_to_constraints)
+                .collect()
+        } else {
+            manifolds
+                .iter()
+                .map(Self::manifold_to_constraints)
+                .collect()
+        };
 
         for _ in 0..PGS_ITERATIONS {
             for constraint_set in &mut constraints {
@@ -358,16 +371,6 @@ impl PhysicsSystem {
                 }
             }
         }
-    }
-    pub fn positional_correction_system(
-        mut query: Query<(&mut TransformComponent, Option<&PhysicsComponent>)>,
-        phys: ResMut<PhysicsResource>,
-    ) {
-        let manifolds = Self::generate_manifolds_from_contacts(&phys.contacts);
-        let constraints: Vec<Vec<ContactConstraint>> = manifolds
-            .iter()
-            .map(|m| Self::manifold_to_constraints(m))
-            .collect();
 
         for constraint_set in &constraints {
             for constraint in constraint_set.iter() {
@@ -392,8 +395,6 @@ fn physics_props(physics: Option<&PhysicsComponent>) -> (f32, f32, f32, glam::Ma
     };
 
     // --- Inverse inertia ---
-    // For now, assume physics.inertia is a Mat3 representing the object's world-space inertia tensor
-    // If you store it in local space, you must rotate it to world space using the current orientation
     let inv_inertia = if matches!(physics.physics_type, PhysicsType::Dynamic) {
         // Avoid dividing by zero
         physics.local_inertia.inverse_or_zero()

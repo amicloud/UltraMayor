@@ -28,6 +28,8 @@ sdl2 = "0.38.0"
 tobj = "4.0.3"
 glam = "0.31.0"
 
+rayon = "1.11.0"
+
 # native
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 tracing-subscriber = "0.3"

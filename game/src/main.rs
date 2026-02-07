@@ -109,6 +109,11 @@ fn main() {
          player_scale*2.0,
         CollisionLayer::Player,
     );
+    let egg_collider = ConvexCollider::egg(
+        3.0,
+        player_scale.x,
+        CollisionLayer::Player,
+    );
     engine.world.spawn((
         TransformComponent {
             position: player_start,
@@ -120,30 +125,30 @@ fn main() {
             angular: Vec3::ZERO,
         },
         RenderBodyComponent {
-            render_body_id: cube,
+            render_body_id: sphere,
         },
-        cuboid_collider,
+        sphere_collider,
         PhysicsComponent {
             mass: 5.0,
             physics_type: PhysicsType::Dynamic,
-            friction: 0.8,
+            friction: 0.9,
             drag_coefficient: 0.1,
             angular_drag_coefficient: 0.1,
             restitution: 0.5,
             local_inertia: glam::Mat3::IDENTITY,
         },
         // SleepComponent::default(),
-        PlayerComponent { speed: 1.0 },
+        PlayerComponent { speed: 0.1 },
     ));
 
     let t_range = 2.0;
 
-    for _ in 0..50 {
+    for _ in 0..300 {
         // Random position
         let pos = Vec3::new(
-            random_range(0.0..40.0),
             random_range(-20.0..20.0),
-            random_range(20.0..100.0),
+            random_range(-20.0..20.0),
+            random_range(20.0..200.0),
         );
 
         // Random translational velocity
@@ -219,30 +224,56 @@ fn main() {
     //     },
     // ));
 
-    let monkey_ball_platform = engine.load_model("resources/models/platform/platform.obj");
-    let money_ball_collider = engine
-        .mesh_collider_from_render_body(monkey_ball_platform.unwrap(), CollisionLayer::Default)
-        .expect("Render body AABB not found");
+    // let monkey_ball_platform = engine.load_model("resources/models/platform/platform.obj");
+    // let money_ball_collider = engine
+    //     .mesh_collider_from_render_body(monkey_ball_platform.unwrap(), CollisionLayer::Default)
+    //     .expect("Render body AABB not found");
 
+    // engine.world.spawn((
+    //     TransformComponent {
+    //         position: Vec3::new(0.0, 0.0, 0.0),
+    //         rotation: Quat::IDENTITY,
+    //         scale: Vec3::splat(2.0),
+    //     },
+    //     RenderBodyComponent {
+    //         render_body_id: monkey_ball_platform.unwrap(),
+    //     },
+    //     money_ball_collider,
+    //     PhysicsComponent {
+    //         mass: f32::INFINITY,
+    //         physics_type: PhysicsType::Static,
+    //         friction: 0.5,
+    //         drag_coefficient: 0.1,
+    //         angular_drag_coefficient: 0.1,
+    //         restitution: 0.3,
+    //         local_inertia: glam::Mat3::IDENTITY,
+    //     },
+    // ));
+
+    let bowl = engine.load_model("resources/models/bowl/bowl.obj").unwrap();
+    let bowl_collider = engine
+        .mesh_collider_from_render_body(bowl, CollisionLayer::Default)
+        .expect("Render body AABB not found");
     engine.world.spawn((
         TransformComponent {
-            position: Vec3::new(0.0, 0.0, 0.0),
+            position: Vec3::splat(0.0),
             rotation: Quat::IDENTITY,
-            scale: Vec3::splat(2.0),
+            scale: Vec3::splat(0.2),
         },
         RenderBodyComponent {
-            render_body_id: monkey_ball_platform.unwrap(),
+            render_body_id: bowl,
         },
-        money_ball_collider,
+        bowl_collider,
         PhysicsComponent {
             mass: f32::INFINITY,
             physics_type: PhysicsType::Static,
             friction: 0.5,
             drag_coefficient: 0.1,
             angular_drag_coefficient: 0.1,
-            restitution: 0.3,
+            restitution: 0.6,
             local_inertia: glam::Mat3::IDENTITY,
         },
     ));
+    
     engine.run();
 }
