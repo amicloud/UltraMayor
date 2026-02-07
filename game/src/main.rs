@@ -106,7 +106,7 @@ fn main() {
     let player_start = Vec3::new(5.0, 0.0, 25.0);
     let sphere_collider = ConvexCollider::sphere(player_scale.x, CollisionLayer::Player);
     let cuboid_collider = ConvexCollider::cuboid(
-         player_scale,
+         player_scale*2.0,
         CollisionLayer::Player,
     );
     engine.world.spawn((
@@ -200,7 +200,7 @@ fn main() {
         .expect("Render body not found");
     engine.world.spawn((
         TransformComponent {
-            position: Vec3::new(0.0, 0.0, -250.0),
+            position: Vec3::new(0.0, 0.0, -100.0),
             rotation: Quat::IDENTITY,
             scale: Vec3::new(ground_scale, ground_scale, ground_scale),
         },

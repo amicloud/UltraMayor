@@ -91,6 +91,11 @@ pub enum ConvexShape {
     Sphere {
         radius: f32,
     },
+    Triangle {
+        v0: Vec3,
+        v1: Vec3,
+        v2: Vec3,
+    },
 }
 
 #[derive(Clone, Copy, Component, Debug)]
@@ -123,6 +128,13 @@ impl ConvexCollider {
     pub fn sphere(radius: f32, layer: CollisionLayer) -> Self {
         Self {
             shape: ConvexShape::Sphere { radius },
+            layer,
+        }
+    }
+
+    pub fn triangle(v0: Vec3, v1: Vec3, v2: Vec3, layer: CollisionLayer) -> Self {
+        Self {
+            shape: ConvexShape::Triangle { v0, v1, v2 },
             layer,
         }
     }
@@ -187,6 +199,20 @@ impl ConvexCollider {
                     local_dir.normalize() * radius
                 }
             }
+            ConvexShape::Triangle { v0, v1, v2 } => {
+                let mut best = v0;
+                let mut best_dot = v0.dot(local_dir);
+                let v1_dot = v1.dot(local_dir);
+                if v1_dot > best_dot {
+                    best = v1;
+                    best_dot = v1_dot;
+                }
+                let v2_dot = v2.dot(local_dir);
+                if v2_dot > best_dot {
+                    best = v2;
+                }
+                best
+            }
         };
 
         transform.transform_point3(local_point)
@@ -216,6 +242,15 @@ impl Collider for ConvexCollider {
                     min: center - Vec3::splat(radius),
                     max: center + Vec3::splat(radius),
                 }
+            }
+            ConvexShape::Triangle { v0, v1, v2 } => {
+                let local_min = v0.min(v1).min(v2);
+                let local_max = v0.max(v1).max(v2);
+                let local_aabb = AABB {
+                    min: local_min,
+                    max: local_max,
+                };
+                transform_aabb(local_aabb, transform)
             }
         }
     }

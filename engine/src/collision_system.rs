@@ -584,17 +584,7 @@ fn convex_mesh_contact_at_transform(
             }
         };
 
-        let feature_normal_world = {
-            let n = convex_center_world - closest_world;
-            if n.length_squared() > f32::EPSILON {
-                Some(n.normalize())
-            } else {
-                None
-            }
-        };
-
-        let prefer_face_normal = is_face_center(&tri_world, closest_world);
-
+        // The easy sphere case
         if let ConvexShape::Sphere { radius } = convex_collider.shape {
             let delta = convex_center_world - closest_world;
             let dist2 = delta.length_squared();
@@ -616,68 +606,61 @@ fn convex_mesh_contact_at_transform(
                     penetration,
                 });
             }
-
             continue;
         }
 
-        let face_candidate = face_normal_world.and_then(|normal_world| {
-            let mut normal = normal_world;
-            if (convex_center_world - closest_world).dot(normal) < 0.0 {
-                normal = -normal;
-            }
-            let support_world = convex_collider.support(convex_world, normal);
-            let penetration = (support_world - closest_world).dot(normal);
-            if penetration <= 0.0 {
-                None
-            } else {
-                Some(ContactCandidate {
-                    point: closest_world,
-                    normal,
-                    penetration,
-                })
-            }
-        });
+        // Use GJK/EPA to get the contact all other convex colliders for now
+        let triangle_collider =
+            ConvexCollider::triangle(tri.v0, tri.v1, tri.v2, convex_collider.layer);
 
-        let feature_candidate = feature_normal_world.and_then(|normal_world| {
-            let mut normal = normal_world;
-            if (convex_center_world - closest_world).dot(normal) < 0.0 {
-                normal = -normal;
-            }
-            let support_world = convex_collider.support(convex_world, normal);
-            let penetration = (support_world - closest_world).dot(normal);
-            if penetration <= 0.0 {
-                None
-            } else {
-                Some(ContactCandidate {
-                    point: closest_world,
-                    normal,
-                    penetration,
-                })
-            }
-        });
+        let result = gjk_intersect(
+            &triangle_collider,
+            *mesh_world,
+            convex_collider,
+            convex_world,
+        );
 
-        let best = if prefer_face_normal {
-            face_candidate.or(feature_candidate)
-        } else {
-            match (face_candidate, feature_candidate) {
-                (Some(face), Some(feature)) => {
-                    if feature.penetration > face.penetration {
-                        Some(feature)
-                    } else {
-                        Some(face)
-                    }
-                }
-                (Some(face), None) => Some(face),
-                (None, Some(feature)) => Some(feature),
-                (None, None) => None,
-            }
+        let simplex = match result {
+            GjkResult::Intersection(hit) => hit.simplex,
+            GjkResult::NoIntersection => continue,
         };
 
-        if let Some(candidate) = best {
-            candidates.push(candidate);
-        }
-    }
+        let Some(epa_result) = epa(
+            &triangle_collider,
+            *mesh_world,
+            convex_collider,
+            convex_world,
+            &simplex,
+        ) else {
+            continue;
+        };
 
+        let mut normal = epa_result.normal;
+        let tri_normal = face_normal_world.unwrap();
+        if tri_normal.dot(normal) > 0.95 {
+            normal = tri_normal;
+        }
+        let tri_center_local = (tri.v0 + tri.v1 + tri.v2) / 3.0;
+        let tri_center_world = mesh_world.transform_point3(tri_center_local);
+        let convex_center_world = convex_world.transform_point3(Vec3::ZERO);
+        let ab = convex_center_world - tri_center_world;
+        if ab.length_squared() > f32::EPSILON && normal.dot(ab) < 0.0 {
+            normal = -normal;
+        }
+
+        let support = convex_collider.support(convex_world, -normal);
+        // project support point onto triangle plane
+        let plane_point = tri_world.v0;
+        let plane_normal = normal;
+        let d = (support - plane_point).dot(plane_normal);
+        let contact_point = support - plane_normal * d;
+
+        candidates.push(ContactCandidate {
+            point: contact_point,
+            normal,
+            penetration: epa_result.penetration_depth,
+        });
+    }
     candidates
 }
 
@@ -712,7 +695,7 @@ fn reduce_contact_candidates(
 
     let extent = convex_aabb_world.max - convex_aabb_world.min;
     let cluster_distance = extent.length().max(0.01) * 0.1;
-
+    let normal_epsilon = 0.01;
     let mut selected: Vec<ContactCandidate> = Vec::new();
     for candidate in candidates {
         if selected
@@ -721,6 +704,13 @@ fn reduce_contact_candidates(
         {
             continue;
         }
+        if selected
+            .iter()
+            .any(|c| c.normal.dot(candidate.normal) > 1.0 - normal_epsilon)
+        {
+            continue;
+        }
+
         selected.push(candidate);
         if selected.len() >= 4 {
             break;
