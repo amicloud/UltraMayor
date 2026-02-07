@@ -143,7 +143,7 @@ fn main() {
 
     let t_range = 2.0;
 
-    for _ in 0..300 {
+    for _ in 0..500 {
         // Random position
         let pos = Vec3::new(
             random_range(-20.0..20.0),

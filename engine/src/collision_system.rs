@@ -1,11 +1,21 @@
 use bevy_ecs::prelude::{Changed, Entity, Query, Res, ResMut};
 use glam::{Mat4, Vec3};
-use std::collections::{HashMap, HashSet};
+use rayon::prelude::*;
+use std::collections::{HashMap};
 
 use crate::{
-    TransformComponent, collider_component::{
-        BVHNode, Collider, ConvexCollider, ConvexShape, MeshCollider, Triangle, closest_point_on_triangle
-    }, epa::epa, gjk::{GjkResult, gjk_intersect}, mesh::AABB, physics_resource::{Contact, ContactManifold, PhysicsResource}, physics_system::delta_time, render_resource_manager::RenderResourceManager, velocity_component::VelocityComponent
+    collider_component::{
+        closest_point_on_triangle, BVHNode, Collider, ConvexCollider, ConvexShape, MeshCollider,
+        Triangle,
+    },
+    epa::epa,
+    gjk::{gjk_intersect, GjkResult},
+    mesh::AABB,
+    physics_resource::{Contact, ContactManifold, PhysicsResource},
+    physics_system::delta_time,
+    render_resource_manager::RenderResourceManager,
+    velocity_component::VelocityComponent,
+    TransformComponent,
 };
 
 #[derive(Default)]
@@ -66,135 +76,195 @@ impl CollisionSystem {
     ) {
         phys.contacts.clear();
 
-        let moving_entities: Vec<Entity> = moving_query.iter().map(|(e, _, _, _, _)| e).collect();
         let mut contacts: Vec<Contact> = Vec::new();
         let mut new_manifolds: HashMap<(Entity, Entity), ContactManifold> = HashMap::new();
-        let mut processed_pairs: HashSet<(Entity, Entity)> = HashSet::new();
 
-        // Iterate over moving entities only
-        for &entity_a in &moving_entities {
-            let Some(aabb_a) = phys.world_aabbs.get(&entity_a) else {
-                continue;
-            };
+        #[derive(Clone, Copy)]
+        struct SweptEntry {
+            entity: Entity,
+            aabb: AABB,
+        }
 
-            let Ok((_, transform_a, velocity_a, convex_a, mesh_a)) = moving_query.get(entity_a)
-            else {
-                continue;
-            };
-
-            // Compare against all colliders (moving + static)
-            for (entity_b, transform_b, velocity_b, convex_b, mesh_b) in &all_query {
-                if entity_a == entity_b {
-                    continue;
-                } // skip self
-
-                let Some(aabb_b) = phys.world_aabbs.get(&entity_b) else {
-                    continue;
-                };
-
-                let mut aabb_a_swept = *aabb_a;
-                if let Some(velocity) = velocity_a {
+        let moving_entries: Vec<SweptEntry> = moving_query
+            .iter()
+            .filter_map(|(entity, _transform, velocity, _convex, _mesh)| {
+                let aabb = *phys.world_aabbs.get(&entity)?;
+                let mut swept = aabb;
+                if let Some(velocity) = velocity {
                     let delta = velocity.translational * delta_time();
                     if delta.length_squared() > 0.0 {
-                        aabb_a_swept = swept_aabb(aabb_a, delta);
+                        swept = swept_aabb(&aabb, delta);
                     }
                 }
+                Some(SweptEntry {
+                    entity,
+                    aabb: swept,
+                })
+            })
+            .collect();
 
-                let mut aabb_b_swept = *aabb_b;
-                if let Some(velocity) = velocity_b {
+        let all_entries: Vec<SweptEntry> = all_query
+            .iter()
+            .filter_map(|(entity, _transform, velocity, _convex, _mesh)| {
+                let aabb = *phys.world_aabbs.get(&entity)?;
+                let mut swept = aabb;
+                if let Some(velocity) = velocity {
                     let delta = velocity.translational * delta_time();
                     if delta.length_squared() > 0.0 {
-                        aabb_b_swept = swept_aabb(aabb_b, delta);
+                        swept = swept_aabb(&aabb, delta);
                     }
                 }
+                Some(SweptEntry {
+                    entity,
+                    aabb: swept,
+                })
+            })
+            .collect();
 
-                if aabb_intersects(&aabb_a_swept, &aabb_b_swept) {
-                    if let (Some(convex_a), Some(convex_b)) = (convex_a, convex_b) {
-                        let pair = ordered_pair(entity_a, entity_b);
-                        if processed_pairs.insert(pair) {
-                            let mut new_contacts = Vec::new();
-                            if let Some(contact) = convex_convex_contact(
-                                entity_a,
-                                convex_a,
-                                transform_a,
-                                entity_b,
-                                convex_b,
-                                transform_b,
-                            ) {
-                                new_contacts.push(orient_contact_to_pair(contact, pair));
-                            }
-                            let merge_distance = manifold_merge_distance_pair(&phys, pair.0, pair.1);
-                            let merged = merge_contact_manifold(
-                                phys.manifolds.get(&pair),
-                                &new_contacts,
-                                merge_distance,
-                                0.95,
-                                4,
-                            );
-                            if !merged.contacts.is_empty() {
-                                new_manifolds.insert(pair, merged);
-                            }
-                        }
-                        continue;
+        let candidate_pairs: Vec<(Entity, Entity)> = moving_entries
+            .par_iter()
+            .flat_map_iter(|moving| {
+                all_entries.iter().filter_map(move |other| {
+                    if moving.entity == other.entity {
+                        None
+                    } else if aabb_intersects(&moving.aabb, &other.aabb) {
+                        Some((moving.entity, other.entity))
+                    } else {
+                        None
                     }
+                })
+            })
+            .collect();
 
-                    if let (Some(convex_a), Some(mesh_b)) = (convex_a, mesh_b) {
-                        let pair = (entity_b, entity_a); // (mesh, convex)
-                        if processed_pairs.insert(pair) {
-                            let mesh_contacts = convex_mesh_contact(
-                                entity_a,
-                                convex_a,
-                                transform_a,
-                                velocity_a,
-                                entity_b,
-                                mesh_b,
-                                transform_b,
-                                &render_resources,
-                            );
-                            let merge_distance = manifold_merge_distance_pair(&phys, entity_a, entity_a);
-                            let merged = merge_contact_manifold(
-                                phys.manifolds.get(&pair),
-                                &mesh_contacts,
-                                merge_distance,
-                                0.9,
-                                8,
-                            );
-                            if !merged.contacts.is_empty() {
-                                new_manifolds.insert(pair, merged);
-                            }
-                        }
-                        continue;
-                    }
+        #[derive(Clone, Copy)]
+        struct EntityData {
+            transform: TransformComponent,
+            velocity: Option<VelocityComponent>,
+            convex: Option<ConvexCollider>,
+            mesh: Option<MeshCollider>,
+        }
 
-                    if let (Some(mesh_a), Some(convex_b)) = (mesh_a, convex_b) {
-                        let pair = (entity_a, entity_b); // (mesh, convex)
-                        if processed_pairs.insert(pair) {
-                            let mesh_contacts = convex_mesh_contact(
-                                entity_b,
-                                convex_b,
-                                transform_b,
-                                velocity_b,
-                                entity_a,
-                                mesh_a,
-                                transform_a,
-                                &render_resources,
-                            );
-                            let merge_distance = manifold_merge_distance_pair(&phys, entity_b, entity_b);
-                            let merged = merge_contact_manifold(
-                                phys.manifolds.get(&pair),
-                                &mesh_contacts,
-                                merge_distance,
-                                0.9,
-                                8,
-                            );
-                            if !merged.contacts.is_empty() {
-                                new_manifolds.insert(pair, merged);
-                            }
-                        }
-                        continue;
+        let entity_data: HashMap<Entity, EntityData> = all_query
+            .iter()
+            .map(|(entity, transform, velocity, convex, mesh)| {
+                (
+                    entity,
+                    EntityData {
+                        transform: *transform,
+                        velocity: velocity.copied(),
+                        convex: convex.copied(),
+                        mesh: mesh.copied(),
+                    },
+                )
+            })
+            .collect();
+
+        let narrowphase_results: Vec<((Entity, Entity), ContactManifold)> = candidate_pairs
+            .par_iter()
+            .filter_map(|(entity_a, entity_b)| {
+                let data_a = entity_data.get(entity_a)?;
+                let data_b = entity_data.get(entity_b)?;
+
+                if let (Some(convex_a), Some(convex_b)) = (data_a.convex, data_b.convex) {
+                    let pair = ordered_pair(*entity_a, *entity_b);
+                    let mut new_contacts = Vec::new();
+                    if let Some(contact) = convex_convex_contact(
+                        *entity_a,
+                        &convex_a,
+                        &data_a.transform,
+                        *entity_b,
+                        &convex_b,
+                        &data_b.transform,
+                    ) {
+                        new_contacts.push(orient_contact_to_pair(contact, pair));
                     }
+                    let merge_distance =
+                        manifold_merge_distance_pair_map(&phys.world_aabbs, pair.0, pair.1);
+                    let merged = merge_contact_manifold(
+                        phys.manifolds.get(&pair),
+                        &new_contacts,
+                        merge_distance,
+                        0.95,
+                        4,
+                    );
+                    if merged.contacts.is_empty() {
+                        return None;
+                    }
+                    return Some((pair, merged));
                 }
-            }
+
+                if let (Some(convex_a), Some(mesh_b)) = (data_a.convex, data_b.mesh) {
+                    let pair = (*entity_b, *entity_a); // (mesh, convex)
+                    let mesh_contacts = convex_mesh_contact(
+                        *entity_a,
+                        &convex_a,
+                        &data_a.transform,
+                        data_a.velocity.as_ref(),
+                        *entity_b,
+                        &mesh_b,
+                        &data_b.transform,
+                        &render_resources,
+                    );
+                    let merge_distance =
+                        manifold_merge_distance_pair_map(&phys.world_aabbs, *entity_a, *entity_a);
+                    let merged = merge_contact_manifold(
+                        phys.manifolds.get(&pair),
+                        &mesh_contacts,
+                        merge_distance,
+                        0.9,
+                        8,
+                    );
+                    if merged.contacts.is_empty() {
+                        return None;
+                    }
+                    return Some((pair, merged));
+                }
+
+                if let (Some(mesh_a), Some(convex_b)) = (data_a.mesh, data_b.convex) {
+                    let pair = (*entity_a, *entity_b); // (mesh, convex)
+                    let mesh_contacts = convex_mesh_contact(
+                        *entity_b,
+                        &convex_b,
+                        &data_b.transform,
+                        data_b.velocity.as_ref(),
+                        *entity_a,
+                        &mesh_a,
+                        &data_a.transform,
+                        &render_resources,
+                    );
+                    let merge_distance =
+                        manifold_merge_distance_pair_map(&phys.world_aabbs, *entity_b, *entity_b);
+                    let merged = merge_contact_manifold(
+                        phys.manifolds.get(&pair),
+                        &mesh_contacts,
+                        merge_distance,
+                        0.9,
+                        8,
+                    );
+                    if merged.contacts.is_empty() {
+                        return None;
+                    }
+                    return Some((pair, merged));
+                }
+
+                None
+            })
+            .collect();
+
+        for (pair, manifold) in narrowphase_results {
+            new_manifolds
+                .entry(pair)
+                .and_modify(|existing| {
+                    if manifold.contacts.len() > existing.contacts.len() {
+                        *existing = manifold.clone();
+                    } else if manifold.contacts.len() == existing.contacts.len()
+                        && manifold_max_penetration(&manifold)
+                            > manifold_max_penetration(existing)
+                    {
+                        *existing = manifold.clone();
+                    }
+                })
+                .or_insert(manifold.clone());
         }
 
         for manifold in new_manifolds.values() {
@@ -209,14 +279,16 @@ impl CollisionSystem {
     }
 }
 
-fn manifold_merge_distance_pair(phys: &PhysicsResource, a: Entity, b: Entity) -> f32 {
-    let extent_a = phys
-        .world_aabbs
+fn manifold_merge_distance_pair_map(
+    world_aabbs: &HashMap<Entity, AABB>,
+    a: Entity,
+    b: Entity,
+) -> f32 {
+    let extent_a = world_aabbs
         .get(&a)
         .map(|aabb| (aabb.max - aabb.min).length())
         .unwrap_or(0.0);
-    let extent_b = phys
-        .world_aabbs
+    let extent_b = world_aabbs
         .get(&b)
         .map(|aabb| (aabb.max - aabb.min).length())
         .unwrap_or(0.0);
@@ -245,6 +317,14 @@ fn orient_contact_to_pair(mut contact: Contact, pair: (Entity, Entity)) -> Conta
     contact
 }
 
+fn manifold_max_penetration(manifold: &ContactManifold) -> f32 {
+    manifold
+        .contacts
+        .iter()
+        .map(|c| c.penetration)
+        .fold(0.0_f32, f32::max)
+}
+
 fn merge_contact_manifold(
     previous: Option<&ContactManifold>,
     new_contacts: &[Contact],
@@ -253,7 +333,9 @@ fn merge_contact_manifold(
     max_contacts: usize,
 ) -> ContactManifold {
     if new_contacts.is_empty() {
-        return ContactManifold { contacts: Vec::new() };
+        return ContactManifold {
+            contacts: Vec::new(),
+        };
     }
 
     let merge_distance_sq = merge_distance * merge_distance;
@@ -272,8 +354,8 @@ fn merge_contact_manifold(
                 if prev_contact.normal.dot(new_contact.normal) < normal_cos_threshold {
                     continue;
                 }
-                let dist_sq = (prev_contact.contact_point - new_contact.contact_point)
-                    .length_squared();
+                let dist_sq =
+                    (prev_contact.contact_point - new_contact.contact_point).length_squared();
                 if dist_sq <= merge_distance_sq && dist_sq < best_dist_sq {
                     best_dist_sq = dist_sq;
                     best_idx = Some(i);
@@ -939,7 +1021,6 @@ fn swept_aabb(aabb: &AABB, delta: Vec3) -> AABB {
         max: aabb.max.max(moved_max),
     }
 }
-
 
 fn render_body_local_aabb(
     render_body_id: crate::handles::RenderBodyHandle,
