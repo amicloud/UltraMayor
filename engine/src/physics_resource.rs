@@ -13,10 +13,16 @@ pub struct Contact {
     pub contact_point: Vec3, // Point of contact in world space
 }
 
+#[derive(Debug, Clone)]
+pub struct ContactManifold {
+    pub contacts: Vec<Contact>,
+}
+
 #[derive(Default, Resource)]
 pub struct PhysicsResource {
     pub world_aabbs: HashMap<Entity, AABB>,
     pub contacts: Vec<Contact>,
+    pub manifolds: HashMap<(Entity, Entity), ContactManifold>,
 }
 
 impl PhysicsResource {
