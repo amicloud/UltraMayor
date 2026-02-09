@@ -931,11 +931,13 @@ fn reduce_contact_candidates(
     mut candidates: Vec<ContactCandidate>,
     convex_aabb_world: AABB,
 ) -> Vec<Contact> {
+    // Filter out degenerate contacts
     candidates.retain(|c| c.penetration > 0.0 && c.normal.length_squared() > f32::EPSILON);
     if candidates.is_empty() {
         return Vec::new();
     }
 
+    // Sort by penetration depth (descending), then stable tie-breakers
     candidates.sort_by(|a, b| {
         b.penetration
             .total_cmp(&a.penetration)
@@ -947,21 +949,27 @@ fn reduce_contact_candidates(
             .then_with(|| a.normal.z.total_cmp(&b.normal.z))
     });
 
+    // Compute cluster distance
     let extent = convex_aabb_world.max - convex_aabb_world.min;
     let cluster_distance = extent.length().max(0.01) * 0.1;
     let normal_epsilon = 0.01;
+
+    // Select contacts
     let mut selected: Vec<ContactCandidate> = Vec::new();
     for candidate in candidates {
-        if selected
-            .iter()
-            .any(|c| (c.point - candidate.point).length() < cluster_distance)
-        {
-            continue;
+        let mut skip = false;
+        for c in &selected {
+            let close = (c.point - candidate.point).length() < cluster_distance;
+            let same_normal = c.normal.dot(candidate.normal) > 1.0 - normal_epsilon;
+
+            // Only skip if BOTH too close AND normals are almost identical
+            if close && same_normal {
+                skip = true;
+                break;
+            }
         }
-        if selected
-            .iter()
-            .any(|c| c.normal.dot(candidate.normal) > 1.0 - normal_epsilon)
-        {
+
+        if skip {
             continue;
         }
 
@@ -971,6 +979,7 @@ fn reduce_contact_candidates(
         }
     }
 
+    // Convert to Contact
     selected
         .into_iter()
         .map(|candidate| Contact {
@@ -1186,6 +1195,74 @@ mod tests {
         assert_relative_eq!(contacts[1].penetration, 5.0, epsilon = 1e-6);
         assert_relative_eq!(contacts[2].penetration, 4.0, epsilon = 1e-6);
         assert_relative_eq!(contacts[3].penetration, 3.0, epsilon = 1e-6);
+    }
+
+    #[test]
+    fn reduce_contact_candidates_clusters() {
+        let mesh_entity = Entity::from_bits(1);
+        let convex_entity = Entity::from_bits(2);
+        let convex_aabb_world = AABB {
+            min: Vec3::splat(-1.0),
+            max: Vec3::splat(1.0),
+        };
+
+        // Points 0.0, 0.05, 0.1 are very close → should cluster to 1 contact
+        // Points 1.0, 1.05 are far enough → separate cluster
+        let candidates = vec![
+            ContactCandidate {
+                point: Vec3::new(0.0, 0.0, 0.0),
+                normal: Vec3::Z,
+                penetration: 6.0,
+            },
+            ContactCandidate {
+                point: Vec3::new(0.05, 0.0, 0.0),
+                normal: Vec3::Z,
+                penetration: 5.5,
+            },
+            ContactCandidate {
+                point: Vec3::new(0.1, 0.0, 0.0),
+                normal: Vec3::Z,
+                penetration: 5.0,
+            },
+            ContactCandidate {
+                point: Vec3::new(1.0, 0.0, 0.0),
+                normal: Vec3::Z,
+                penetration: 4.0,
+            },
+            ContactCandidate {
+                point: Vec3::new(1.05, 0.0, 0.0),
+                normal: Vec3::Z,
+                penetration: 3.5,
+            },
+            ContactCandidate {
+                point: Vec3::new(2.0, 0.0, 0.0),
+                normal: Vec3::Z,
+                penetration: 3.0,
+            },
+            ContactCandidate {
+                point: Vec3::new(3.0, 0.0, 0.0),
+                normal: Vec3::Z,
+                penetration: 2.0,
+            },
+        ];
+
+        let contacts =
+            reduce_contact_candidates(mesh_entity, convex_entity, candidates, convex_aabb_world);
+
+        // Only one from each cluster should be chosen, respecting the max of 4 contacts
+        assert_eq!(contacts.len(), 4);
+
+        // First cluster picks the deepest penetration
+        assert_relative_eq!(contacts[0].penetration, 6.0, epsilon = 1e-6);
+
+        // Second cluster picks next deepest (1.0 point cluster)
+        assert_relative_eq!(contacts[1].penetration, 4.0, epsilon = 1e-6);
+
+        // Third cluster (2.0 point)
+        assert_relative_eq!(contacts[2].penetration, 3.0, epsilon = 1e-6);
+
+        // Fourth cluster (3.0 point)
+        assert_relative_eq!(contacts[3].penetration, 2.0, epsilon = 1e-6);
     }
 
     #[test]
