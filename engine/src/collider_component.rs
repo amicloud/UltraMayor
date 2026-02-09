@@ -4,7 +4,7 @@ use glam::{Mat4, Vec3};
 use crate::handles::RenderBodyHandle;
 use crate::mesh::AABB;
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Debug, Clone, Copy)]
 pub enum CollisionLayer {
     Default,
     Player,
@@ -14,14 +14,14 @@ pub enum CollisionLayer {
 
 const SUPPORT_EPSILON: f32 = 1e-6;
 
-#[derive(Clone, Debug)]
+#[derive(Debug, Clone)]
 pub struct Triangle {
     pub v0: Vec3,
     pub v1: Vec3,
     pub v2: Vec3,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Debug, Clone)]
 pub struct BVHNode {
     pub aabb: AABB,
     pub left: Option<Box<BVHNode>>,
@@ -81,7 +81,7 @@ pub trait Collider {
     fn aabb(&self, transform: &Mat4) -> AABB;
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Debug, Clone, Copy)]
 pub enum ConvexShape {
     Cuboid {
         length: f32,
@@ -102,7 +102,7 @@ pub enum ConvexShape {
     },
 }
 
-#[derive(Clone, Copy, Component, Debug)]
+#[derive(Component, Debug, Clone, Copy)]
 pub struct ConvexCollider {
     pub shape: ConvexShape,
     pub layer: CollisionLayer,
@@ -294,7 +294,7 @@ impl Collider for ConvexCollider {
     }
 }
 
-#[derive(Clone, Copy, Component)]
+#[derive(Component, Clone, Copy)]
 pub struct MeshCollider {
     pub render_body_id: RenderBodyHandle,
     pub layer: CollisionLayer,

@@ -135,7 +135,7 @@ fn main() {
             local_inertia: glam::Mat3::IDENTITY,
         },
         // SleepComponent::default(),
-        PlayerComponent { speed: 0.1 },
+        PlayerComponent { speed: 1.0 },
     ));
 
     let t_range = 2.0;

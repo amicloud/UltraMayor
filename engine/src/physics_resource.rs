@@ -18,7 +18,7 @@ pub struct ContactManifold {
     pub contacts: Vec<Contact>,
 }
 
-#[derive(Default, Resource)]
+#[derive(Resource, Default)]
 pub struct PhysicsResource {
     pub world_aabbs: HashMap<Entity, AABB>,
     pub contacts: Vec<Contact>,

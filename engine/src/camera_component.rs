@@ -29,7 +29,7 @@ impl CameraComponent {
 /// The active camera entity used for rendering.
 ///
 /// This is optional so games can decide when a camera becomes active.
-#[derive(Resource, Default, Clone, Copy, Debug)]
+#[derive(Resource, Debug, Default, Clone, Copy)]
 pub struct ActiveCamera(pub Option<Entity>);
 
 impl ActiveCamera {

@@ -7,7 +7,7 @@ pub enum PhysicsType {
     Kinematic,
 }
 
-#[derive(Clone, Copy, Component)]
+#[derive(Component, Clone, Copy)]
 pub struct PhysicsComponent {
     pub physics_type: PhysicsType,
     pub mass: f32,
