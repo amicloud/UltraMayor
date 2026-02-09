@@ -1,3 +1,4 @@
+mod bowl_controller;
 mod camera_controller;
 mod input_controller;
 mod settings;
@@ -6,6 +7,7 @@ use camera_controller::{
     apply_flying_camera_input, apply_flying_camera_movement, apply_player_movement_impulses,
     update_orbit_camera_target, FlyingCameraComponent, PlayerComponent,
 };
+use bowl_controller::{update_bowl_float, BowlFloatComponent, BowlFloatTime};
 // use input_controller::{update_input_state, InputState};
 use crate::camera_controller::{
     apply_orbit_camera_input, apply_switch_camera_input, initialize_flying_camera_rotation,
@@ -89,9 +91,12 @@ fn main() {
             apply_flying_camera_movement,
             apply_player_movement_impulses,
             apply_switch_camera_input,
+            update_bowl_float,
         )
             .chain(),
     );
+
+    engine.world.insert_resource(BowlFloatTime::default());
 
     let cube = engine
         .load_model("resources/models/cube/Cube.gltf")
@@ -264,6 +269,11 @@ fn main() {
             render_body_id: bowl,
         },
         bowl_collider,
+        BowlFloatComponent {
+            base_height: 0.0,
+            amplitude: 10.0,
+            speed: 2.0,
+        },
         PhysicsComponent {
             mass: f32::INFINITY,
             physics_type: PhysicsType::Static,

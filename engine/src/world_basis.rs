@@ -7,7 +7,7 @@ use glam::Vec3;
 /// Canonical world coordinate basis.
 ///
 /// Right-handed, Z-up, -Y forward.
-#[derive(Resource, Debug, Copy, Clone)]
+#[derive(Resource, Debug, Clone, Copy)]
 pub struct WorldBasis {
     up: Vec3,
     forward: Vec3,

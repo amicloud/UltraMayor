@@ -10,7 +10,7 @@ use crate::transform_component::TransformComponent;
 ///
 /// Note: This component intentionally does NOT store any transform data.
 /// A camera entity must also have a `TransformComponent` to provide view data.
-#[derive(Component, Debug, Copy, Clone)]
+#[derive(Component, Debug, Clone, Copy)]
 #[require(TransformComponent)]
 pub struct CameraComponent {
     /// Vertical field-of-view in radians.
@@ -29,7 +29,7 @@ impl CameraComponent {
 /// The active camera entity used for rendering.
 ///
 /// This is optional so games can decide when a camera becomes active.
-#[derive(Resource, Default, Copy, Clone, Debug)]
+#[derive(Resource, Default, Clone, Copy, Debug)]
 pub struct ActiveCamera(pub Option<Entity>);
 
 impl ActiveCamera {
