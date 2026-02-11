@@ -107,9 +107,9 @@ fn main() {
 
     let player_scale: Vec3 = Vec3::splat(1.0);
     let player_start = Vec3::new(5.0, 0.0, 25.0);
-    let sphere_collider = ConvexCollider::sphere(player_scale.x, CollisionLayer::Player);
+    let _sphere_collider = ConvexCollider::sphere(player_scale.x, CollisionLayer::Player);
     let cuboid_collider = ConvexCollider::cuboid(player_scale * 2.0, CollisionLayer::Player);
-    let egg_collider = ConvexCollider::egg(3.0, player_scale.x, CollisionLayer::Player);
+    let _egg_collider = ConvexCollider::egg(3.0, player_scale.x, CollisionLayer::Player);
     engine.world.spawn((
         TransformComponent {
             position: player_start,

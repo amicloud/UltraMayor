@@ -1,6 +1,5 @@
 use bevy_ecs::prelude::*;
 use engine::input::InputStateResource;
-use engine::physics_resource::PhysicsResource;
 use engine::{
     ActiveCamera, CameraComponent, MouseButton, TransformComponent, VelocityComponent, WorldBasis,
 };
