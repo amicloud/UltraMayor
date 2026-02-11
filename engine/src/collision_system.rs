@@ -73,8 +73,8 @@ impl CollisionSystem {
     }
 
     pub fn cleanup_removed_entities(
-        mut phys: ResMut<PhysicsResource>,
-        removed: RemovedComponents<TransformComponent>,
+        _phys: ResMut<PhysicsResource>,
+        _removed: RemovedComponents<TransformComponent>,
     ) {
         todo!("Handle removed entities in collision system");
         // for entity in removed.iter() {

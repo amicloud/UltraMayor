@@ -93,7 +93,7 @@ fn main() {
             apply_player_movement_impulses,
             apply_switch_camera_input,
             do_gameplay,
-            // update_bowl_float,
+            update_bowl_float,
         )
             .chain(),
     );
@@ -307,7 +307,7 @@ fn main() {
         bowl_collider,
         BowlFloatComponent {
             base_height: 0.0,
-            amplitude: 5.0,
+            amplitude: 0.0,
             speed: 10.0,
         },
         PhysicsComponent {

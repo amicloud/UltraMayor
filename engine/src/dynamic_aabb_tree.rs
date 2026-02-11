@@ -151,7 +151,8 @@ impl DynamicAabbTree {
 
             if cost < cost_left && cost < cost_right {
                 break; // create new parent here instead of descending
-            } else if cost_left < cost_right { // Descend
+            } else if cost_left < cost_right {
+                // Descend
                 index = left;
             } else {
                 index = right;
@@ -188,21 +189,106 @@ impl DynamicAabbTree {
         self.fix_upwards(new_parent);
     }
 
+    fn update_node(&mut self, node: NodeId) {
+        let left = self.nodes[node].left.unwrap();
+        let right = self.nodes[node].right.unwrap();
+
+        self.nodes[node].height = 1 + self.nodes[left].height.max(self.nodes[right].height);
+        self.nodes[node].aabb = self.nodes[left].aabb.union(&self.nodes[right].aabb);
+    }
+
     fn fix_upwards(&mut self, mut index: NodeId) {
         loop {
+            // Update height/AABB first
+            self.update_node(index);
+
+            // Check balance
             let left = self.nodes[index].left.unwrap();
             let right = self.nodes[index].right.unwrap();
+            let balance = self.nodes[left].height as isize - self.nodes[right].height as isize;
 
-            self.nodes[index].height = 1 + self.nodes[left].height.max(self.nodes[right].height);
+            // Perform rotation if needed, get new root of this subtree
+            index = if balance > 1 {
+                self.rotate_right(index)
+            } else if balance < -1 {
+                self.rotate_left(index)
+            } else {
+                index
+            };
 
-            self.nodes[index].aabb = self.nodes[left].aabb.union(&self.nodes[right].aabb);
-
+            // Move up to parent of the current subtree root
             if let Some(parent) = self.nodes[index].parent {
                 index = parent;
             } else {
                 break;
             }
         }
+    }
+
+    fn rotate_right(&mut self, node: NodeId) -> NodeId {
+        let left = self.nodes[node].left.unwrap();
+        let left_right = self.nodes[left].right;
+
+        // Left becomes new parent
+        self.nodes[left].parent = self.nodes[node].parent;
+        self.nodes[node].parent = Some(left);
+
+        // Update children
+        self.nodes[left].right = Some(node);
+        self.nodes[node].left = left_right;
+
+        if let Some(lr) = left_right {
+            self.nodes[lr].parent = Some(node);
+        }
+
+        // Update parent pointer
+        if let Some(parent) = self.nodes[left].parent {
+            if self.nodes[parent].left == Some(node) {
+                self.nodes[parent].left = Some(left);
+            } else {
+                self.nodes[parent].right = Some(left);
+            }
+        } else {
+            self.root = Some(left);
+        }
+
+        // Recompute heights and AABBs
+        self.update_node(node);
+        self.update_node(left);
+        left
+    }
+
+    fn rotate_left(&mut self, node: NodeId) -> NodeId {
+        let right = self.nodes[node].right.unwrap();
+        let right_left = self.nodes[right].left;
+
+        // Right becomes new parent
+        self.nodes[right].parent = self.nodes[node].parent;
+        self.nodes[node].parent = Some(right);
+
+        // Update children
+        self.nodes[right].left = Some(node);
+        self.nodes[node].right = right_left;
+
+        if let Some(rl) = right_left {
+            self.nodes[rl].parent = Some(node);
+        }
+
+        // Update parent pointer
+        if let Some(parent) = self.nodes[right].parent {
+            if self.nodes[parent].left == Some(node) {
+                self.nodes[parent].left = Some(right);
+            } else {
+                self.nodes[parent].right = Some(right);
+            }
+        } else {
+            self.root = Some(right);
+        }
+
+        // Recompute heights and AABBs
+        self.update_node(node);
+        self.update_node(right);
+        right
     }
 
     fn allocate_node(&mut self) -> NodeId {
