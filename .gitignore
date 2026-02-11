@@ -43,3 +43,4 @@ temp/
 resources/models
 perf.data
 perf.data.old
+flamegraph.svg
