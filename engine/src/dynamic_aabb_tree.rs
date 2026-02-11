@@ -879,4 +879,98 @@ mod tests {
             assert_eq!(found, expected);
         }
     }
+
+    #[test]
+    fn stress_random_test_max_imbalance() {
+        let mut rng = StdRng::seed_from_u64(0xAABB_CCDD_1234_5678);
+        let mut tree = DynamicAabbTree::default();
+        let mut leaves: Vec<(NodeId, Entity, AABB)> = Vec::new();
+
+        // Insert 300 random leaves
+        for i in 0..300u64 {
+            let center = Vec3::new(
+                rng.random_range(-50.0..50.0),
+                rng.random_range(-50.0..50.0),
+                rng.random_range(-50.0..50.0),
+            );
+            let half = rng.random_range(0.2..3.0);
+            let aabb = make_aabb(center, half);
+            let entity = Entity::from_bits(i + 1000);
+            let id = tree.allocate_leaf(entity, aabb);
+            leaves.push((id, entity, aabb));
+        }
+
+        // Helper to compute max imbalance recursively
+        fn max_imbalance(tree: &DynamicAabbTree, node_id: NodeId) -> i32 {
+            let node = &tree.nodes[node_id];
+            if tree.is_leaf(node_id) {
+                return 0;
+            }
+
+            let left = node.left.unwrap();
+            let right = node.right.unwrap();
+            let left_height = tree.nodes[left].height;
+            let right_height = tree.nodes[right].height;
+
+            let balance = (left_height - right_height).abs();
+            let left_max = max_imbalance(tree, left);
+            let right_max = max_imbalance(tree, right);
+
+            balance.max(left_max).max(right_max)
+        }
+
+        // Initial max imbalance
+        let initial_max = tree.root.map(|r| max_imbalance(&tree, r)).unwrap_or(0);
+        println!("Max imbalance after insertion: {}", initial_max);
+        assert!(
+            initial_max <= 3,
+            "initial max imbalance too high: {initial_max}"
+        );
+
+        // Remove ~1/3 of the leaves randomly
+        let mut indices: Vec<usize> = (0..leaves.len()).collect();
+        indices.shuffle(&mut rng);
+        let remove_count = leaves.len() / 3;
+        let mut removed = HashSet::new();
+        for idx in indices.iter().take(remove_count) {
+            let (id, _, _) = leaves[*idx];
+            tree.remove(id);
+            removed.insert(id);
+        }
+        leaves.retain(|(id, _, _)| !removed.contains(id));
+
+        // Max imbalance after removals
+        let post_remove_max = tree.root.map(|r| max_imbalance(&tree, r)).unwrap_or(0);
+        println!("Max imbalance after removals: {}", post_remove_max);
+        assert!(
+            post_remove_max <= 3,
+            "post-remove max imbalance too high: {post_remove_max}"
+        );
+
+        // Random queries to check correctness
+        for _ in 0..100 {
+            let center = Vec3::new(
+                rng.random_range(-60.0..60.0),
+                rng.random_range(-60.0..60.0),
+                rng.random_range(-60.0..60.0),
+            );
+            let half = rng.random_range(0.5..5.0);
+            let query = make_aabb(center, half);
+
+            let mut found = HashSet::new();
+            tree.query(query, |entity| {
+                found.insert(entity);
+            });
+
+            let mut expected = HashSet::new();
+            for (_, entity, aabb) in &leaves {
+                let fat = DynamicAabbTree::expand_aabb(*aabb, 0.1);
+                if fat.intersects(&query) {
+                    expected.insert(*entity);
+                }
+            }
+
+            assert_eq!(found, expected);
+        }
+    }
 }
