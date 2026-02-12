@@ -10,8 +10,7 @@ pub struct MeshResource {
 }
 
 impl MeshResource {
-    pub fn add_mesh(&mut self, mut mesh: Mesh, gl: &glow::Context) -> MeshHandle {
-        mesh.upload_to_gpu(gl);
+    pub fn add_mesh(&mut self, mesh: Mesh) -> MeshHandle {
         let id = mesh.id;
         self.meshes.insert(id, mesh);
         id
@@ -27,9 +26,9 @@ impl MeshResource {
     }
 
     #[allow(dead_code)]
-    pub fn remove_mesh(&mut self, mesh_id: MeshHandle, renderer: &Renderer) {
-        if let Some(mut mesh) = self.meshes.remove(&mesh_id) {
-            renderer.delete_mesh_gpu(&mut mesh);
+    pub fn remove_mesh(&mut self, mesh_id: MeshHandle, renderer: &mut Renderer) {
+        if self.meshes.remove(&mesh_id).is_some() {
+            renderer.delete_mesh_gpu(mesh_id);
         }
     }
 }

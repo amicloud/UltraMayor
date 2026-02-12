@@ -1,3 +1,10 @@
+use std::{collections::HashMap, rc::Rc};
+
+use glam::{Mat4, Vec3};
+use glow::{Context as GlowContext, HasContext};
+
+use crate::{MaterialHandle, MeshHandle, render_instance::RenderInstance, renderer::VaoKey};
+
 pub trait GraphicsBackend {
     type Buffer;
     type Program;
@@ -12,20 +19,15 @@ pub trait GraphicsBackend {
     fn use_program(&mut self, program: Option<Self::Program>);
     fn bind_vertex_array(&mut self, vao: Option<Self::VertexArray>);
 
-    fn draw_elements_instanced(
-        &mut self,
-        count: i32,
-        instance_count: i32,
-    );
+    fn draw_elements_instanced(&mut self, count: i32, instance_count: i32);
 }
 pub struct NullBackend {
-    frames_rendered: u64,
+    pub frames_rendered: u64,
 }
 
 pub struct GlowBackend {
-    gl: Rc<GlowContext>,
-    frames_rendered: u64,
-    vao_cache: HashMap<VaoKey, glow::VertexArray>,
+    pub gl: Rc<GlowContext>,
+    pub frames_rendered: u64,
 }
 
 impl GraphicsBackend for NullBackend {
@@ -42,11 +44,7 @@ impl GraphicsBackend for NullBackend {
     fn use_program(&mut self, _program: Option<Self::Program>) {}
     fn bind_vertex_array(&mut self, _vao: Option<Self::VertexArray>) {}
 
-    fn draw_elements_instanced(
-        &mut self,
-        _count: i32,
-        _instance_count: i32,
-    ) {
+    fn draw_elements_instanced(&mut self, _count: i32, _instance_count: i32) {
         self.frames_rendered += 1;
     }
 }
@@ -95,11 +93,7 @@ impl GraphicsBackend for GlowBackend {
         unsafe { self.gl.bind_vertex_array(vao) }
     }
 
-    fn draw_elements_instanced(
-        &mut self,
-        count: i32,
-        instance_count: i32,
-    ) {
+    fn draw_elements_instanced(&mut self, count: i32, instance_count: i32) {
         unsafe {
             self.gl.draw_elements_instanced(
                 glow::TRIANGLES,

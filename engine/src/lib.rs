@@ -30,6 +30,7 @@ mod render_queue;
 mod render_resource_manager;
 mod render_system;
 mod renderer;
+mod renderer_backends;
 mod shader;
 mod shader_resource;
 mod sleep_component;

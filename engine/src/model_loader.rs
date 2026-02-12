@@ -262,9 +262,7 @@ impl Engine {
                 built_mesh.compute_bounding_sphere();
                 built_mesh.build_bvh(8);
 
-                let mesh_handle = render_resource_manager
-                    .mesh_manager
-                    .add_mesh(built_mesh, gl);
+                let mesh_handle = render_resource_manager.mesh_manager.add_mesh(built_mesh);
                 let material_handle = mesh
                     .material_id
                     .and_then(|idx| material_handles.get(idx).copied())
@@ -324,7 +322,7 @@ impl Engine {
 
             let mut parts = Vec::with_capacity(mesh_primitives.len());
             for prim in mesh_primitives {
-                let mesh_handle = render_resource_manager.mesh_manager.add_mesh(prim.mesh, gl);
+                let mesh_handle = render_resource_manager.mesh_manager.add_mesh(prim.mesh);
 
                 let material_handle = prim
                     .material_index

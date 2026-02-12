@@ -93,13 +93,13 @@ fn main() {
             apply_flying_camera_movement,
             apply_player_movement_impulses,
             apply_switch_camera_input,
-            do_gameplay,
-            update_bowl_float,
+            // do_gameplay,
+            // update_bowl_float,
         )
             .chain(),
     );
 
-    engine.world.insert_resource(BowlFloatTime::default());
+    // engine.world.insert_resource(BowlFloatTime::default());
 
     let cube = engine
         .load_model("resources/models/cube/Cube.gltf")
@@ -109,13 +109,13 @@ fn main() {
         .load_model("resources/models/sphere/sphere.obj")
         .unwrap();
 
-    engine.world.insert_resource(ProjectileSpawner {
-        sphere_handle: sphere,
-        cooldown: 0.2,
-        cooldown_timer: 0.0,
-        speed: 200.0,
-        scale: 1.0,
-    });
+    // engine.world.insert_resource(ProjectileSpawner {
+    //     sphere_handle: sphere,
+    //     cooldown: 0.2,
+    //     cooldown_timer: 0.0,
+    //     speed: 200.0,
+    //     scale: 1.0,
+    // });
 
     let player_scale: Vec3 = Vec3::splat(1.0);
     let player_start = Vec3::new(5.0, 0.0, 25.0);
@@ -161,9 +161,9 @@ fn main() {
                 angular: Vec3::ZERO,
             },
             RenderBodyComponent {
-                render_body_id: sphere,
+                render_body_id: cube,
             },
-            ConvexCollider::sphere(1.0, CollisionLayer::Default),
+            ConvexCollider::cube(2.0, CollisionLayer::Default),
             PhysicsComponent {
                 mass: 5.0,
                 physics_type: PhysicsType::Dynamic,

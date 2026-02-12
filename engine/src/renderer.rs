@@ -21,7 +21,16 @@ pub struct Renderer {
     gl: Rc<GlowContext>,
     frames_rendered: u64,
     vao_cache: HashMap<VaoKey, glow::VertexArray>,
+    mesh_render_data: HashMap<MeshHandle, MeshRenderData>,
     frame_data: FrameData,
+}
+
+struct MeshRenderData {
+    // GPU handles
+    pub vbo: Option<glow::Buffer>,
+    pub ebo: Option<glow::Buffer>,
+    pub instance_vbo: Option<glow::Buffer>,
+    pub instance_count: usize,
 }
 
 #[derive(Default)]
@@ -46,7 +55,7 @@ pub struct RenderParams {
 }
 
 #[derive(PartialEq, Hash, Eq)]
-struct VaoKey {
+pub struct VaoKey {
     mesh: MeshHandle,
     shader: ShaderHandle,
 }
@@ -71,7 +80,7 @@ impl Renderer {
         instances: Vec<RenderInstance>,
         camera: Option<CameraRenderData>,
     ) {
-        let gl = &self.gl;
+        let gl = self.gl.clone();
         let current_time = std::time::Instant::now();
         let mut draw_calls = 0;
 
@@ -152,7 +161,6 @@ impl Renderer {
         // ------------------------------------------------------------
         // PASS 2: Group by material
         // ------------------------------------------------------------
-
         for inst in self.frame_data.visible_instances.drain(..) {
             self.frame_data
                 .instances_by_material
@@ -164,10 +172,11 @@ impl Renderer {
         // ------------------------------------------------------------
         // PASS 3: Render
         // ------------------------------------------------------------
-        for (material_id, inst_group) in &self.frame_data.instances_by_material {
+        let instances_by_material = std::mem::take(&mut self.frame_data.instances_by_material);
+        for (material_id, inst_group) in instances_by_material {
             let material = render_data_manager
                 .material_manager
-                .get_material(*material_id)
+                .get_material(material_id)
                 .expect("Material not found");
             let shader = render_data_manager
                 .shader_manager
@@ -177,20 +186,12 @@ impl Renderer {
             // Bind shader
             unsafe {
                 gl.use_program(Some(shader.program));
-                material.desc.params.keys().for_each(|name| {
-                    if !shader.uniforms.contains_key(name) {
-                        println!(
-                            "Warning: material provides uniform '{}' not used by shader",
-                            name
-                        );
-                    }
-                });
             }
 
             // 1. Bind frame uniforms
             if let Some(loc) = shader.uniforms.get("u_view_proj") {
                 Self::bind_uniform(
-                    gl,
+                    &gl,
                     loc,
                     &UniformValue::Mat4(self.frame_data.frame_uniforms.view_proj),
                     render_data_manager,
@@ -198,7 +199,7 @@ impl Renderer {
             }
             if let Some(loc) = shader.uniforms.get("u_camera_position") {
                 Self::bind_uniform(
-                    gl,
+                    &gl,
                     loc,
                     &UniformValue::Vec3(self.frame_data.frame_uniforms.camera_position),
                     render_data_manager,
@@ -206,7 +207,7 @@ impl Renderer {
             }
             if let Some(loc) = shader.uniforms.get("u_light_direction") {
                 Self::bind_uniform(
-                    gl,
+                    &gl,
                     loc,
                     &UniformValue::Vec3(self.frame_data.frame_uniforms.light_direction),
                     render_data_manager,
@@ -214,7 +215,7 @@ impl Renderer {
             }
             if let Some(loc) = shader.uniforms.get("u_light_color") {
                 Self::bind_uniform(
-                    gl,
+                    &gl,
                     loc,
                     &UniformValue::Vec3(self.frame_data.frame_uniforms.light_color),
                     render_data_manager,
@@ -226,37 +227,36 @@ impl Renderer {
             // 2. Bind material uniforms
             for (name, value) in &material.desc.params {
                 if let Some(loc) = shader.uniforms.get(name) {
-                    textures_bound += Self::bind_uniform(gl, loc, value, render_data_manager);
+                    textures_bound += Self::bind_uniform(&gl, loc, value, render_data_manager);
                 }
             }
 
             // Group by mesh
-            self.frame_data.instances_by_mesh.clear();
+            let mut instances_by_mesh: HashMap<MeshHandle, Vec<[f32; 16]>> = HashMap::new();
             for inst in inst_group {
-                self.frame_data
-                    .instances_by_mesh
+                instances_by_mesh
                     .entry(inst.mesh_id)
                     .or_default()
                     .push(inst.transform.to_cols_array());
             }
 
             // Draw each mesh
-            for (mesh_id, matrices) in &self.frame_data.instances_by_mesh {
-                let vao = Self::get_or_create_vao(
-                    &mut self.vao_cache,
-                    &self.gl,
+            for (mesh_id, matrices) in &instances_by_mesh {
+                let vao = self.get_or_create_vao(
+                    &gl,
                     &mesh_id,
                     &material.desc.shader,
                     render_data_manager,
                 );
+                self.update_instance_buffer(*mesh_id, &matrices);
 
-                let index_count = {
-                    let mesh = render_data_manager
+                let index_count: i32 = {
+                    render_data_manager
                         .mesh_manager
-                        .get_mesh_mut(*mesh_id)
-                        .expect("Mesh not found");
-                    mesh.update_instance_buffer(&matrices, gl);
-                    mesh.indices.len() as i32
+                        .get_mesh(*mesh_id)
+                        .expect("Couldn't find a mesh")
+                        .indices
+                        .len() as i32
                 };
 
                 unsafe {
@@ -313,13 +313,88 @@ impl Renderer {
                 frames_rendered: 0,
                 vao_cache: HashMap::new(),
                 frame_data: FrameData::default(),
+                mesh_render_data: HashMap::new(),
             };
             renderer
         }
     }
 
+    pub fn upload_to_gpu(&mut self, mesh: &Mesh) {
+        let gl = &self.gl;
+        unsafe {
+            // Unbind any active VAO so that EBO binding below does not
+            // corrupt a previously-created VAO's element-buffer state.
+            gl.bind_vertex_array(None);
+
+            // --- Create GPU objects ---
+            let vbo = gl.create_buffer().unwrap();
+            let ebo = gl.create_buffer().unwrap();
+            let instance_vbo = gl.create_buffer().unwrap();
+
+            // Upload vertex data
+            gl.bind_buffer(glow::ARRAY_BUFFER, Some(vbo));
+            gl.buffer_data_u8_slice(
+                glow::ARRAY_BUFFER,
+                bytemuck::cast_slice(&mesh.vertices),
+                glow::STATIC_DRAW,
+            );
+
+            // Upload index data
+            gl.bind_buffer(glow::ELEMENT_ARRAY_BUFFER, Some(ebo));
+            gl.buffer_data_u8_slice(
+                glow::ELEMENT_ARRAY_BUFFER,
+                bytemuck::cast_slice(&mesh.indices),
+                glow::STATIC_DRAW,
+            );
+
+            // Allocate empty instance buffer (resized on update)
+            gl.bind_buffer(glow::ARRAY_BUFFER, Some(instance_vbo));
+            gl.buffer_data_size(glow::ARRAY_BUFFER, 0, glow::DYNAMIC_DRAW);
+            gl.bind_buffer(glow::ARRAY_BUFFER, None);
+            gl.bind_buffer(glow::ELEMENT_ARRAY_BUFFER, None);
+
+            let mesh_data = MeshRenderData {
+                vbo: Some(vbo),
+                ebo: Some(ebo),
+                instance_vbo: Some(instance_vbo),
+                instance_count: 0,
+            };
+            self.mesh_render_data.insert(mesh.id, mesh_data);
+        }
+    }
+
+    pub fn update_instance_buffer(
+        &mut self,
+        mesh_handle: MeshHandle,
+        instance_matrices: &[[f32; 16]],
+    ) {
+        let gl = &self.gl;
+        let mesh_data = self
+            .mesh_render_data
+            .get_mut(&mesh_handle)
+            .expect("Mesh not found");
+        if instance_matrices.is_empty() {
+            mesh_data.instance_count = 0;
+            return;
+        }
+
+        let instance_buf = mesh_data.instance_vbo.unwrap();
+
+        unsafe {
+            gl.bind_buffer(glow::ARRAY_BUFFER, Some(instance_buf));
+            gl.buffer_data_u8_slice(
+                glow::ARRAY_BUFFER,
+                bytemuck::cast_slice(instance_matrices),
+                glow::DYNAMIC_DRAW,
+            );
+            gl.bind_buffer(glow::ARRAY_BUFFER, None);
+
+            mesh_data.instance_count = instance_matrices.len();
+        }
+    }
+
     fn get_or_create_vao(
-        vao_cache: &mut HashMap<VaoKey, glow::VertexArray>,
+        &mut self,
         gl: &glow::Context,
         mesh: &MeshHandle,
         shader: &ShaderHandle,
@@ -330,19 +405,27 @@ impl Renderer {
             shader: *shader,
         };
 
-        if let Some(vao) = vao_cache.get(&key) {
+        if let Some(vao) = self.vao_cache.get(&key) {
             return *vao;
         }
+
+        if !self.mesh_render_data.contains_key(mesh) {
+            let mesh_data = render_data_manager
+                .mesh_manager
+                .get_mesh(*mesh)
+                .expect("Mesh not found");
+            self.upload_to_gpu(mesh_data);
+        }
+
+        let mesh_data = self.mesh_render_data.get(mesh).unwrap();
+        let vertex_stride = crate::mesh::Vertex::stride();
 
         unsafe {
             let vao = gl.create_vertex_array().unwrap();
             gl.bind_vertex_array(Some(vao));
 
-            let mesh_data = render_data_manager.mesh_manager.get_mesh(*mesh).unwrap();
             gl.bind_buffer(glow::ARRAY_BUFFER, Some(mesh_data.vbo.unwrap()));
             gl.bind_buffer(glow::ELEMENT_ARRAY_BUFFER, Some(mesh_data.ebo.unwrap()));
-
-            let vertex_stride = crate::mesh::Vertex::stride();
 
             let instance_offset_for = |name: &str| -> Option<i32> {
                 if let Some(suffix) = name.strip_prefix("instance_model_col") {
@@ -422,25 +505,29 @@ impl Renderer {
             }
 
             gl.bind_vertex_array(None);
-            vao_cache.insert(key, vao);
+            self.vao_cache.insert(key, vao);
             vao
         }
     }
 
     /// Deletes a mesh's GPU resources
     #[allow(dead_code)]
-    pub fn delete_mesh_gpu(&self, mesh: &mut Mesh) {
+    pub fn delete_mesh_gpu(&mut self, mesh_handle: MeshHandle) {
+        let mesh_data = self
+            .mesh_render_data
+            .get_mut(&mesh_handle)
+            .expect("Mesh not found");
         unsafe {
-            if let Some(vbo) = mesh.vbo.take() {
+            if let Some(vbo) = mesh_data.vbo.take() {
                 self.gl.delete_buffer(vbo);
             }
-            if let Some(ebo) = mesh.ebo.take() {
+            if let Some(ebo) = mesh_data.ebo.take() {
                 self.gl.delete_buffer(ebo);
             }
-            if let Some(inst) = mesh.instance_vbo.take() {
+            if let Some(inst) = mesh_data.instance_vbo.take() {
                 self.gl.delete_buffer(inst);
             }
-            mesh.instance_count = 0;
+            mesh_data.instance_count = 0;
         }
     }
 

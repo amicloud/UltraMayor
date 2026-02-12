@@ -172,14 +172,6 @@ pub struct Mesh {
 
     // Collision
     pub bvh: Option<BVHNode>,
-
-    // GPU handles
-    pub vbo: Option<glow::Buffer>,
-    pub ebo: Option<glow::Buffer>,
-    pub instance_vbo: Option<glow::Buffer>,
-
-    // Instancing
-    pub instance_count: usize,
 }
 
 #[derive(Clone)]
@@ -222,82 +214,6 @@ impl Mesh {
             tris.push(Triangle { v0, v1, v2 });
         }
         tris
-    }
-
-    pub fn upload_to_gpu(&mut self, gl: &glow::Context) {
-        unsafe {
-            // --- Create GPU objects ---
-            let vbo = gl.create_buffer().unwrap();
-            let ebo = gl.create_buffer().unwrap();
-            let instance_vbo = gl.create_buffer().unwrap();
-
-            // Upload vertex data
-            gl.bind_buffer(glow::ARRAY_BUFFER, Some(vbo));
-            gl.buffer_data_u8_slice(
-                glow::ARRAY_BUFFER,
-                bytemuck::cast_slice(&self.vertices),
-                glow::STATIC_DRAW,
-            );
-
-            // Upload index data
-            gl.bind_buffer(glow::ELEMENT_ARRAY_BUFFER, Some(ebo));
-            gl.buffer_data_u8_slice(
-                glow::ELEMENT_ARRAY_BUFFER,
-                bytemuck::cast_slice(&self.indices),
-                glow::STATIC_DRAW,
-            );
-
-            // Allocate empty instance buffer (resized on update)
-            gl.bind_buffer(glow::ARRAY_BUFFER, Some(instance_vbo));
-            gl.buffer_data_size(glow::ARRAY_BUFFER, 0, glow::DYNAMIC_DRAW);
-            gl.bind_buffer(glow::ARRAY_BUFFER, None);
-            gl.bind_buffer(glow::ELEMENT_ARRAY_BUFFER, None);
-
-            self.vbo = Some(vbo);
-            self.ebo = Some(ebo);
-            self.instance_vbo = Some(instance_vbo);
-            self.instance_count = 0;
-        }
-    }
-
-    pub fn update_instance_buffer(&mut self, instance_matrices: &[[f32; 16]], gl: &glow::Context) {
-        if instance_matrices.is_empty() {
-            self.instance_count = 0;
-            return;
-        }
-
-        let instance_buf = self.instance_vbo.unwrap();
-
-        let byte_len = (instance_matrices.len() * 16 * 4) as i32;
-
-        unsafe {
-            gl.bind_buffer(glow::ARRAY_BUFFER, Some(instance_buf));
-            gl.buffer_data_size(glow::ARRAY_BUFFER, byte_len, glow::DYNAMIC_DRAW);
-
-            let ptr = gl.map_buffer_range(
-                glow::ARRAY_BUFFER,
-                0,
-                byte_len,
-                glow::MAP_WRITE_BIT | glow::MAP_INVALIDATE_BUFFER_BIT,
-            );
-
-            if ptr.is_null() {
-                panic!("Failed to map instance buffer");
-            }
-
-            let float_ptr = ptr as *mut f32;
-
-            std::ptr::copy_nonoverlapping(
-                instance_matrices.as_ptr() as *const f32,
-                float_ptr,
-                instance_matrices.len() * 16,
-            );
-
-            gl.unmap_buffer(glow::ARRAY_BUFFER);
-            gl.bind_buffer(glow::ARRAY_BUFFER, None);
-
-            self.instance_count = instance_matrices.len();
-        }
     }
 
     pub fn compute_bounding_sphere(&mut self) {
