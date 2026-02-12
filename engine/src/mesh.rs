@@ -3,7 +3,6 @@
 use approx::relative_eq;
 use bytemuck::{Pod, Zeroable};
 use glam::Vec3;
-use glow::HasContext;
 use std::hash::{Hash, Hasher};
 
 use crate::collider_component::{BVHNode, Triangle};
