@@ -109,8 +109,8 @@ impl Engine {
                 MovementSystem::update,
                 CollisionSystem::update_world_aabb_cache,
                 CollisionSystem::update_world_dynamic_tree,
-                // CollisionSystem::generate_contacts,
-                // PhysicsSystem::physics_solver,
+                CollisionSystem::generate_contacts,
+                PhysicsSystem::physics_solver,
                 PhysicsSystem::integrate_motion,
             )
                 .chain(),

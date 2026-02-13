@@ -5,7 +5,7 @@ use glam::{Mat4, Vec3};
 
 use crate::collider_component::ConvexCollider;
 
-const EPA_MAX_ITERATIONS: usize = 4;
+const EPA_MAX_ITERATIONS: usize = 64;
 const EPA_TOLERANCE: f32 = 1e-4;
 const EPSILON: f32 = 1e-6;
 
@@ -248,16 +248,17 @@ fn make_face_outward(vertices: &[Vec3], a: usize, b: usize, c: usize) -> Option<
     let ac = vertices[c] - vertices[a];
     let mut normal = ab.cross(ac);
 
+    // Degenerate or near-degenerate triangle
     if normal.length_squared() < EPSILON {
         return None;
     }
 
     normal = normal.normalize();
-    let distance = normal.dot(vertices[a]);
+    let mut distance = normal.dot(vertices[a]);
 
     if distance < 0.0 {
-        // Flip winding
-        return make_face_outward(vertices, b, a, c);
+        normal = -normal;
+        distance = -distance;
     }
 
     Some(Face {
