@@ -4,7 +4,6 @@ use crate::handles::MeshHandle;
 use crate::handles::ShaderHandle;
 use crate::mesh::Mesh;
 use crate::mesh::Vertex;
-use crate::mesh_resource::MeshResource;
 use crate::render_instance::RenderInstance;
 use crate::render_resource_manager::RenderResourceManager;
 use crate::shader::InputRate::PerInstance;
@@ -26,7 +25,7 @@ pub struct Renderer {
     frame_data: FrameData,
 }
 
-struct MeshRenderData {
+pub struct MeshRenderData {
     // GPU handles
     pub vbo: Option<glow::Buffer>,
     pub ebo: Option<glow::Buffer>,
@@ -37,8 +36,8 @@ struct MeshRenderData {
 #[derive(Default)]
 struct FrameData {
     visible_instances: Vec<RenderInstance>,
-    instances_by_material: HashMap<MaterialHandle, Vec<RenderInstance>>,
-    instances_by_mesh: HashMap<MeshHandle, Vec<[f32; 16]>>,
+    temp_material_map: MaterialBatchMap,
+    temp_mesh_map: MaterialMeshMap,
     frame_uniforms: FrameUniforms,
     material_batches: Vec<MaterialBatch>,
 }
@@ -71,9 +70,16 @@ pub struct CameraRenderData {
 pub struct MaterialBatch {
     pub material_id: MaterialHandle,
     pub instances: Vec<RenderInstance>,
+    pub mesh_batches: Vec<MeshBatch>,
+}
+
+pub struct MeshBatch {
+    pub mesh_id: MeshHandle,
+    pub instance_matrices: Vec<[f32; 16]>,
 }
 
 type MaterialBatchMap = HashMap<MaterialHandle, Vec<RenderInstance>>;
+type MaterialMeshMap = HashMap<MeshHandle, Vec<[f32; 16]>>;
 
 impl Renderer {
     fn max_scale(mat: Mat4) -> f32 {
@@ -133,10 +139,6 @@ impl Renderer {
 
         let view_proj = camera.view_proj;
 
-        self.frame_data.visible_instances.clear();
-        self.frame_data.instances_by_material.clear();
-        self.frame_data.instances_by_mesh.clear();
-
         // Set common uniforms
         let default_light_color = Vec3::new(1.0, 1.0, 1.0);
 
@@ -145,9 +147,6 @@ impl Renderer {
         self.frame_data.frame_uniforms.light_direction = Vec3::new(0.0, 0.0, 1.0);
         self.frame_data.frame_uniforms.light_color = default_light_color;
 
-        // ------------------------------------------------------------
-        // PASS 1: Frustum culling
-        // ------------------------------------------------------------
         Self::frustum_culling(
             &mut self.frame_data.visible_instances,
             instances,
@@ -155,20 +154,14 @@ impl Renderer {
             &view_proj,
         );
 
-        // ------------------------------------------------------------
-        // PASS 2: Group by material
-        // ------------------------------------------------------------
         Self::material_batcher(
             &mut self.frame_data.visible_instances,
             &mut self.frame_data.material_batches,
-            &mut self.frame_data.instances_by_material,
+            &mut self.frame_data.temp_material_map,
+            &mut self.frame_data.temp_mesh_map,
         );
 
-        // ------------------------------------------------------------
-        // PASS 3: Render
-        // ------------------------------------------------------------
-
-        for batch in &self.frame_data.material_batches {
+        for mut batch in self.frame_data.material_batches.drain(..) {
             let material = render_data_manager
                 .material_manager
                 .get_material(batch.material_id)
@@ -226,32 +219,28 @@ impl Renderer {
                 }
             }
 
-            // Group by mesh
-            let mut instances_by_mesh: HashMap<MeshHandle, Vec<[f32; 16]>> = HashMap::new();
-            for inst in &batch.instances {
-                instances_by_mesh
-                    .entry(inst.mesh_id)
-                    .or_default()
-                    .push(inst.transform.to_cols_array());
-            }
-
             // Draw each mesh
-            for (mesh_id, matrices) in &instances_by_mesh {
+            for mesh_batch in batch.mesh_batches.drain(..) {
                 let vao = Self::get_or_create_vao(
                     &mut self.vao_cache,
                     &gl,
-                    &mesh_id,
+                    &mesh_batch.mesh_id,
                     &material.desc.shader,
                     render_data_manager,
                     &mut self.mesh_render_data,
                 );
-                Self::update_instance_buffer(&gl, *mesh_id, &mut self.mesh_render_data, &matrices);
+                Self::update_instance_buffer(
+                    &gl,
+                    mesh_batch.mesh_id,
+                    &mut self.mesh_render_data,
+                    &mesh_batch.instance_matrices,
+                );
 
                 let index_count: i32 = {
                     render_data_manager
                         .mesh_manager
-                        .get_mesh(*mesh_id)
-                        .expect(&format!("Couldn't find mesh: {:?}", mesh_id))
+                        .get_mesh(mesh_batch.mesh_id)
+                        .expect(&format!("Couldn't find mesh: {:?}", mesh_batch.mesh_id))
                         .indices
                         .len() as i32
                 };
@@ -263,7 +252,7 @@ impl Renderer {
                         index_count,
                         glow::UNSIGNED_INT,
                         0,
-                        matrices.len() as i32,
+                        mesh_batch.instance_matrices.len() as i32,
                     );
                 }
                 draw_calls += 1;
@@ -301,35 +290,49 @@ impl Renderer {
     }
 
     pub fn material_batcher(
-        instances: &mut Vec<RenderInstance>, // <- take a mutable reference
+        instances: &mut Vec<RenderInstance>,
         batches: &mut Vec<MaterialBatch>,
         temp_map: &mut MaterialBatchMap,
+        temp_mesh_map: &mut MaterialMeshMap,
     ) {
-        temp_map.clear();
-        batches.clear();
-
         // Drain the instances vector into temp_map
         for inst in instances.drain(..) {
             temp_map.entry(inst.material_id).or_default().push(inst);
         }
 
         for (material_id, instances) in temp_map.drain() {
+            for inst in instances.iter() {
+                temp_mesh_map
+                    .entry(inst.mesh_id)
+                    .or_default()
+                    .push(inst.transform.to_cols_array());
+            }
+
+            let mesh_batches = temp_mesh_map
+                .drain()
+                .map(|(mesh_id, instance_matrices)| MeshBatch {
+                    mesh_id,
+                    instance_matrices,
+                })
+                .collect();
+
             batches.push(MaterialBatch {
                 material_id,
                 instances,
+                mesh_batches,
             });
         }
     }
 
     pub fn frustum_culling(
         visible_instances: &mut Vec<RenderInstance>,
-        instances: Vec<RenderInstance>,
+        mut instances: Vec<RenderInstance>,
         render_data_manager: &RenderResourceManager,
         view_proj: &Mat4,
     ) {
         let frustum = Frustum::from_view_proj(&view_proj);
 
-        for inst in instances {
+        for inst in instances.drain(..) {
             // println!("Checking culling for instance: {:?}", inst);
             let mesh = render_data_manager
                 .mesh_manager

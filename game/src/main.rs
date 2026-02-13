@@ -24,7 +24,15 @@ use engine::{
 };
 use glam::{Quat, Vec3};
 use rand::random_range;
+
+#[cfg(feature = "dhat-heap")]
+#[global_allocator]
+static ALLOC: dhat::Alloc = dhat::Alloc;
+
 fn main() {
+    #[cfg(feature = "dhat-heap")]
+    let _profiler = dhat::Profiler::new_heap();
+
     println!("Welcome to the Game!");
     let mut engine = Engine::new();
 
@@ -180,7 +188,7 @@ fn main() {
 
     let t_range = 2.0;
 
-    (0..20).for_each(|_| {
+    (0..100).for_each(|_| {
         // Random position
         let pos = Vec3::new(
             random_range(-20.0..20.0),

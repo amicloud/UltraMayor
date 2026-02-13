@@ -29,6 +29,7 @@ tobj = "4.0.3"
 glam = "0.31.0"
 
 rayon = "1.11.0"
+dhat = "0.3.3"
 
 # native
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
@@ -50,3 +51,6 @@ criterion = { version = "0.8", features = ["html_reports"] }
 [[bench]]
 name = "my_benchmark"
 harness = false
+
+[features]
+dhat-heap = []    # if you are doing heap profiling
