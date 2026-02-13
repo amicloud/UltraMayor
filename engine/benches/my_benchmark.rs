@@ -3,7 +3,7 @@ use bevy_ecs::schedule::{IntoScheduleConfigs, Schedule};
 use criterion::{Criterion, criterion_group, criterion_main};
 use std::hint::black_box;
 
-use engine::physics_resource::PhysicsResource;
+use engine::physics_resource::{CollisionFrameData, PhysicsResource};
 use engine::{
     CollisionLayer, CollisionSystem, ConvexCollider, RenderResourceManager, TransformComponent,
 };
@@ -100,8 +100,8 @@ fn bench_generate_contacts(c: &mut Criterion) {
             schedule.run(&mut world);
             black_box(
                 world
-                    .get_resource::<PhysicsResource>()
-                    .expect("PhysicsResource missing")
+                    .get_resource::<CollisionFrameData>()
+                    .expect("CollisionFrameData missing")
                     .contacts
                     .len(),
             );
@@ -131,8 +131,8 @@ fn bench_generate_contacts_touching(c: &mut Criterion) {
             schedule.run(&mut world);
             black_box(
                 world
-                    .get_resource::<PhysicsResource>()
-                    .expect("PhysicsResource missing")
+                    .get_resource::<CollisionFrameData>()
+                    .expect("CollisionFrameData missing")
                     .contacts
                     .len(),
             );

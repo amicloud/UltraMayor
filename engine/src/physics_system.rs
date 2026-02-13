@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use crate::WorldBasis;
 use crate::movement_system::MovementSystem;
-use crate::physics_resource::{Contact, PhysicsResource};
+use crate::physics_resource::{CollisionFrameData, Contact, ContactManifold, PhysicsResource};
 use crate::velocity_component::VelocityComponent;
 use crate::{
     physics_component::PhysicsComponent, sleep_component::SleepComponent,
@@ -11,11 +11,6 @@ use crate::{
 use bevy_ecs::prelude::*;
 use glam::Vec3;
 use rayon::prelude::*;
-#[derive(Clone)]
-struct ContactManifold {
-    normal: Vec3,
-    contacts: Vec<Contact>,
-}
 pub struct PhysicsSystem {}
 
 pub fn delta_time() -> f32 {
@@ -349,9 +344,13 @@ impl PhysicsSystem {
             Option<&mut VelocityComponent>,
             Option<&PhysicsComponent>,
         )>,
-        phys: ResMut<PhysicsResource>,
+        collision_frame_data: Res<CollisionFrameData>,
     ) {
-        let manifolds = Self::generate_manifolds_from_contacts(&phys.contacts);
+        let manifolds = collision_frame_data
+            .manifolds
+            .values()
+            .cloned()
+            .collect::<Vec<_>>();
         let mut constraints: Vec<Vec<ContactConstraint>> = if manifolds.len() >= PAR_THRESHOLD {
             manifolds
                 .par_iter()
@@ -407,13 +406,15 @@ fn physics_props(physics: Option<&PhysicsComponent>) -> (f32, f32, f32, glam::Ma
 
 #[cfg(test)]
 mod tests {
+    use crate::physics_component::PhysicsType;
+
     use super::*;
     use approx::assert_relative_eq;
     use glam::{Quat, Vec3};
 
     fn physics_component() -> PhysicsComponent {
         PhysicsComponent {
-            physics_type: crate::physics_component::PhysicsType::Dynamic,
+            physics_type: PhysicsType::Dynamic,
             mass: 1.0,
             friction: 0.0,
             drag_coefficient: 0.1,

@@ -15,7 +15,7 @@ use crate::{
     epa::epa,
     gjk::{GjkResult, gjk_intersect},
     mesh::AABB,
-    physics_resource::{Contact, ContactManifold, PhysicsResource},
+    physics_resource::{CollisionFrameData, Contact, ContactManifold, PhysicsResource},
     physics_system::delta_time,
     render_resource_manager::RenderResourceManager,
     velocity_component::VelocityComponent,
@@ -147,16 +147,13 @@ impl CollisionSystem {
             Option<&MeshCollider>,
         )>,
         render_resources: Res<RenderResourceManager>,
-        mut phys: ResMut<PhysicsResource>,
+        physics_world: Res<PhysicsResource>,
+        mut frame: ResMut<CollisionFrameData>,
     ) {
-        phys.contacts.clear();
-
-        let mut contacts: Vec<Contact> = Vec::new();
-        let mut new_manifolds: HashMap<(Entity, Entity), ContactManifold> = HashMap::new();
-        let mut candidate_pairs: Vec<(Entity, Entity)> = Vec::new();
+        frame.clear();
 
         for (entity, _transform, velocity, _convex, _mesh) in &moving_query {
-            let base_aabb = match phys.world_aabbs.get(&entity) {
+            let base_aabb = match physics_world.world_aabbs.get(&entity) {
                 Some(aabb) => *aabb,
                 None => continue,
             };
@@ -174,62 +171,45 @@ impl CollisionSystem {
             };
 
             // --- Query dynamic tree ---
-            phys.broadphase.query(swept, |other_entity| {
+            physics_world.broadphase.query(swept, |other_entity| {
                 if other_entity != entity {
-                    candidate_pairs.push((entity, other_entity));
+                    frame.candidate_pairs.push((entity, other_entity));
                 }
             });
         }
 
         // deduplicate pairs (important!)
-        Self::deduplicate_pairs(&mut candidate_pairs);
+        Self::deduplicate_pairs(&mut frame.candidate_pairs);
 
-        #[derive(Clone, Copy)]
-        struct EntityData {
-            transform: TransformComponent,
-            velocity: Option<VelocityComponent>,
-            convex: Option<ConvexCollider>,
-            mesh: Option<MeshCollider>,
-        }
-
-        let entity_data: HashMap<Entity, EntityData> = all_query
-            .iter()
-            .map(|(entity, transform, velocity, convex, mesh)| {
-                (
-                    entity,
-                    EntityData {
-                        transform: *transform,
-                        velocity: velocity.copied(),
-                        convex: convex.copied(),
-                        mesh: mesh.copied(),
-                    },
-                )
-            })
-            .collect();
-
-        let narrowphase_results: Vec<((Entity, Entity), ContactManifold)> = candidate_pairs
+        let narrowphase_results: Vec<((Entity, Entity), ContactManifold)> = frame
+            .candidate_pairs
             .par_iter()
             .filter_map(|(entity_a, entity_b)| {
-                let data_a = entity_data.get(entity_a)?;
-                let data_b = entity_data.get(entity_b)?;
+                let (.., transform_a, velocity_a, convex_a, mesh_a) =
+                    all_query.get(*entity_a).ok()?;
+                let (.., transform_b, velocity_b, convex_b, mesh_b) =
+                    all_query.get(*entity_b).ok()?;
 
-                if let (Some(convex_a), Some(convex_b)) = (data_a.convex, data_b.convex) {
+                if let (Some(convex_a), Some(convex_b)) = (convex_a, convex_b) {
                     let pair = ordered_pair(*entity_a, *entity_b);
                     let mut new_contacts = Vec::new();
                     if let Some(contact) = convex_convex_contact(
                         *entity_a,
                         &convex_a,
-                        &data_a.transform,
+                        &transform_a,
                         *entity_b,
                         &convex_b,
-                        &data_b.transform,
+                        &transform_b,
                     ) {
                         new_contacts.push(orient_contact_to_pair(contact, pair));
                     }
-                    let merge_distance =
-                        manifold_merge_distance_pair_map(&phys.world_aabbs, pair.0, pair.1);
+                    let merge_distance = manifold_merge_distance_pair_map(
+                        &physics_world.world_aabbs,
+                        pair.0,
+                        pair.1,
+                    );
                     let merged = merge_contact_manifold(
-                        phys.manifolds.get(&pair),
+                        frame.manifolds.get(&pair),
                         &new_contacts,
                         merge_distance,
                         0.95,
@@ -241,22 +221,25 @@ impl CollisionSystem {
                     return Some((pair, merged));
                 }
 
-                if let (Some(convex_a), Some(mesh_b)) = (data_a.convex, data_b.mesh) {
+                if let (Some(convex_a), Some(mesh_b)) = (convex_a, mesh_b) {
                     let pair = (*entity_b, *entity_a); // (mesh, convex)
                     let mesh_contacts = convex_mesh_contact(
                         *entity_a,
                         &convex_a,
-                        &data_a.transform,
-                        data_a.velocity.as_ref(),
+                        &transform_a,
+                        velocity_a,
                         *entity_b,
                         &mesh_b,
-                        &data_b.transform,
+                        &transform_b,
                         &render_resources,
                     );
-                    let merge_distance =
-                        manifold_merge_distance_pair_map(&phys.world_aabbs, *entity_a, *entity_a);
+                    let merge_distance = manifold_merge_distance_pair_map(
+                        &physics_world.world_aabbs,
+                        *entity_a,
+                        *entity_b,
+                    );
                     let merged = merge_contact_manifold(
-                        phys.manifolds.get(&pair),
+                        frame.manifolds.get(&pair),
                         &mesh_contacts,
                         merge_distance,
                         0.9,
@@ -268,22 +251,25 @@ impl CollisionSystem {
                     return Some((pair, merged));
                 }
 
-                if let (Some(mesh_a), Some(convex_b)) = (data_a.mesh, data_b.convex) {
-                    let pair = (*entity_a, *entity_b); // (mesh, convex)
+                if let (Some(mesh_a), Some(convex_b)) = (mesh_a, convex_b) {
+                    let pair = (*entity_a, *entity_b);
                     let mesh_contacts = convex_mesh_contact(
                         *entity_b,
                         &convex_b,
-                        &data_b.transform,
-                        data_b.velocity.as_ref(),
+                        &transform_b,
+                        velocity_b,
                         *entity_a,
                         &mesh_a,
-                        &data_a.transform,
+                        &transform_a,
                         &render_resources,
                     );
-                    let merge_distance =
-                        manifold_merge_distance_pair_map(&phys.world_aabbs, *entity_b, *entity_b);
+                    let merge_distance = manifold_merge_distance_pair_map(
+                        &physics_world.world_aabbs,
+                        *entity_b,
+                        *entity_b,
+                    );
                     let merged = merge_contact_manifold(
-                        phys.manifolds.get(&pair),
+                        frame.manifolds.get(&pair),
                         &mesh_contacts,
                         merge_distance,
                         0.9,
@@ -300,7 +286,8 @@ impl CollisionSystem {
             .collect();
 
         for (pair, manifold) in narrowphase_results {
-            new_manifolds
+            frame
+                .manifolds
                 .entry(pair)
                 .and_modify(|existing| {
                     if manifold.contacts.len() > existing.contacts.len() {
@@ -314,15 +301,11 @@ impl CollisionSystem {
                 .or_insert(manifold.clone());
         }
 
-        for manifold in new_manifolds.values() {
-            contacts.extend_from_slice(&manifold.contacts);
+        let mut merged_contacts = Vec::new();
+        for manifold in frame.manifolds.values() {
+            merged_contacts.extend_from_slice(&manifold.contacts);
         }
-
-        phys.manifolds = new_manifolds;
-
-        for contact in contacts {
-            phys.add_contact(contact);
-        }
+        frame.contacts.extend(merged_contacts);
     }
 }
 
@@ -382,6 +365,7 @@ fn merge_contact_manifold(
     if new_contacts.is_empty() {
         return ContactManifold {
             contacts: Vec::new(),
+            normal: Vec3::ZERO,
         };
     }
 
@@ -466,7 +450,18 @@ fn merge_contact_manifold(
         merged = scored.into_iter().map(|(contact, _)| contact).collect();
     }
 
-    ContactManifold { contacts: merged }
+    let normal = merged
+        .iter()
+        .fold(Vec3::ZERO, |acc, contact| {
+            acc + contact.normal * contact.penetration
+        })
+        .try_normalize()
+        .unwrap_or(Vec3::ZERO);
+
+    ContactManifold {
+        contacts: merged,
+        normal,
+    }
 }
 
 fn transform_aabb(local: AABB, transform: &TransformComponent) -> AABB {

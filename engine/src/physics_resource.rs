@@ -19,26 +19,29 @@ pub struct Contact {
 #[derive(Debug, Clone)]
 pub struct ContactManifold {
     pub contacts: Vec<Contact>,
+    pub normal: Vec3,
 }
 
 #[derive(Resource, Default)]
 pub struct PhysicsResource {
     pub world_aabbs: HashMap<Entity, AABB>,
-    pub contacts: Vec<Contact>,
-    pub manifolds: HashMap<(Entity, Entity), ContactManifold>,
     pub broadphase: DynamicAabbTree,
     pub entity_node: HashMap<Entity, NodeId>,
 }
 
-impl PhysicsResource {
-    pub fn add_contact(&mut self, contact: Contact) {
-        self.contacts.push(contact);
-    }
+#[derive(Resource, Default)]
+pub struct CollisionFrameData {
+    pub delta_time: f32,
+    pub candidate_pairs: Vec<(Entity, Entity)>,
+    pub contacts: Vec<Contact>,
+    pub manifolds: HashMap<(Entity, Entity), ContactManifold>,
+}
 
-    pub fn are_in_contact(&self, entity_a: Entity, entity_b: Entity) -> bool {
-        self.contacts.iter().any(|contact| {
-            (contact.entity_a == entity_a && contact.entity_b == entity_b)
-                || (contact.entity_a == entity_b && contact.entity_b == entity_a)
-        })
+impl CollisionFrameData {
+    pub fn clear(&mut self) {
+        self.delta_time = 0.0;
+        self.candidate_pairs.clear();
+        self.contacts.clear();
+        self.manifolds.clear();
     }
 }
