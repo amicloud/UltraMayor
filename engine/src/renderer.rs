@@ -1,3 +1,4 @@
+
 use crate::frustum::Frustum;
 use crate::handles::MaterialHandle;
 use crate::handles::MeshHandle;
@@ -15,6 +16,7 @@ use glow::Context as GlowContext;
 use glow::HasContext;
 use std::collections::HashMap;
 use std::mem::offset_of;
+use std::ops::Range;
 use std::rc::Rc;
 
 pub struct Renderer {
@@ -35,11 +37,26 @@ pub struct MeshRenderData {
 
 #[derive(Default)]
 struct FrameData {
+    /// Instances copied from the render queue at the start of each frame.
+    input_instances: Vec<RenderInstance>,
     visible_instances: Vec<RenderInstance>,
-    temp_material_map: MaterialBatchMap,
-    temp_mesh_map: MaterialMeshMap,
     frame_uniforms: FrameUniforms,
-    material_batches: Vec<MaterialBatch>,
+    /// Flat storage for all instance matrices in the frame (reused across frames).
+    instance_matrices: Vec<[f32; 16]>,
+    /// Ranges into `instance_matrices` for each mesh within a material batch.
+    mesh_batch_ranges: Vec<MeshBatchRange>,
+    /// Ranges into `mesh_batch_ranges` for each material batch.
+    material_batch_ranges: Vec<MaterialBatchRange>,
+}
+
+struct MaterialBatchRange {
+    material_id: MaterialHandle,
+    mesh_batches: Range<usize>,
+}
+
+struct MeshBatchRange {
+    mesh_id: MeshHandle,
+    matrices: Range<usize>,
 }
 
 #[derive(Default)]
@@ -67,20 +84,6 @@ pub struct CameraRenderData {
     pub position: Vec3,
 }
 
-pub struct MaterialBatch {
-    pub material_id: MaterialHandle,
-    pub instances: Vec<RenderInstance>,
-    pub mesh_batches: Vec<MeshBatch>,
-}
-
-pub struct MeshBatch {
-    pub mesh_id: MeshHandle,
-    pub instance_matrices: Vec<[f32; 16]>,
-}
-
-type MaterialBatchMap = HashMap<MaterialHandle, Vec<RenderInstance>>;
-type MaterialMeshMap = HashMap<MeshHandle, Vec<[f32; 16]>>;
-
 impl Renderer {
     fn max_scale(mat: Mat4) -> f32 {
         let x = mat.x_axis.truncate().length();
@@ -89,11 +92,17 @@ impl Renderer {
         x.max(y).max(z)
     }
 
+    /// Copies instances into the renderer's internal buffer.
+    /// Call this before `render()` to stage the frame's instances.
+    pub fn stage_instances(&mut self, instances: &[RenderInstance]) {
+        self.frame_data.input_instances.clear();
+        self.frame_data.input_instances.extend_from_slice(instances);
+    }
+
     pub fn render(
         &mut self,
         render_params: RenderParams,
         render_data_manager: &mut RenderResourceManager,
-        instances: Vec<RenderInstance>,
         camera: Option<CameraRenderData>,
     ) {
         let gl = self.gl.clone();
@@ -149,22 +158,27 @@ impl Renderer {
 
         Self::frustum_culling(
             &mut self.frame_data.visible_instances,
-            instances,
+            &self.frame_data.input_instances,
             render_data_manager,
             &view_proj,
         );
 
         Self::material_batcher(
             &mut self.frame_data.visible_instances,
-            &mut self.frame_data.material_batches,
-            &mut self.frame_data.temp_material_map,
-            &mut self.frame_data.temp_mesh_map,
+            &mut self.frame_data.material_batch_ranges,
+            &mut self.frame_data.mesh_batch_ranges,
+            &mut self.frame_data.instance_matrices,
         );
 
-        for mut batch in self.frame_data.material_batches.drain(..) {
+        for mat_idx in 0..self.frame_data.material_batch_ranges.len() {
+            let material_id = self.frame_data.material_batch_ranges[mat_idx].material_id;
+            let mesh_range = self.frame_data.material_batch_ranges[mat_idx]
+                .mesh_batches
+                .clone();
+
             let material = render_data_manager
                 .material_manager
-                .get_material(batch.material_id)
+                .get_material(material_id)
                 .expect("Material not found");
             let shader = render_data_manager
                 .shader_manager
@@ -220,27 +234,31 @@ impl Renderer {
             }
 
             // Draw each mesh
-            for mesh_batch in batch.mesh_batches.drain(..) {
+            for mesh_idx in mesh_range {
+                let mesh_id = self.frame_data.mesh_batch_ranges[mesh_idx].mesh_id;
+                let matrices_range = self.frame_data.mesh_batch_ranges[mesh_idx].matrices.clone();
+                let matrices_slice = &self.frame_data.instance_matrices[matrices_range];
+
                 let vao = Self::get_or_create_vao(
                     &mut self.vao_cache,
                     &gl,
-                    &mesh_batch.mesh_id,
+                    &mesh_id,
                     &material.desc.shader,
                     render_data_manager,
                     &mut self.mesh_render_data,
                 );
                 Self::update_instance_buffer(
                     &gl,
-                    mesh_batch.mesh_id,
+                    mesh_id,
                     &mut self.mesh_render_data,
-                    &mesh_batch.instance_matrices,
+                    matrices_slice,
                 );
 
                 let index_count: i32 = {
                     render_data_manager
                         .mesh_manager
-                        .get_mesh(mesh_batch.mesh_id)
-                        .expect(&format!("Couldn't find mesh: {:?}", mesh_batch.mesh_id))
+                        .get_mesh(mesh_id)
+                        .expect(&format!("Couldn't find mesh: {:?}", mesh_id))
                         .indices
                         .len() as i32
                 };
@@ -252,7 +270,7 @@ impl Renderer {
                         index_count,
                         glow::UNSIGNED_INT,
                         0,
-                        mesh_batch.instance_matrices.len() as i32,
+                        matrices_slice.len() as i32,
                     );
                 }
                 draw_calls += 1;
@@ -289,51 +307,69 @@ impl Renderer {
         }
     }
 
-    pub fn material_batcher(
+    /// Groups visible instances into material → mesh batches using a sort
+    /// instead of hash maps. All output is written into caller-owned `Vec`s
+    /// that are `.clear()`-ed here and reused across frames, so after the
+    /// first few frames there are zero allocations.
+    fn material_batcher(
         instances: &mut Vec<RenderInstance>,
-        batches: &mut Vec<MaterialBatch>,
-        temp_map: &mut MaterialBatchMap,
-        temp_mesh_map: &mut MaterialMeshMap,
+        material_ranges: &mut Vec<MaterialBatchRange>,
+        mesh_ranges: &mut Vec<MeshBatchRange>,
+        matrices: &mut Vec<[f32; 16]>,
     ) {
-        // Drain the instances vector into temp_map
-        for inst in instances.drain(..) {
-            temp_map.entry(inst.material_id).or_default().push(inst);
-        }
+        material_ranges.clear();
+        mesh_ranges.clear();
+        matrices.clear();
 
-        for (material_id, instances) in temp_map.drain() {
-            for inst in instances.iter() {
-                temp_mesh_map
-                    .entry(inst.mesh_id)
-                    .or_default()
-                    .push(inst.transform.to_cols_array());
+        // Sort by (material, mesh) so identical keys are contiguous.
+        instances.sort_unstable_by(|a, b| {
+            a.material_id
+                .cmp(&b.material_id)
+                .then(a.mesh_id.cmp(&b.mesh_id))
+        });
+
+        let mut i = 0;
+        while i < instances.len() {
+            let material_id = instances[i].material_id;
+            let mesh_batches_start = mesh_ranges.len();
+
+            // Walk all instances that share this material.
+            while i < instances.len() && instances[i].material_id == material_id {
+                let mesh_id = instances[i].mesh_id;
+                let matrices_start = matrices.len();
+
+                // Walk all instances that share this material AND mesh.
+                while i < instances.len()
+                    && instances[i].material_id == material_id
+                    && instances[i].mesh_id == mesh_id
+                {
+                    matrices.push(instances[i].transform.to_cols_array());
+                    i += 1;
+                }
+
+                mesh_ranges.push(MeshBatchRange {
+                    mesh_id,
+                    matrices: matrices_start..matrices.len(),
+                });
             }
 
-            let mesh_batches = temp_mesh_map
-                .drain()
-                .map(|(mesh_id, instance_matrices)| MeshBatch {
-                    mesh_id,
-                    instance_matrices,
-                })
-                .collect();
-
-            batches.push(MaterialBatch {
+            material_ranges.push(MaterialBatchRange {
                 material_id,
-                instances,
-                mesh_batches,
+                mesh_batches: mesh_batches_start..mesh_ranges.len(),
             });
         }
     }
 
     pub fn frustum_culling(
         visible_instances: &mut Vec<RenderInstance>,
-        mut instances: Vec<RenderInstance>,
+        instances: &[RenderInstance],
         render_data_manager: &RenderResourceManager,
         view_proj: &Mat4,
     ) {
-        let frustum = Frustum::from_view_proj(&view_proj);
+        visible_instances.clear();
+        let frustum = Frustum::from_view_proj(view_proj);
 
-        for inst in instances.drain(..) {
-            // println!("Checking culling for instance: {:?}", inst);
+        for inst in instances {
             let mesh = render_data_manager
                 .mesh_manager
                 .get_mesh(inst.mesh_id)
@@ -346,7 +382,7 @@ impl Renderer {
             let world_radius = mesh.sphere_radius * scale;
 
             if frustum.intersects_sphere(world_center, world_radius) {
-                visible_instances.push(inst);
+                visible_instances.push(inst.clone());
             }
         }
     }

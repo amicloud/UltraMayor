@@ -186,9 +186,9 @@ fn main() {
         ));
     });
 
-    let t_range = 2.0;
+    let t_range = 200.0;
 
-    (0..800).for_each(|_| {
+    (0..10000).for_each(|_| {
         // Random position
         let pos = Vec3::new(
             random_range(-20.0..20.0),

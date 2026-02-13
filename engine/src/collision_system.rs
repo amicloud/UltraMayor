@@ -184,7 +184,7 @@ impl CollisionSystem {
 
         let narrowphase_results: Vec<((Entity, Entity), ContactManifold)> = frame
             .candidate_pairs
-            .par_iter()
+            .iter()
             .filter_map(|(entity_a, entity_b)| {
                 let (.., transform_a, velocity_a, convex_a, mesh_a) =
                     all_query.get(*entity_a).ok()?;

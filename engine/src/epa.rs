@@ -5,7 +5,7 @@ use glam::{Mat4, Vec3};
 
 use crate::collider_component::ConvexCollider;
 
-const EPA_MAX_ITERATIONS: usize = 64;
+const EPA_MAX_ITERATIONS: usize = 4;
 const EPA_TOLERANCE: f32 = 1e-4;
 const EPSILON: f32 = 1e-6;
 
@@ -34,30 +34,42 @@ pub fn epa(
     let (mut vertices, mut faces) =
         build_initial_polytope(a, a_transform, b, b_transform, simplex)?;
 
-    let mut best_face: Option<Face> = None;
+    vertices.reserve(64); // worst case extra vertices
+    faces.reserve(128); // conservative upper bound
+
+    let mut horizon_edges: Vec<(usize, usize)> = Vec::with_capacity(64);
+    let mut new_faces: Vec<Face> = Vec::with_capacity(128);
 
     for _ in 0..EPA_MAX_ITERATIONS {
-        let (_closest_index, closest_face) = find_closest_face(&faces)?;
-        best_face = Some(closest_face.clone());
+        horizon_edges.clear();
+        new_faces.clear();
+
+        let closest_index = find_closest_face(&faces)?;
+        let closest_face = &faces[closest_index];
 
         let support = support_minkowski(a, a_transform, b, b_transform, closest_face.normal);
         let support_distance = closest_face.normal.dot(support);
         let distance_delta = support_distance - closest_face.distance;
 
         if distance_delta <= EPA_TOLERANCE {
+            let (normal, penetration_depth) = orient_result(
+                closest_face.normal,
+                closest_face.distance,
+                a_transform,
+                b_transform,
+            );
+
             return Some(EpaResult {
-                normal: closest_face.normal,
-                penetration_depth: closest_face.distance,
+                normal,
+                penetration_depth,
             });
         }
 
         let new_index = vertices.len();
         vertices.push(support);
 
-        let mut horizon_edges: Vec<(usize, usize)> = Vec::new();
-        let mut new_faces: Vec<Face> = Vec::new();
-
-        for (_i, face) in faces.iter().enumerate() {
+        // ---- Visibility pass ----
+        for face in faces.iter() {
             if is_face_visible(&vertices, face, support) {
                 add_edge(&mut horizon_edges, face.indices[0], face.indices[1]);
                 add_edge(&mut horizon_edges, face.indices[1], face.indices[2]);
@@ -67,29 +79,48 @@ pub fn epa(
             }
         }
 
-        for (a_idx, b_idx) in horizon_edges {
-            if let Some(face) = make_face_outward(&vertices, a_idx, b_idx, new_index) {
+        // ---- SAFETY CHECK GOES HERE ----
+        if horizon_edges.is_empty() {
+            break; // Degenerate case
+        }
+
+        // ---- Rebuild faces from horizon ----
+        for (a_idx, b_idx) in &horizon_edges {
+            if let Some(face) = make_face_outward(&vertices, *a_idx, *b_idx, new_index) {
                 new_faces.push(face);
             }
         }
 
-        faces = new_faces;
-
-        if faces.is_empty() {
-            if let Some(face) = best_face {
-                return Some(EpaResult {
-                    normal: face.normal,
-                    penetration_depth: face.distance,
-                });
-            }
-            return None;
-        }
+        std::mem::swap(&mut faces, &mut new_faces);
     }
 
-    best_face.map(|face| EpaResult {
-        normal: face.normal,
-        penetration_depth: face.distance,
+    let closest_index = find_closest_face(&faces)?;
+    let face = &faces[closest_index];
+
+    let (normal, penetration_depth) =
+        orient_result(face.normal, face.distance, a_transform, b_transform);
+
+    Some(EpaResult {
+        normal,
+        penetration_depth,
     })
+}
+
+fn orient_result(
+    mut normal: Vec3,
+    penetration_depth: f32,
+    a_transform: Mat4,
+    b_transform: Mat4,
+) -> (Vec3, f32) {
+    let a_center = a_transform.transform_point3(Vec3::ZERO);
+    let b_center = b_transform.transform_point3(Vec3::ZERO);
+    let ab = b_center - a_center;
+
+    if normal.dot(ab) < 0.0 {
+        normal = -normal;
+    }
+
+    (normal, penetration_depth)
 }
 
 fn build_initial_polytope(
@@ -212,48 +243,42 @@ fn support_unique(
     Some(support)
 }
 
-fn make_face_outward(vertices: &[Vec3], i0: usize, i1: usize, i2: usize) -> Option<Face> {
-    let a = vertices[i0];
-    let b = vertices[i1];
-    let c = vertices[i2];
-    let mut normal = (b - a).cross(c - a);
-    if normal.length_squared() <= EPSILON {
+fn make_face_outward(vertices: &[Vec3], a: usize, b: usize, c: usize) -> Option<Face> {
+    let ab = vertices[b] - vertices[a];
+    let ac = vertices[c] - vertices[a];
+    let mut normal = ab.cross(ac);
+
+    if normal.length_squared() < EPSILON {
         return None;
     }
 
     normal = normal.normalize();
-    if normal.dot(a) < 0.0 {
-        normal = -normal;
+    let distance = normal.dot(vertices[a]);
+
+    if distance < 0.0 {
+        // Flip winding
+        return make_face_outward(vertices, b, a, c);
     }
 
-    let distance = normal.dot(a);
-    let distance = if distance.abs() <= EPSILON {
-        EPSILON
-    } else {
-        distance.abs()
-    };
-
     Some(Face {
-        indices: [i0, i1, i2],
+        indices: [a, b, c],
         normal,
         distance,
     })
 }
 
-fn find_closest_face(faces: &[Face]) -> Option<(usize, Face)> {
+fn find_closest_face(faces: &[Face]) -> Option<usize> {
     let mut best_index = None;
     let mut best_distance = f32::INFINITY;
-    let mut best_face = None;
 
     for (i, face) in faces.iter().enumerate() {
         if face.distance < best_distance {
             best_distance = face.distance;
             best_index = Some(i);
-            best_face = Some(face.clone());
         }
     }
 
-    best_index.and_then(|idx| best_face.map(|face| (idx, face)))
+    best_index
 }
 
 fn is_face_visible(vertices: &[Vec3], face: &Face, point: Vec3) -> bool {

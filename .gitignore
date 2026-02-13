@@ -45,3 +45,4 @@ perf.data
 perf.data.old
 flamegraph.svg
 dhat-heap.json
+dhat-heap.json

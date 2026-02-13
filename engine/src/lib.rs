@@ -59,7 +59,6 @@ use crate::physics_resource::CollisionFrameData;
 use crate::physics_resource::PhysicsFrameData;
 use crate::physics_resource::PhysicsResource;
 use crate::physics_system::PhysicsSystem;
-use crate::render_instance::RenderInstance;
 use crate::render_queue::RenderQueue;
 pub use crate::render_resource_manager::RenderResourceManager;
 use crate::render_system::RenderSystem;
@@ -110,8 +109,8 @@ impl Engine {
                 MovementSystem::update,
                 CollisionSystem::update_world_aabb_cache,
                 CollisionSystem::update_world_dynamic_tree,
-                CollisionSystem::generate_contacts,
-                PhysicsSystem::physics_solver,
+                // CollisionSystem::generate_contacts,
+                // PhysicsSystem::physics_solver,
                 PhysicsSystem::integrate_motion,
             )
                 .chain(),
@@ -251,35 +250,31 @@ impl Engine {
                 self.game_schedule.run(&mut self.world);
                 self.render_schedule.run(&mut self.world);
 
-                // 1. Extract instance data AFTER systems run
-                let instances: Vec<RenderInstance> = {
-                    let render_queue = self
-                        .world
-                        .get_resource::<RenderQueue>()
-                        .expect("RenderQueue resource not found");
-                    render_queue.instances.clone()
-                };
-
-                // 2. Compute camera matrices from ECS state (camera is fully game-driven).
+                // 1. Compute camera matrices from ECS state (camera is fully game-driven).
                 let camera_data = Self::build_camera_render_data(
                     &mut self.world,
                     render_params.width,
                     render_params.height,
                 );
 
-                // 3. Get the render data manager
-                let mut render_data_manager = self
-                    .world
-                    .get_resource_mut::<RenderResourceManager>()
-                    .expect("RenderDataManager resource not found");
+                // 3. Get the render queue and render data manager
+                {
+                    let render_queue = self
+                        .world
+                        .get_resource::<RenderQueue>()
+                        .expect("RenderQueue resource not found");
+                    renderer.stage_instances(&render_queue.instances);
+                }
 
-                // 4. Render
-                renderer.render(
-                    render_params,
-                    &mut *render_data_manager,
-                    instances,
-                    camera_data,
-                );
+                {
+                    let mut render_data_manager = self
+                        .world
+                        .get_resource_mut::<RenderResourceManager>()
+                        .expect("RenderDataManager resource not found");
+
+                    // 4. Render
+                    renderer.render(render_params, &mut *render_data_manager, camera_data);
+                }
             }
             self.window.gl_swap_window();
             let frame_time = frame_start.elapsed();
