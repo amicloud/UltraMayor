@@ -174,7 +174,7 @@ fn main() {
     (0..100).for_each(|i| {
         engine.world.spawn((
             TransformComponent {
-                position: Vec3::new(0.0, 0.0, i as f32 * 10.01),
+                position: Vec3::new(0.0, 0.0, i as f32 * 4.01),
                 rotation: Quat::IDENTITY,
                 scale: player_scale,
             },

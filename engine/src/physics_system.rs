@@ -333,6 +333,10 @@ impl PhysicsSystem {
             Vec3::Z
         };
 
+        let support_dot_threshold = 0.55;
+        let linear_rest_threshold = 0.9;
+        let angular_rest_threshold = 1.6;
+
         for manifold in collision_frame_data.manifolds.values() {
             if manifold.contacts.is_empty() {
                 continue;
@@ -345,7 +349,7 @@ impl PhysicsSystem {
             };
 
             // Only apply this for support-like contacts (roughly aligned with up/down).
-            if normal.dot(up).abs() < 0.6 {
+            if normal.dot(up).abs() < support_dot_threshold {
                 continue;
             }
 
@@ -370,18 +374,27 @@ impl PhysicsSystem {
                     let angular_speed = vel.angular.length();
 
                     // Only stabilize nearly-resting bodies so active motion is unaffected.
-                    if linear_speed < 0.6 && angular_speed < 1.2 {
-                        vel.angular *= 0.75;
+                    if linear_speed < linear_rest_threshold
+                        && angular_speed < angular_rest_threshold
+                    {
+                        // Stronger rolling/spin damping while supported.
+                        vel.angular *= 0.5;
 
                         let vertical_speed = vel.translational.dot(up);
-                        if vertical_speed.abs() < 0.25 {
+                        if vertical_speed.abs() < 0.35 {
                             vel.translational -= up * vertical_speed;
                         }
 
-                        if vel.angular.length() < 0.05 {
+                        // Dampen tiny horizontal drift that keeps contacts chattering.
+                        let horizontal = vel.translational - up * vel.translational.dot(up);
+                        if horizontal.length() < 0.6 {
+                            vel.translational -= horizontal * 0.35;
+                        }
+
+                        if vel.angular.length() < 0.15 {
                             vel.angular = Vec3::ZERO;
                         }
-                        if vel.translational.length() < 0.03 {
+                        if vel.translational.length() < 0.08 {
                             vel.translational = Vec3::ZERO;
                         }
                     }
