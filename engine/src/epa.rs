@@ -21,9 +21,6 @@ struct Face {
     normal: Vec3,
     distance: f32,
 }
-
-/// Runs EPA using an initial simplex from GJK.
-/// Returns `None` when the expansion fails to converge.
 pub fn epa(
     a: &ConvexCollider,
     a_transform: Mat4,
@@ -34,69 +31,94 @@ pub fn epa(
     let (mut vertices, mut faces) =
         build_initial_polytope(a, a_transform, b, b_transform, simplex)?;
 
-    vertices.reserve(64); // worst case extra vertices
-    faces.reserve(128); // conservative upper bound
+    vertices.reserve(64);
+    faces.reserve(128);
 
     let mut horizon_edges: Vec<(usize, usize)> = Vec::with_capacity(64);
     let mut new_faces: Vec<Face> = Vec::with_capacity(128);
 
+    // Keep track of previous closest face normal to reduce oscillation
+    // This should probably be getting used!
+    let prev_normal = Vec3::ZERO;
+
     for _ in 0..EPA_MAX_ITERATIONS {
         horizon_edges.clear();
         new_faces.clear();
+        {
+            let closest_index = find_closest_face(&faces)?;
 
-        let closest_index = find_closest_face(&faces)?;
-        let closest_face = &faces[closest_index];
-
-        let support = support_minkowski(a, a_transform, b, b_transform, closest_face.normal);
-        let support_distance = closest_face.normal.dot(support);
-        let distance_delta = support_distance - closest_face.distance;
-
-        if distance_delta <= EPA_TOLERANCE {
-            let (normal, penetration_depth) = orient_result(
-                closest_face.normal,
-                closest_face.distance,
-                a_transform,
-                b_transform,
-            );
-
-            return Some(EpaResult {
-                normal,
-                penetration_depth,
-            });
-        }
-
-        let new_index = vertices.len();
-        vertices.push(support);
-
-        // ---- Visibility pass ----
-        for face in faces.iter() {
-            if is_face_visible(&vertices, face, support) {
-                add_edge(&mut horizon_edges, face.indices[0], face.indices[1]);
-                add_edge(&mut horizon_edges, face.indices[1], face.indices[2]);
-                add_edge(&mut horizon_edges, face.indices[2], face.indices[0]);
+            // Stabilize: pick the face whose normal is most aligned with previous frame
+            let closest_face = if prev_normal != Vec3::ZERO {
+                faces
+                    .iter()
+                    .min_by(|f1, f2| {
+                        let d1 = f1.normal.dot(prev_normal).abs();
+                        let d2 = f2.normal.dot(prev_normal).abs();
+                        d2.partial_cmp(&d1).unwrap() // pick most aligned
+                    })
+                    .unwrap()
             } else {
-                new_faces.push(face.clone());
+                &faces[closest_index]
+            };
+
+            let support = support_minkowski(a, a_transform, b, b_transform, closest_face.normal);
+            let support_distance = closest_face.normal.dot(support);
+            let distance_delta = support_distance - closest_face.distance;
+
+            if distance_delta <= EPA_TOLERANCE {
+                let (normal, penetration_depth) = orient_result(
+                    closest_face.normal,
+                    closest_face.distance,
+                    a_transform,
+                    b_transform,
+                );
+                return Some(EpaResult {
+                    normal,
+                    penetration_depth,
+                });
+            }
+
+            let new_index = vertices.len();
+            vertices.push(support);
+
+            // ---- Visibility pass ----
+            for face in faces.iter() {
+                if is_face_visible(&vertices, face, support) {
+                    add_edge(&mut horizon_edges, face.indices[0], face.indices[1]);
+                    add_edge(&mut horizon_edges, face.indices[1], face.indices[2]);
+                    add_edge(&mut horizon_edges, face.indices[2], face.indices[0]);
+                } else {
+                    // Skip degenerate faces
+                    if face.normal.length_squared() > EPSILON {
+                        new_faces.push(face.clone());
+                    }
+                }
+            }
+
+            // SAFETY: if no horizon edges, break early
+            if horizon_edges.is_empty() {
+                break;
+            }
+
+            // ---- Rebuild faces from horizon ----
+            for (a_idx, b_idx) in &horizon_edges {
+                if let Some(face) = make_face_outward(&vertices, *a_idx, *b_idx, new_index) {
+                    // Skip faces with nearly zero normal
+                    if face.normal.length_squared() > EPSILON {
+                        new_faces.push(face);
+                    }
+                }
             }
         }
-
-        // ---- SAFETY CHECK GOES HERE ----
-        if horizon_edges.is_empty() {
-            break; // Degenerate case
-        }
-
-        // ---- Rebuild faces from horizon ----
-        for (a_idx, b_idx) in &horizon_edges {
-            if let Some(face) = make_face_outward(&vertices, *a_idx, *b_idx, new_index) {
-                new_faces.push(face);
-            }
-        }
-
         std::mem::swap(&mut faces, &mut new_faces);
+
+        // Record previous normal for stability
+        // prev_normal = closest_face.normal;
     }
 
+    // Fallback: return closest face we have
     let closest_index = find_closest_face(&faces)?;
     let face = &faces[closest_index];
-
     let (normal, penetration_depth) =
         orient_result(face.normal, face.distance, a_transform, b_transform);
 
@@ -105,7 +127,6 @@ pub fn epa(
         penetration_depth,
     })
 }
-
 fn orient_result(
     mut normal: Vec3,
     penetration_depth: f32,
