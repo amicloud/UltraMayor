@@ -10,7 +10,7 @@ const EPSILON: f32 = 1e-6;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct GjkHit {
-    /// Simplex points for optional EPA expansion (may be line/triangle/tetrahedron).
+    /// Simplex points for optional EPA expansion, always contains 4 points for a tetrahedron
     pub simplex: Vec<Vec3>,
 }
 
@@ -21,7 +21,7 @@ pub enum GjkResult {
 }
 
 /// Performs GJK intersection testing between two convex colliders.
-/// Returns a simplex (line/triangle/tetrahedron) suitable as EPA seed.
+/// Returns a tetrahedron suitable as EPA seed.
 pub fn gjk_intersect(
     a: &ConvexCollider,
     a_transform: Mat4,
@@ -538,7 +538,7 @@ mod tests {
         let result = gjk_intersect(&cuboid, a_transform, &cuboid, b_transform);
         match result {
             GjkResult::Intersection(hit) => {
-                assert!(hit.simplex.len() >= 2);
+                assert!(hit.simplex.len() == 4);
             }
             _ => panic!("Expected intersection for non-uniform cuboids."),
         }
@@ -567,7 +567,7 @@ mod tests {
         let result = gjk_intersect(&cuboid, a_transform, &cuboid, b_transform);
         match result {
             GjkResult::Intersection(hit) => {
-                assert!(hit.simplex.len() >= 2);
+                assert!(hit.simplex.len() == 4);
             }
             _ => panic!("Expected intersection for rotated non-uniform cuboids."),
         }
@@ -584,8 +584,8 @@ mod tests {
         match result {
             GjkResult::Intersection(hit) => {
                 assert!(
-                    hit.simplex.len() >= 2,
-                    "GJK simplex should have at least 2 points for EPA, got {}",
+                    hit.simplex.len() == 4,
+                    "GJK should always return a tetrahedron for EPA, got {}",
                     hit.simplex.len()
                 );
             }
@@ -604,8 +604,8 @@ mod tests {
         match result {
             GjkResult::Intersection(hit) => {
                 assert!(
-                    hit.simplex.len() >= 2,
-                    "GJK simplex should have at least 2 points even for coincident centers, got {}",
+                    hit.simplex.len() == 4,
+                    "GJK should always return a tetrahedron even for coincident centers, got {}",
                     hit.simplex.len()
                 );
             }
@@ -617,7 +617,7 @@ mod tests {
     fn gjk_coplaner_faces_cuboids() {
         let cube = ConvexCollider::cube(2.0, CollisionLayer::Default);
         let a_transform = transform_at(Vec3::ZERO);
-        let b_transform = transform_at(Vec3::new(0.0, 0.0, 2.0 - 1.0)); // Just touching along Z
+        let b_transform = transform_at(Vec3::new(0.0, 0.0, 2.0)); // Just touching along Z
 
         let result = gjk_intersect(&cube, a_transform, &cube, b_transform);
         dbg!(&result);
@@ -625,8 +625,30 @@ mod tests {
             GjkResult::Intersection(hit) => {
                 println!("GJK simplex size: {:?}", hit.simplex.len());
                 assert!(
-                    hit.simplex.len() >= 2,
-                    "GJK simplex should have at least 2 points even for nearly coplanar faces, got {}",
+                    hit.simplex.len() == 4,
+                    "GJK should always return a tetrahedron even for nearly coplanar faces, got {}",
+                    hit.simplex.len()
+                );
+            }
+            _ => panic!("Expected intersection for nearly coplanar faces."),
+        }
+    }
+
+    #[test]
+    fn gjk_nearly_coplaner_faces_cuboids() {
+        let cube = ConvexCollider::cube(2.0, CollisionLayer::Default);
+        let a_transform = transform_at(Vec3::ZERO);
+        let m_epsilon = EPSILON * 100.0;
+        let b_transform = transform_at(Vec3::new(0.0, 0.0, 2.0 - m_epsilon)); // Just touching along Z
+
+        let result = gjk_intersect(&cube, a_transform, &cube, b_transform);
+        dbg!(&result);
+        match result {
+            GjkResult::Intersection(hit) => {
+                println!("GJK simplex size: {:?}", hit.simplex.len());
+                assert!(
+                    hit.simplex.len() == 4,
+                    "GJK should always return a tetrahedron even for nearly coplanar faces, got {}",
                     hit.simplex.len()
                 );
             }

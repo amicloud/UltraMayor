@@ -136,32 +136,11 @@ fn build_initial_polytope(
     b_transform: Mat4,
     simplex: &[Vec3],
 ) -> Option<(Vec<Vec3>, Vec<Face>)> {
-    let mut vertices: Vec<Vec3> = simplex.to_vec();
+    let vertices: Vec<Vec3> = simplex.to_vec();
 
     match vertices.len() {
         4 => {}
-        3 => {
-            let dir = direction_to_origin_triangle(vertices[0], vertices[1], vertices[2])
-                .unwrap_or_else(|| fallback_direction(vertices[0], vertices[1]));
-            let d = support_unique(a, a_transform, b, b_transform, dir, &vertices)?;
-            vertices.push(d);
-        }
-        2 => {
-            let dir = direction_to_origin_line(vertices[0], vertices[1])
-                .unwrap_or_else(|| fallback_direction(vertices[0], vertices[1]));
-            let c = support_unique(a, a_transform, b, b_transform, dir, &vertices)?;
-            vertices.push(c);
-
-            let dir = direction_to_origin_triangle(vertices[0], vertices[1], vertices[2])
-                .unwrap_or_else(|| fallback_direction(vertices[0], vertices[1]));
-            let d = support_unique(a, a_transform, b, b_transform, dir, &vertices)?;
-            vertices.push(d);
-        }
         _ => return None,
-    }
-
-    if vertices.len() != 4 {
-        return None;
     }
 
     let mut faces = Vec::with_capacity(4);
