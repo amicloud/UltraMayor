@@ -69,7 +69,7 @@ fn initial_direction(a_transform: Mat4, b_transform: Mat4) -> Vec3 {
     let b_center = b_transform.transform_point3(Vec3::ZERO);
     let dir = b_center - a_center;
     if dir.length_squared() <= EPSILON {
-        Vec3::X
+        Vec3::NEG_Z
     } else {
         dir
     }
@@ -610,6 +610,50 @@ mod tests {
                 );
             }
             _ => panic!("Expected intersection for coincident cubes."),
+        }
+    }
+
+    #[test]
+    fn gjk_coplaner_faces_cuboids() {
+        let cube = ConvexCollider::cube(2.0, CollisionLayer::Default);
+        let a_transform = transform_at(Vec3::ZERO);
+        let b_transform = transform_at(Vec3::new(0.0, 0.0, 2.0 - 1.0)); // Just touching along Z
+
+        let result = gjk_intersect(&cube, a_transform, &cube, b_transform);
+        dbg!(&result);
+        match result {
+            GjkResult::Intersection(hit) => {
+                println!("GJK simplex size: {:?}", hit.simplex.len());
+                assert!(
+                    hit.simplex.len() >= 2,
+                    "GJK simplex should have at least 2 points even for nearly coplanar faces, got {}",
+                    hit.simplex.len()
+                );
+            }
+            _ => panic!("Expected intersection for nearly coplanar faces."),
+        }
+    }
+
+    #[test]
+    fn gjk_should_make_tetrahedron() {
+        let size = 2.0;
+        let diff = 0.1;
+        let cube = ConvexCollider::cube(size, CollisionLayer::Default);
+        let a_transform = transform_at(Vec3::ZERO);
+        let b_transform = transform_at(Vec3::new(0.0, 0.0, size - diff));
+
+        let result = gjk_intersect(&cube, a_transform, &cube, b_transform);
+        dbg!(&result);
+        match result {
+            GjkResult::Intersection(hit) => {
+                println!("GJK simplex size: {:?}", hit.simplex.len());
+                assert!(
+                    hit.simplex.len() == 4,
+                    "GJK simplex should have 4 points for a tetrahedron, got {}",
+                    hit.simplex.len()
+                );
+            }
+            _ => panic!("Expected intersection for 0.1 penetration."),
         }
     }
 }

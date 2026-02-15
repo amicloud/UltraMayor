@@ -1,3 +1,4 @@
+use std::cmp::min;
 use std::collections::HashMap;
 
 use crate::WorldBasis;
@@ -174,7 +175,8 @@ impl PhysicsSystem {
         // --- Restitution ---
         let restitution_threshold = 0.1;
         let restitution = if rvn < -restitution_threshold {
-            ((restitution_a.sqrt() + restitution_b.sqrt()) * 0.5).powi(2)
+            // ((restitution_a.sqrt() + restitution_b.sqrt()) * 0.5).powi(2)
+            f32::min(restitution_a, restitution_b)
         } else {
             0.0
         };
