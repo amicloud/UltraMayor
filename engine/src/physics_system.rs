@@ -326,7 +326,6 @@ impl PhysicsSystem {
             Option<&PhysicsComponent>,
         )>,
     ) {
-        // return; // Disable for now - needs tuning and is causing some issues maybe
         use crate::physics_component::PhysicsType;
 
         let gravity = WorldBasis::gravity_vector();
@@ -430,7 +429,7 @@ impl PhysicsSystem {
         }
 
         Self::positional_correction(&physics_frame_data.constraints, &mut query);
-        // Self::stabilize_resting_contacts(&collision_frame_data, &mut query);
+        Self::stabilize_resting_contacts(&collision_frame_data, &mut query);
         physics_frame_data.clear();
     }
 }

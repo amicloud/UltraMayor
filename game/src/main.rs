@@ -116,7 +116,7 @@ fn main() {
         .load_model("resources/models/cube/Cube.gltf")
         .unwrap();
 
-    let sphere = engine
+    let _sphere = engine
         .load_model("resources/models/sphere_low/sphere.obj")
         .unwrap();
 
@@ -171,33 +171,33 @@ fn main() {
         PlayerComponent { speed: 1.0 },
     ));
 
-    // (0..1).for_each(|i| {
-    //     engine.world.spawn((
-    //         TransformComponent {
-    //             position: Vec3::new(0.0, 0.0, i as f32 * 2.01),
-    //             rotation: Quat::IDENTITY,
-    //             scale: player_scale,
-    //         },
-    //         VelocityComponent {
-    //             translational: Vec3::ZERO,
-    //             angular: Vec3::ZERO,
-    //         },
-    //         RenderBodyComponent {
-    //             render_body_id: cube,
-    //         },
-    //         cuboid_collider,
-    //         PhysicsComponent {
-    //             mass: 5.0,
-    //             physics_type: PhysicsType::Dynamic,
-    //             friction: 0.9,
-    //             drag_coefficient: 0.1,
-    //             angular_drag_coefficient: 0.1,
-    //             restitution: 0.5,
-    //             local_inertia: glam::Mat3::IDENTITY,
-    //         },
-    //         SleepComponent::default(),
-    //     ));
-    // });
+    (0..10).for_each(|i| {
+        engine.world.spawn((
+            TransformComponent {
+                position: Vec3::new(0.0, 0.0, i as f32 * 3.01),
+                rotation: Quat::IDENTITY,
+                scale: player_scale,
+            },
+            VelocityComponent {
+                translational: Vec3::ZERO,
+                angular: Vec3::ZERO,
+            },
+            RenderBodyComponent {
+                render_body_id: cube,
+            },
+            cuboid_collider,
+            PhysicsComponent {
+                mass: 5.0,
+                physics_type: PhysicsType::Dynamic,
+                friction: 0.9,
+                drag_coefficient: 0.1,
+                angular_drag_coefficient: 0.1,
+                restitution: 0.5,
+                local_inertia: glam::Mat3::IDENTITY,
+            },
+            SleepComponent::default(),
+        ));
+    });
 
     // engine.world.spawn((
     //     TransformComponent {
