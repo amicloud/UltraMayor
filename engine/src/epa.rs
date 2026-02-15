@@ -422,7 +422,7 @@ mod tests {
             Vec3::new(-5.0, 5.0, 0.0),
             Vec3::new(5.0, 5.0, 0.0),
             Vec3::new(0.0, -5.0, 0.0),
-            2.0,
+            1.0,
             CollisionLayer::Default,
         );
         let b = ConvexCollider::cube(2.0, CollisionLayer::Default);

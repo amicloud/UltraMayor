@@ -14,6 +14,22 @@ pub struct GjkHit {
     pub simplex: Vec<Vec3>,
 }
 
+impl GjkHit {
+    pub fn approx_equal(&self, other: &GjkHit, epsilon: f32) -> bool {
+        if self.simplex.len() != other.simplex.len() {
+            return false;
+        }
+
+        for (p1, p2) in self.simplex.iter().zip(other.simplex.iter()) {
+            if (*p1 - *p2).length_squared() > epsilon * 100.0 {
+                return false;
+            }
+        }
+
+        true
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum GjkResult {
     NoIntersection,
@@ -980,6 +996,50 @@ mod tests {
         match result {
             GjkResult::Intersection(hit) => assert_eq!(hit.simplex.len(), 4),
             _ => panic!("Expected intersection with large vs small collider"),
+        }
+    }
+
+    #[test]
+    fn gjk_box_vs_prism_colliding_nearly_coplanar_sweep_simplex_comparisons() {
+        // let a = ConvexCollider::cube(2.0, CollisionLayer::Default);
+        let a = ConvexCollider::triangle_prism(
+            Vec3::new(-5.0, 5.0, 0.0),
+            Vec3::new(5.0, 5.0, 0.0),
+            Vec3::new(0.0, -5.0, 0.0),
+            1.0,
+            CollisionLayer::Default,
+        );
+        let b = ConvexCollider::cube(2.0, CollisionLayer::Default);
+        let a_transform = transform_at(Vec3::ZERO);
+        let coplanar_point = 2.0;
+        let mut previous_hit: Option<GjkHit> = None;
+
+        for i in 1..10_000 {
+            dbg!(i);
+            let e = (1000.0 * EPSILON) / i as f32;
+            let b_transform = transform_at(Vec3::new(0.0, 0.0, coplanar_point - (e)));
+
+            let result = gjk_intersect(&a, a_transform, &b, b_transform);
+            // Check that the new simplex is approximately equal to the previous simplex (order may differ)
+            match result {
+                GjkResult::Intersection(hit) => {
+                    assert_eq!(
+                        hit.simplex.len(),
+                        4,
+                        "Expected simplex to have 4 points for EPA"
+                    );
+                    if let Some(prev_hit) = &previous_hit {
+                        dbg!("Previous hit simplex:", &prev_hit.simplex);
+                        dbg!("Current hit simplex:", &hit.simplex);
+                        assert!(
+                            hit.approx_equal(prev_hit, e),
+                            "Expected hit to be approximately equal to previous hit"
+                        );
+                    }
+                    previous_hit = Some(hit);
+                }
+                _ => panic!("Expected intersection for nearly coplanar sweep"),
+            }
         }
     }
 }
