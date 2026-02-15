@@ -311,6 +311,15 @@ impl CollisionSystem {
             merged_contacts.extend_from_slice(&manifold.contacts);
         }
         frame.contacts.extend(merged_contacts);
+        if frame.contacts.len() > 0 {
+            frame
+                .contacts
+                .iter()
+                .filter(|c| c.penetration > 1.0)
+                .for_each(|c| {
+                    dbg!(c.penetration);
+                });
+        }
     }
 }
 

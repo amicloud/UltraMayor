@@ -262,9 +262,9 @@ impl PhysicsSystem {
         )>,
     ) {
         // Parameters
-        let slop = 0.025; // small penetration allowed before correction
-        let percent = 0.25; // softer correction to reduce resting jitter
-        let max_correction = 100.0; // maximum correction per timestep per body
+        let slop = 0.025;
+        let percent = 0.45;
+        let max_correction = 100.0;
 
         // Track accumulated corrections per entity
         let mut corrections: HashMap<Entity, Vec3> = HashMap::new();
@@ -326,6 +326,7 @@ impl PhysicsSystem {
             Option<&PhysicsComponent>,
         )>,
     ) {
+        // return; // Disable for now - needs tuning and is causing some issues maybe
         use crate::physics_component::PhysicsType;
 
         let gravity = WorldBasis::gravity_vector();
@@ -394,8 +395,8 @@ impl PhysicsSystem {
                         }
 
                         // Hard lock very small residual motion so bodies fully settle.
-                        if vel.angular.length() < 0.01 {
-                            vel.angular = Vec3::ZERO;
+                        if vel.angular.z < 0.01 {
+                            vel.angular.z = 0.0;
                         }
                         if vel.translational.length() < 0.01 {
                             vel.translational = Vec3::ZERO;

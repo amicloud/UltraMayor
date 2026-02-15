@@ -171,7 +171,7 @@ fn main() {
         PlayerComponent { speed: 1.0 },
     ));
 
-    // (0..100).for_each(|i| {
+    // (0..1).for_each(|i| {
     //     engine.world.spawn((
     //         TransformComponent {
     //             position: Vec3::new(0.0, 0.0, i as f32 * 2.01),

@@ -915,4 +915,71 @@ mod tests {
             _ => panic!("Expected intersection for 0.1 penetration."),
         }
     }
+
+    #[test]
+    fn gjk_nearly_coplanar_small_rotation() {
+        let cube = ConvexCollider::cube(2.0, CollisionLayer::Default);
+        let a_transform = transform_at(Vec3::ZERO);
+        let mut b_transform = transform_at(Vec3::new(0.0, 0.0, 2.0 - EPSILON * 10.0));
+        b_transform = b_transform * Mat4::from_rotation_y(0.001); // tiny rotation
+
+        let result = gjk_intersect(&cube, a_transform, &cube, b_transform);
+        match result {
+            GjkResult::Intersection(hit) => assert_eq!(hit.simplex.len(), 4),
+            _ => panic!("Expected intersection with tiny rotation"),
+        }
+    }
+
+    #[test]
+    fn gjk_edge_vertex_touching_cuboids_no_hit() {
+        let cube = ConvexCollider::cube(2.0, CollisionLayer::Default);
+        let a_transform = transform_at(Vec3::ZERO);
+        let b_transform = transform_at(Vec3::new(2.0, 2.0, 0.0)); // vertex touches
+
+        let result = gjk_intersect(&cube, a_transform, &cube, b_transform);
+        match result {
+            GjkResult::NoIntersection => {}
+            _ => panic!("Expected no intersection for edge/vertex touching cubes"),
+        }
+    }
+
+    #[test]
+    fn gjk_vertex_to_face_near_touch() {
+        let cube = ConvexCollider::cube(2.0, CollisionLayer::Default);
+        let a_transform = transform_at(Vec3::ZERO);
+        let b_transform = transform_at(Vec3::new(1.0, 1.0, 2.0 - EPSILON * 5.0)); // vertex near face
+
+        let result = gjk_intersect(&cube, a_transform, &cube, b_transform);
+        match result {
+            GjkResult::Intersection(hit) => assert_eq!(hit.simplex.len(), 4),
+            _ => panic!("Expected intersection for vertex-to-face near contact"),
+        }
+    }
+
+    #[test]
+    fn gjk_thin_planes_intersection() {
+        let thin_box = ConvexCollider::cuboid(Vec3::new(1.0, 1.0, 0.01), CollisionLayer::Default);
+        let a_transform = transform_at(Vec3::ZERO);
+        let b_transform = transform_at(Vec3::new(0.5, 0.5, 0.0)); // partial overlap
+
+        let result = gjk_intersect(&thin_box, a_transform, &thin_box, b_transform);
+        match result {
+            GjkResult::Intersection(hit) => assert_eq!(hit.simplex.len(), 4),
+            _ => panic!("Expected intersection for thin-plane overlap"),
+        }
+    }
+
+    #[test]
+    fn gjk_large_vs_small_collider() {
+        let large_cube = ConvexCollider::cube(10.0, CollisionLayer::Default);
+        let small_cube = ConvexCollider::cube(1.0, CollisionLayer::Default);
+        let a_transform = transform_at(Vec3::ZERO);
+        let b_transform = transform_at(Vec3::new(0.005, 0.005, 0.005)); // tiny intersection
+
+        let result = gjk_intersect(&large_cube, a_transform, &small_cube, b_transform);
+        match result {
+            GjkResult::Intersection(hit) => assert_eq!(hit.simplex.len(), 4),
+            _ => panic!("Expected intersection with large vs small collider"),
+        }
+    }
 }
