@@ -36,6 +36,7 @@ mod shader_resource;
 mod sleep_component;
 mod texture;
 mod texture_resource_manager;
+mod time_resource;
 mod transform_component;
 mod velocity_component;
 pub mod world_basis;
@@ -71,6 +72,7 @@ pub use crate::input::MouseButton;
 pub use crate::material_component::MaterialComponent;
 pub use crate::render_body_component::RenderBodyComponent;
 pub use crate::sleep_component::SleepComponent;
+use crate::time_resource::TimeResource;
 pub use crate::transform_component::TransformComponent;
 pub use crate::velocity_component::VelocityComponent;
 pub use crate::world_basis::WorldBasis;
@@ -78,8 +80,8 @@ pub struct Engine {
     pub world: World,
     pub game_frame_schedule: Schedule,
     pub game_simulation_schedule: Schedule,
+    frame_schedule: Schedule,
     physics_schedule: Schedule,
-    render_schedule: Schedule,
     gl: Rc<glow::Context>,
     window: sdl2::video::Window,
     events_loop: sdl2::EventPump,
@@ -101,6 +103,7 @@ impl Engine {
         world.insert_resource(PhysicsResource::default());
         world.insert_resource(CollisionFrameData::default());
         world.insert_resource(PhysicsFrameData::default());
+        world.insert_resource(TimeResource::default());
 
         let mut physics_schedule = Schedule::default();
 
@@ -117,8 +120,14 @@ impl Engine {
                 .chain(),
         );
 
-        let mut render_schedule = Schedule::default();
-        render_schedule.add_systems(RenderSystem::build_render_queue);
+        let mut frame_schedule = Schedule::default();
+        frame_schedule.add_systems(
+            (
+                RenderSystem::build_render_queue,
+                TimeResource::update_time_resource,
+            )
+                .chain(),
+        );
 
         let game_frame_schedule = Schedule::default();
         let game_simulation_schedule = Schedule::default();
@@ -135,8 +144,8 @@ impl Engine {
             world,
             game_frame_schedule,
             game_simulation_schedule,
+            frame_schedule,
             physics_schedule,
-            render_schedule,
             gl,
             window,
             events_loop,
@@ -235,20 +244,16 @@ impl Engine {
                 let frame_time = now - last_frame;
                 last_frame = now;
 
+                // Update things that should run every frame, regardless of physics steps
+                self.frame_schedule.run(&mut self.world);
+                self.game_frame_schedule.run(&mut self.world);
+
                 // Prevent absurd frame times (debugger pauses, window drag, etc.)
                 let frame_time = frame_time.min(Duration::from_millis(250));
 
                 accumulator += frame_time;
 
                 let mut steps = 0;
-                // while accumulator >= target_simulation_dt && steps < MAX_PHYSICS_STEPS {
-                //     self.physics_schedule.run(&mut self.world);
-                //     accumulator -= target_simulation_dt;
-                //     steps += 1;
-                // }
-
-                // accumulator = Duration::ZERO;
-
                 while accumulator >= target_simulation_dt && steps < MAX_PHYSICS_STEPS {
                     self.physics_schedule.run(&mut self.world);
                     self.game_simulation_schedule.run(&mut self.world);
@@ -260,32 +265,27 @@ impl Engine {
                     accumulator = accumulator.min(target_simulation_dt);
                 }
 
-                self.game_frame_schedule.run(&mut self.world);
-                self.render_schedule.run(&mut self.world);
-
                 let camera_data = Self::build_camera_render_data(
                     &mut self.world,
                     render_params.width,
                     render_params.height,
                 );
 
-                {
-                    let render_queue = self
+                renderer.stage_instances(
+                    &self
                         .world
                         .get_resource::<RenderQueue>()
-                        .expect("RenderQueue resource not found");
-                    renderer.stage_instances(&render_queue.instances);
-                }
+                        .expect("RenderQueue resource not found")
+                        .instances,
+                );
 
-                {
-                    let mut render_data_manager = self
-                        .world
-                        .get_resource_mut::<RenderResourceManager>()
-                        .expect("RenderDataManager resource not found");
+                let mut render_data_manager = self
+                    .world
+                    .get_resource_mut::<RenderResourceManager>()
+                    .expect("RenderDataManager resource not found");
 
-                    // 4. Render
-                    renderer.render(render_params, &mut *render_data_manager, camera_data);
-                }
+                // 4. Render
+                renderer.render(render_params, &mut *render_data_manager, camera_data);
             }
             self.window.gl_swap_window();
             let frame_time = frame_start.elapsed();
