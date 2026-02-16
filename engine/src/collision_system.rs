@@ -1508,7 +1508,7 @@ mod tests {
         let convex_collider =
             ConvexCollider::cuboid(Vec3::new(2.0, 2.0, 2.000001), CollisionLayer::Player);
         let ground_obj = Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../resources/models/test_ground/test_ground.obj");
+            .join("../resources/tests/test_ground/test_ground.obj");
         let triangles = load_obj_triangles(ground_obj.to_str().expect("Invalid UTF-8 path"));
         let bvh = BVHNode::build(triangles, 8);
 
