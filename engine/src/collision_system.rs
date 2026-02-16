@@ -194,8 +194,7 @@ impl CollisionSystem {
                 let previous_manifold = old_manifolds.get(&pair);
 
                 if let (Some(convex_a), Some(convex_b)) = (convex_a, convex_b) {
-                    let mut new_contacts = Vec::new();
-                    if let Some(contact) = convex_convex_contact(
+                    return convex_convex_pair_manifold(
                         *entity_a,
                         &convex_a,
                         &transform_a,
@@ -204,30 +203,14 @@ impl CollisionSystem {
                         &convex_b,
                         &transform_b,
                         velocity_b,
-                        previous_manifold,
-                    ) {
-                        new_contacts.push(orient_contact_to_pair(contact, pair));
-                    }
-                    let merge_distance = manifold_merge_distance_pair_map(
                         &physics_world.world_aabbs,
-                        pair.0,
-                        pair.1,
-                    );
-                    let merged = merge_contact_manifold(
                         previous_manifold,
-                        &new_contacts,
-                        merge_distance,
-                        0.95,
-                        4,
-                    );
-                    if merged.contacts.is_empty() {
-                        return None;
-                    }
-                    return Some((pair, merged));
+                    )
+                    .map(|merged| (pair, merged));
                 }
 
                 if let (Some(convex_a), Some(mesh_b)) = (convex_a, mesh_b) {
-                    let mesh_contacts = convex_mesh_contact(
+                    return convex_mesh_pair_manifold(
                         *entity_a,
                         &convex_a,
                         &transform_a,
@@ -236,28 +219,14 @@ impl CollisionSystem {
                         &mesh_b,
                         &transform_b,
                         &render_resources,
-                        previous_manifold,
-                    );
-                    let merge_distance = manifold_merge_distance_pair_map(
                         &physics_world.world_aabbs,
-                        *entity_a,
-                        *entity_b,
-                    );
-                    let merged = merge_contact_manifold(
                         previous_manifold,
-                        &mesh_contacts,
-                        merge_distance,
-                        0.9,
-                        8,
-                    );
-                    if merged.contacts.is_empty() {
-                        return None;
-                    }
-                    return Some((pair, merged));
+                    )
+                    .map(|merged| (pair, merged));
                 }
 
                 if let (Some(mesh_a), Some(convex_b)) = (mesh_a, convex_b) {
-                    let mesh_contacts = convex_mesh_contact(
+                    return convex_mesh_pair_manifold(
                         *entity_b,
                         &convex_b,
                         &transform_b,
@@ -266,24 +235,10 @@ impl CollisionSystem {
                         &mesh_a,
                         &transform_a,
                         &render_resources,
-                        previous_manifold,
-                    );
-                    let merge_distance = manifold_merge_distance_pair_map(
                         &physics_world.world_aabbs,
-                        *entity_a,
-                        *entity_b,
-                    );
-                    let merged = merge_contact_manifold(
                         previous_manifold,
-                        &mesh_contacts,
-                        merge_distance,
-                        0.9,
-                        8,
-                    );
-                    if merged.contacts.is_empty() {
-                        return None;
-                    }
-                    return Some((pair, merged));
+                    )
+                    .map(|merged| (pair, merged));
                 }
 
                 None
@@ -309,6 +264,7 @@ impl CollisionSystem {
         let mut merged_contacts = Vec::new();
         for manifold in frame.manifolds.values() {
             merged_contacts.extend_from_slice(&manifold.contacts);
+            dbg!(&manifold);
         }
         frame.contacts.extend(merged_contacts);
     }
@@ -327,9 +283,93 @@ fn manifold_merge_distance_pair_map(
         .get(&b)
         .map(|aabb| (aabb.max - aabb.min).length())
         .unwrap_or(0.0);
-    let extent = extent_a.max(extent_b).max(0.01);
-    let merge_strenth = 0.5;
-    extent * merge_strenth
+    let extent = extent_a.min(extent_b);
+    extent * 0.01
+}
+
+fn convex_convex_pair_manifold(
+    entity_a: Entity,
+    collider_a: &ConvexCollider,
+    transform_a: &TransformComponent,
+    velocity_a: Option<&VelocityComponent>,
+    entity_b: Entity,
+    collider_b: &ConvexCollider,
+    transform_b: &TransformComponent,
+    velocity_b: Option<&VelocityComponent>,
+    world_aabbs: &HashMap<Entity, AABB>,
+    previous_manifold: Option<&ContactManifold>,
+) -> Option<ContactManifold> {
+    let pair = ordered_pair(entity_a, entity_b);
+    let mut new_contacts = Vec::new();
+
+    if let Some(contact) = convex_convex_contact(
+        entity_a,
+        collider_a,
+        transform_a,
+        velocity_a,
+        entity_b,
+        collider_b,
+        transform_b,
+        velocity_b,
+        previous_manifold,
+    ) {
+        new_contacts.push(orient_contact_to_pair(contact, pair));
+    }
+
+    let merge_distance = manifold_merge_distance_pair_map(world_aabbs, pair.0, pair.1);
+    let merged = merge_contact_manifold(previous_manifold, &new_contacts, merge_distance, 0.95, 4);
+
+    if merged.contacts.is_empty() {
+        None
+    } else {
+        Some(merged)
+    }
+}
+
+fn convex_mesh_pair_manifold(
+    convex_entity: Entity,
+    convex_collider: &ConvexCollider,
+    convex_transform: &TransformComponent,
+    convex_velocity: Option<&VelocityComponent>,
+    mesh_entity: Entity,
+    mesh_collider: &MeshCollider,
+    mesh_transform: &TransformComponent,
+    render_resources: &RenderResourceManager,
+    world_aabbs: &HashMap<Entity, AABB>,
+    previous_manifold: Option<&ContactManifold>,
+) -> Option<ContactManifold> {
+    let pair = ordered_pair(convex_entity, mesh_entity);
+    let mesh_contacts = convex_mesh_contact(
+        convex_entity,
+        convex_collider,
+        convex_transform,
+        convex_velocity,
+        mesh_entity,
+        mesh_collider,
+        mesh_transform,
+        render_resources,
+        previous_manifold,
+    );
+
+    let oriented_contacts: Vec<Contact> = mesh_contacts
+        .into_iter()
+        .map(|contact| orient_contact_to_pair(contact, pair))
+        .collect();
+
+    let merge_distance = manifold_merge_distance_pair_map(world_aabbs, pair.0, pair.1);
+    let merged = merge_contact_manifold(
+        previous_manifold,
+        &oriented_contacts,
+        merge_distance,
+        0.9,
+        8,
+    );
+
+    if merged.contacts.is_empty() {
+        None
+    } else {
+        Some(merged)
+    }
 }
 
 fn ordered_pair(a: Entity, b: Entity) -> (Entity, Entity) {
@@ -552,6 +592,7 @@ fn sphere_sphere_contact(
     })
 }
 
+/// This should return a Vec<Contact> just like convex_mesh_contact, need to update (TODO)
 fn cuboid_cuboid_contact(
     entity_a: Entity,
     collider_a: &ConvexCollider,
@@ -748,6 +789,7 @@ fn cuboid_cuboid_contact(
     })
 }
 
+/// This should return a Vec<Contact> just like convex_mesh_contact, need to update (TODO)
 fn convex_convex_contact(
     entity_a: Entity,
     collider_a: &ConvexCollider,
@@ -812,6 +854,8 @@ fn convex_convex_contact(
         transform_b,
         previous_manifold,
     )?;
+
+    // This should return a manifold, need to update (TODO)
     Some(Contact {
         entity_a,
         entity_b,
@@ -1051,7 +1095,6 @@ fn convex_mesh_contact(
             ));
         }
     }
-
     reduce_contact_candidates(mesh_entity, convex_entity, candidates, convex_aabb_world)
 }
 
@@ -2155,5 +2198,79 @@ mod tests {
             "Penetration bound violated for snapshot_2: {}",
             best_penetration
         );
+    }
+
+    #[test]
+    fn merge_contact_manifold_should_return_full_manifold() {
+        let entity_a = Entity::from_bits(420);
+        let entity_b = Entity::from_bits(69);
+        let contacts = vec![
+            Contact {
+                entity_a: entity_a,
+                entity_b: entity_b,
+                normal: Vec3 {
+                    x: 0.0,
+                    y: -0.0,
+                    z: 1.0,
+                },
+                penetration: 0.035182,
+                contact_point: Vec3 {
+                    x: 1.9607796e-5,
+                    y: -0.9804878,
+                    z: 1.2450399,
+                },
+            },
+            Contact {
+                entity_a: entity_a,
+                entity_b: entity_b,
+                normal: Vec3 {
+                    x: 0.0,
+                    y: 0.0,
+                    z: 1.0,
+                },
+                penetration: 0.035182,
+                contact_point: Vec3 {
+                    x: 1.0174599,
+                    y: 1.9593022e-5,
+                    z: 1.2450399,
+                },
+            },
+            Contact {
+                entity_a: entity_a,
+                entity_b: entity_b,
+                normal: Vec3 {
+                    x: 0.0,
+                    y: 0.0,
+                    z: 1.0,
+                },
+                penetration: 0.035182,
+                contact_point: Vec3 {
+                    x: 1.0174636,
+                    y: -0.9804802,
+                    z: 1.2450399,
+                },
+            },
+            Contact {
+                entity_a: entity_a,
+                entity_b: entity_b,
+                normal: Vec3 {
+                    x: -0.0,
+                    y: 0.0,
+                    z: 1.0,
+                },
+                penetration: 0.03251047,
+                contact_point: Vec3 {
+                    x: 2e-5,
+                    y: 2e-5,
+                    z: 1.2450399,
+                },
+            },
+        ];
+
+        let merged = merge_contact_manifold(None, &contacts, 0.1, 0.9, 8);
+        assert_eq!(merged.contacts.len(), 4);
+
+        let merged_2 = merge_contact_manifold(Some(&merged), &contacts, 0.1, 0.9, 8);
+        assert_eq!(merged_2.contacts.len(), 4);
     }
 }

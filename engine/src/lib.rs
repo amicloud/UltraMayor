@@ -166,8 +166,10 @@ impl Engine {
 
         let target_simulation_dt = Duration::from_millis(16); // ~60 Hz
         let target_frame_time = Duration::from_millis(16); // ~60 FPS max
-
+        let mut frame_count = 0;
         'render: loop {
+            dbg!(frame_count);
+            frame_count += 1;
             let frame_start = Instant::now();
             {
                 let mut input_state = self
