@@ -519,7 +519,7 @@ mod tests {
         };
         let physics = physics_component();
         let delta_time = 1.0;
-        let gravity = WorldBasis::normal_gravity();
+        let gravity = Vec3::new(0.0, 0.0, -9.81);
 
         PhysicsSystem::update_body(&mut transform, &mut velocity, &physics, delta_time, gravity);
 

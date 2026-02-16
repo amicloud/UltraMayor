@@ -185,11 +185,7 @@ impl Engine {
             .expect("TimeResource resource not found")
             .target_frame_duration();
 
-        // Allow up to 2 frames worth of physics steps to be processed in a single frame before capping.
-        //This is a safety measure to prevent spiral of death if the game can't keep up with the target
-        //frame rate.
-        let max_physics_steps: usize =
-            (frame_target.as_secs_f32() / fixed_dt.as_secs_f32()) as usize * 2;
+        let max_physics_steps: usize = 6;
 
         let mut _frame_count: u64 = 0;
         'render: loop {

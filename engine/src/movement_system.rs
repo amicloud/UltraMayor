@@ -1,5 +1,8 @@
 use crate::velocity_component::VelocityComponent;
-use crate::{physics_component::PhysicsComponent, transform_component::TransformComponent};
+use crate::{
+    physics_component::PhysicsComponent, time_resource::TimeResource,
+    transform_component::TransformComponent,
+};
 use bevy_ecs::prelude::*;
 use glam::{Quat, Vec3};
 pub struct MovementSystem {}
@@ -7,8 +10,9 @@ pub struct MovementSystem {}
 impl MovementSystem {
     pub fn update(
         mut query: Query<(&mut TransformComponent, &VelocityComponent), Without<PhysicsComponent>>,
+        time: Res<TimeResource>,
     ) {
-        let delta_time = 1.0 / 60.0; // Assuming a fixed time step of 1/60 seconds
+        let delta_time = time.simulation_fixed_dt().as_secs_f32();
         for (mut transform, velocity) in query.iter_mut() {
             // Update position based on translational velocity
             transform.position =

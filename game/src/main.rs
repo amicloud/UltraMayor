@@ -15,7 +15,7 @@ use crate::camera_controller::{
     initialize_flying_camera_rotation,
 };
 #[allow(unused_imports)]
-use crate::game_controller::{ProjectileSpawner, do_gameplay};
+use crate::game_controller::{do_gameplay};
 use bevy_ecs::schedule::IntoScheduleConfigs;
 use engine::{
     ActiveCamera, CameraComponent, CollisionLayer, ConvexCollider, Engine, RenderBodyComponent,
@@ -110,8 +110,6 @@ fn main() {
         .game_frame_schedule
         .add_systems((apply_switch_camera_input,).chain());
 
-    // engine.world.insert_resource(BowlFloatTime::default());
-
     let cube = engine
         .load_model("resources/models/cube/Cube.gltf")
         .unwrap();
@@ -120,13 +118,7 @@ fn main() {
         .load_model("resources/models/sphere_low/sphere.obj")
         .unwrap();
 
-    engine.world.insert_resource(ProjectileSpawner {
-        sphere_handle: sphere,
-        cooldown: 0.2,
-        cooldown_timer: 0.0,
-        speed: 200.0,
-        scale: 1.0,
-    });
+    
 
     let player_scale: Vec3 = Vec3::splat(1.0);
     let player_start = Vec3::new(0.0, 5.0, 2.2);

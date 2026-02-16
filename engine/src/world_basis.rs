@@ -48,10 +48,6 @@ impl WorldBasis {
     pub fn set_gravity_vector(&mut self, gravity: Vec3) {
         self.gravity = gravity;
     }
-
-    pub(crate) fn normal_gravity() -> Vec3 {
-        -Self::canonical().up * Self::canonical().gravity.length()
-    }
 }
 
 impl Default for WorldBasis {

@@ -283,6 +283,8 @@ fn manifold_merge_distance_pair_map(
     extent * 0.01
 }
 
+
+/// Delta_t will be used for toi/sweep
 fn convex_convex_pair_manifold(
     entity_a: Entity,
     collider_a: &ConvexCollider,
@@ -294,7 +296,7 @@ fn convex_convex_pair_manifold(
     velocity_b: Option<&VelocityComponent>,
     world_aabbs: &HashMap<Entity, AABB>,
     previous_manifold: Option<&ContactManifold>,
-    delta_t: Duration,
+    _delta_t: Duration,
 ) -> Option<ContactManifold> {
     let pair = ordered_pair(entity_a, entity_b);
     let contacts = convex_convex_contact(
@@ -2216,6 +2218,10 @@ mod tests {
     }
 
     #[test]
+    /// Contact information gathered from a snapshot of the main scene, 
+    /// where two entities had 4 contact points with identical normals and penetrations. 
+    /// This tests that the merge_contact_manifold function correctly retains all 4 
+    /// contacts when they are identical, rather than erroneously merging them into fewer contacts.
     fn merge_contact_manifold_should_return_full_manifold() {
         let entity_a = Entity::from_bits(420);
         let entity_b = Entity::from_bits(69);
