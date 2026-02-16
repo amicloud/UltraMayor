@@ -35,9 +35,10 @@ impl PhysicsSystem {
             Option<&mut SleepComponent>,
         )>,
         time: Res<TimeResource>,
+        world: Res<WorldBasis>,
     ) {
         let delta_time = time.simulation_fixed_dt().as_secs_f32();
-        let g = WorldBasis::gravity_vector();
+        let g = world.gravity_vector();
         for (mut transform, mut velocity, physics, mut sleep) in query.iter_mut() {
             if !matches!(
                 physics.physics_type,
@@ -48,8 +49,8 @@ impl PhysicsSystem {
 
             if let Some(sleep) = sleep.as_deref_mut() {
                 if sleep.is_sleeping {
-                    velocity.translational = glam::Vec3::ZERO;
-                    velocity.angular = glam::Vec3::ZERO;
+                    velocity.translational = Vec3::ZERO;
+                    velocity.angular = Vec3::ZERO;
                     continue;
                 }
             }
@@ -64,8 +65,8 @@ impl PhysicsSystem {
                     sleep.sleep_timer += delta_time;
                     if sleep.sleep_timer >= sleep.time_to_sleep {
                         sleep.is_sleeping = true;
-                        velocity.translational = glam::Vec3::ZERO;
-                        velocity.angular = glam::Vec3::ZERO;
+                        velocity.translational = Vec3::ZERO;
+                        velocity.angular = Vec3::ZERO;
                     }
                 } else {
                     sleep.sleep_timer = 0.0;
@@ -79,7 +80,7 @@ impl PhysicsSystem {
         velocity: &mut VelocityComponent,
         physics: &PhysicsComponent,
         delta_time: f32,
-        gravity: glam::Vec3,
+        gravity: Vec3,
     ) {
         // Integrate gravity
         velocity.translational += gravity * delta_time;
@@ -331,10 +332,10 @@ impl PhysicsSystem {
             Option<&mut VelocityComponent>,
             Option<&PhysicsComponent>,
         )>,
+        gravity: Vec3,
     ) {
         use crate::physics_component::PhysicsType;
 
-        let gravity = WorldBasis::gravity_vector();
         let up = if gravity.length_squared() > f32::EPSILON {
             -gravity.normalize()
         } else {
@@ -421,6 +422,7 @@ impl PhysicsSystem {
         )>,
         collision_frame_data: Res<CollisionFrameData>,
         mut physics_frame_data: ResMut<PhysicsFrameData>,
+        world: Res<WorldBasis>,
     ) {
         for manifold in collision_frame_data.manifolds.values() {
             physics_frame_data
@@ -436,7 +438,11 @@ impl PhysicsSystem {
 
         Self::positional_correction(&physics_frame_data.constraints, &mut query);
         if ENABLE_RESTING_STABILIZATION {
-            Self::stabilize_resting_contacts(&collision_frame_data, &mut query);
+            Self::stabilize_resting_contacts(
+                &collision_frame_data,
+                &mut query,
+                world.gravity_vector(),
+            );
         }
         physics_frame_data.clear();
     }
@@ -513,7 +519,7 @@ mod tests {
         };
         let physics = physics_component();
         let delta_time = 1.0;
-        let gravity = WorldBasis::gravity_vector();
+        let gravity = WorldBasis::normal_gravity();
 
         PhysicsSystem::update_body(&mut transform, &mut velocity, &physics, delta_time, gravity);
 

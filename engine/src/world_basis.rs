@@ -12,6 +12,7 @@ pub struct WorldBasis {
     up: Vec3,
     forward: Vec3,
     right: Vec3,
+    gravity: Vec3,
 }
 
 impl WorldBasis {
@@ -19,8 +20,9 @@ impl WorldBasis {
         let up = up.normalize();
         let forward = forward.normalize();
         let right = forward.cross(up).normalize();
+        let gravity = -up * 9.81;
 
-        Self { up, forward, right }
+        Self { up, forward, right, gravity }
     }
 
     pub fn canonical() -> Self {
@@ -39,8 +41,16 @@ impl WorldBasis {
         self.right
     }
 
-    pub fn gravity_vector() -> Vec3 {
-        -Self::canonical().up() * 9.81
+    pub fn gravity_vector(&self) -> Vec3 {
+        self.gravity
+    }
+
+    pub fn set_gravity_vector(&mut self, gravity: Vec3) {
+        self.gravity = gravity;
+    }
+
+    pub(crate) fn normal_gravity() -> Vec3 {
+        -Self::canonical().up * Self::canonical().gravity.length()
     }
 }
 
