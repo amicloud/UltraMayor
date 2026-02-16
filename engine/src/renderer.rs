@@ -106,8 +106,8 @@ impl Renderer {
         camera: Option<CameraRenderData>,
     ) {
         let gl = self.gl.clone();
-        let current_time = std::time::Instant::now();
-        let mut draw_calls = 0;
+        // let current_time = std::time::Instant::now();
+        // let mut draw_calls = 0;
 
         unsafe {
             gl.enable(glow::DEPTH_TEST);
@@ -273,7 +273,7 @@ impl Renderer {
                         matrices_slice.len() as i32,
                     );
                 }
-                draw_calls += 1;
+                // draw_calls += 1;
             }
 
             // Now that we are done with the material, unbind any textures it used

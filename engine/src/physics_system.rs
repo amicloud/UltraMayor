@@ -400,8 +400,8 @@ impl PhysicsSystem {
                         }
 
                         // Hard lock very small residual motion so bodies fully settle.
-                        if vel.angular.z.abs() < 0.01 {
-                            vel.angular.z = 0.0;
+                        if vel.angular.length() < 0.01 {
+                            vel.angular = Vec3::ZERO;
                         }
                         if vel.translational.length() < 0.01 {
                             vel.translational = Vec3::ZERO;
@@ -428,7 +428,7 @@ impl PhysicsSystem {
                 .extend(Self::manifold_to_constraints(manifold));
         }
 
-        for _ in 0..PGS_ITERATIONS {
+        for _ in 0..=PGS_ITERATIONS {
             for constraint in &mut physics_frame_data.constraints {
                 Self::solve_constraint(constraint, &mut query);
             }
