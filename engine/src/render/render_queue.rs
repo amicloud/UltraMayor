@@ -1,6 +1,6 @@
 use bevy_ecs::resource::Resource;
 
-use crate::render_instance::RenderInstance;
+use crate::render::render_instance::RenderInstance;
 
 #[derive(Resource, Default)]
 pub struct RenderQueue {

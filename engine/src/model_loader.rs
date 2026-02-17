@@ -6,12 +6,12 @@ use std::hash::{Hash, Hasher};
 
 use crate::Engine;
 use crate::handles::{MaterialHandle, MeshHandle, RenderBodyHandle, TextureHandle};
-use crate::material::{Material, MaterialDesc};
 use crate::mesh::{AABB, GltfPrimitiveMesh, Mesh, Vertex};
-use crate::render_body::{RenderBody, RenderBodyPart};
-use crate::render_resource_manager::RenderResourceManager;
-use crate::shader::UniformValue;
-use crate::texture_resource_manager::TextureResource;
+use crate::render::material::{Material, MaterialDesc};
+use crate::render::render_body::{RenderBody, RenderBodyPart};
+use crate::render::render_resource_manager::RenderResourceManager;
+use crate::render::shader::UniformValue;
+use crate::render::texture_resource_manager::TextureResource;
 
 impl Engine {
     fn rgba_from_rgb(rgb: [f32; 3]) -> [u8; 4] {

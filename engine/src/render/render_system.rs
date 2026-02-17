@@ -1,6 +1,6 @@
 use crate::{
-    render_body_component::RenderBodyComponent, render_instance::RenderInstance,
-    render_queue::RenderQueue, render_resource_manager::RenderResourceManager,
+    render::render_body_component::RenderBodyComponent, render::render_instance::RenderInstance,
+    render::render_queue::RenderQueue, render::render_resource_manager::RenderResourceManager,
     transform_component::TransformComponent,
 };
 

@@ -1,6 +1,6 @@
 use crate::handles::TextureHandle;
-use crate::renderer;
-use crate::texture::Texture;
+use crate::render::renderer;
+use crate::render::texture::Texture;
 use glow::Context;
 use image::GenericImageView;
 use std::collections::HashMap;

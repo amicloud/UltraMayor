@@ -10,7 +10,7 @@ use crate::{
     TransformComponent, collider_component::{
         BVHNode, Collider, ConvexCollider, ConvexShape, MeshCollider, Triangle,
         closest_point_on_triangle,
-    }, mesh::AABB, physics, render_resource_manager::RenderResourceManager, time_resource::TimeResource, velocity_component::VelocityComponent
+    }, mesh::AABB, physics, render::render_resource_manager::RenderResourceManager, time_resource::TimeResource, velocity_component::VelocityComponent
 };
 
 use physics::{

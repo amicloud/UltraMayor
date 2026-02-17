@@ -1,6 +1,6 @@
 use bevy_ecs::prelude::*;
 
-use crate::{handles::RenderBodyHandle, render_body::RenderBody};
+use crate::{handles::RenderBodyHandle, render::render_body::RenderBody};
 
 #[derive(Resource, Default)]
 pub struct RenderBodyResource {

@@ -3,7 +3,7 @@ use std::{
     hash::{Hash, Hasher},
 };
 
-use crate::{handles::*, shader::UniformValue};
+use crate::{handles::*, render::shader::UniformValue};
 
 pub struct MaterialDesc {
     pub shader: ShaderHandle,
