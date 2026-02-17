@@ -348,11 +348,13 @@ impl DynamicAabbTree {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use std::collections::HashSet;
+
     use rand::rngs::StdRng;
     use rand::seq::SliceRandom;
     use rand::{Rng, SeedableRng};
-    use std::collections::HashSet;
+
+    use super::*;
 
     fn make_aabb(center: Vec3, half_extent: f32) -> Aabb {
         Aabb {

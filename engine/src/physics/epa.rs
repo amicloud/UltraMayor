@@ -260,13 +260,16 @@ fn support_minkowski(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use assert_approx_eq::assert_approx_eq;
+    use glam::{Quat, Vec3};
+
     use crate::components::collider_component::{CollisionLayer, ConvexCollider};
     use crate::components::transform_component::TransformComponent;
     use crate::mesh::Aabb;
-    use assert_approx_eq::assert_approx_eq;
-    use glam::{Quat, Vec3};
+
     use physics::gjk::{GjkResult, gjk_intersect};
+
+    use super::*;
     fn transform_at(position: Vec3, rotation: Quat) -> Mat4 {
         TransformComponent {
             position,

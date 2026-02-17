@@ -1424,12 +1424,14 @@ fn union_aabb(a: Aabb, b: Aabb) -> Aabb {
 
 #[cfg(test)]
 mod tests {
+    use std::path::Path;
+
+    use approx::assert_relative_eq;
+    use glam::{Mat4, Quat, Vec3};
+
     use crate::components::collider_component::CollisionLayer;
 
     use super::*;
-    use approx::assert_relative_eq;
-    use glam::{Mat4, Quat, Vec3};
-    use std::path::Path;
 
     fn make_transform(position: Vec3, rotation: Quat, scale: Vec3) -> TransformComponent {
         TransformComponent {

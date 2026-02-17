@@ -12,31 +12,36 @@ pub mod physics;
 pub mod render;
 mod time_resource;
 pub mod world_basis;
-use bevy_ecs::prelude::*;
-use glam::Mat4;
-use glam::Vec3;
-use glow::HasContext;
-use render::renderer::Renderer;
-use std::rc::Rc;
-use std::thread::sleep;
-use std::time::Duration;
-use std::time::Instant;
+use std::{
+    rc::Rc,
+    thread::sleep,
+    time::{Duration, Instant},
+};
 
-use crate::components::physics_component::PhysicsComponent;
-use crate::input::InputStateResource;
-use crate::mesh::Aabb;
-use crate::render::mesh_resource::MeshResource;
-use crate::render::render_queue::RenderQueue;
+use bevy_ecs::prelude::*;
+use glam::{Mat4, Vec3};
+use glow::HasContext;
+
+use crate::{
+    components::physics_component::PhysicsComponent,
+    input::InputStateResource,
+    mesh::Aabb,
+    physics::{
+        movement_system::MovementSystem,
+        physics_resource::{CollisionFrameData, PhysicsFrameData, PhysicsResource},
+        physics_system::PhysicsSystem,
+    },
+    render::{
+        mesh_resource::MeshResource,
+        render_queue::RenderQueue,
+        render_system::RenderSystem,
+        renderer::{CameraRenderData, RenderParams, Renderer},
+    },
+};
+
 pub use crate::render::render_resource_manager::RenderResourceManager;
-use crate::render::render_system::RenderSystem;
-use crate::render::renderer::{CameraRenderData, RenderParams};
 pub use physics::collision_system::CollisionSystem;
 pub use physics::gravity_resource::Gravity;
-use physics::movement_system::MovementSystem;
-use physics::physics_resource::CollisionFrameData;
-use physics::physics_resource::PhysicsFrameData;
-use physics::physics_resource::PhysicsResource;
-use physics::physics_system::PhysicsSystem;
 
 pub use crate::components::camera_component::{ActiveCamera, CameraComponent};
 pub use crate::components::collider_component::{
@@ -51,6 +56,7 @@ pub use crate::handles::{MaterialHandle, MeshHandle, RenderBodyHandle};
 pub use crate::input::MouseButton;
 pub use crate::time_resource::TimeResource;
 pub use crate::world_basis::WorldBasis;
+
 pub struct Engine {
     pub world: World,
     pub game_frame_schedule: Schedule,

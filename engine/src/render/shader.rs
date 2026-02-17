@@ -1,8 +1,9 @@
+use std::hash::Hash;
 use std::{collections::HashMap, ffi::OsStr, fs};
 
 use crate::handles::TextureHandle;
 use glow::HasContext;
-use std::hash::Hash;
+
 pub enum UniformValue {
     Float(f32),
     Vec3(glam::Vec3),

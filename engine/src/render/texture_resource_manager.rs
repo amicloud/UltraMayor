@@ -1,11 +1,12 @@
-use crate::handles::TextureHandle;
-use crate::render::renderer;
-use crate::render::texture::Texture;
 use glow::Context;
 use image::GenericImageView;
-use std::collections::HashMap;
-use std::ffi::OsStr;
-use std::hash::{Hash, Hasher};
+use std::{
+    collections::HashMap,
+    ffi::OsStr,
+    hash::{Hash, Hasher},
+};
+
+use crate::{handles::TextureHandle, render::renderer, render::texture::Texture};
 
 #[derive(Default)]
 pub struct TextureResource {

@@ -1,21 +1,20 @@
-use crate::components::velocity_component::VelocityComponent;
-use crate::time_resource::TimeResource;
-use crate::{
-    components::{
-        physics_component::PhysicsComponent, sleep_component::SleepComponent,
-        transform_component::TransformComponent,
-    },
-    physics,
-};
-use physics::{
-    gravity_resource::Gravity,
-    movement_system::MovementSystem,
-    physics_resource::{CollisionFrameData, ContactManifold, PhysicsFrameData},
-};
+use std::collections::HashMap;
 
 use bevy_ecs::prelude::*;
 use glam::{Mat3, Vec3};
-use std::collections::HashMap;
+
+use crate::{
+    components::{
+        physics_component::PhysicsComponent, sleep_component::SleepComponent,
+        transform_component::TransformComponent, velocity_component::VelocityComponent,
+    },
+    physics::{
+        gravity_resource::Gravity,
+        movement_system::MovementSystem,
+        physics_resource::{CollisionFrameData, ContactManifold, PhysicsFrameData},
+    },
+    time_resource::TimeResource,
+};
 pub struct PhysicsSystem {}
 
 pub struct ContactConstraint {
@@ -497,11 +496,12 @@ struct PhysicsProps {
 
 #[cfg(test)]
 mod tests {
+    use approx::assert_relative_eq;
+    use glam::{Quat, Vec3};
+
     use crate::components::physics_component::PhysicsType;
 
     use super::*;
-    use approx::assert_relative_eq;
-    use glam::{Quat, Vec3};
 
     fn physics_component() -> PhysicsComponent {
         PhysicsComponent {

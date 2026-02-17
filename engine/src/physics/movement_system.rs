@@ -1,10 +1,13 @@
-use crate::components::velocity_component::VelocityComponent;
-use crate::{
-    components::{physics_component::PhysicsComponent, transform_component::TransformComponent},
-    time_resource::TimeResource,
-};
 use bevy_ecs::prelude::*;
 use glam::{Quat, Vec3};
+
+use crate::{
+    components::{
+        physics_component::PhysicsComponent, transform_component::TransformComponent,
+        velocity_component::VelocityComponent,
+    },
+    time_resource::TimeResource,
+};
 pub struct MovementSystem {}
 
 impl MovementSystem {
@@ -46,10 +49,11 @@ impl MovementSystem {
 
 #[cfg(test)]
 mod tests {
+    use std::f32::consts::PI;
+
+    use assert_approx_eq::assert_approx_eq;
 
     use super::*;
-    use assert_approx_eq::assert_approx_eq;
-    use std::f32::consts::PI;
 
     const DELTA_TIME: f32 = 1.0;
 

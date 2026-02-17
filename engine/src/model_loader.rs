@@ -1,17 +1,22 @@
 use log::warn;
-use std::collections::HashMap;
-use std::collections::hash_map::DefaultHasher;
-use std::ffi::OsStr;
-use std::hash::{Hash, Hasher};
+use std::{
+    collections::{HashMap, hash_map::DefaultHasher},
+    ffi::OsStr,
+    hash::{Hash, Hasher},
+};
 
-use crate::Engine;
-use crate::handles::{MaterialHandle, MeshHandle, RenderBodyHandle, TextureHandle};
-use crate::mesh::{Aabb, GltfPrimitiveMesh, Mesh, Vertex};
-use crate::render::material::{Material, MaterialDesc};
-use crate::render::render_body::{RenderBody, RenderBodyPart};
-use crate::render::render_resource_manager::RenderResourceManager;
-use crate::render::shader::UniformValue;
-use crate::render::texture_resource_manager::TextureResource;
+use crate::{
+    Engine,
+    handles::{MaterialHandle, MeshHandle, RenderBodyHandle, TextureHandle},
+    mesh::{Aabb, GltfPrimitiveMesh, Mesh, Vertex},
+    render::{
+        material::{Material, MaterialDesc},
+        render_body::{RenderBody, RenderBodyPart},
+        render_resource_manager::RenderResourceManager,
+        shader::UniformValue,
+        texture_resource_manager::TextureResource,
+    },
+};
 
 impl Engine {
     fn rgba_from_rgb(rgb: [f32; 3]) -> [u8; 4] {

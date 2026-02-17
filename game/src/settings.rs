@@ -174,12 +174,12 @@ impl Settings {
 }
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use std::{env, fs, path::PathBuf};
+
     use serial_test::serial;
-    use std::env;
-    use std::fs;
-    use std::path::PathBuf;
-    use tempfile::tempdir; // To run tests serially when modifying environment variables
+    use tempfile::tempdir;
+
+    use super::*;
 
     /// Helper function to set up a temporary configuration directory
     fn setup_temp_config_dir() -> (tempfile::TempDir, PathBuf) {

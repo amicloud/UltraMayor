@@ -1,23 +1,22 @@
-use crate::handles::MaterialHandle;
-use crate::handles::MeshHandle;
-use crate::handles::ShaderHandle;
-use crate::mesh::Mesh;
-use crate::mesh::Vertex;
-use crate::render::frustum::Frustum;
-use crate::render::render_instance::RenderInstance;
-use crate::render::render_resource_manager::RenderResourceManager;
-use crate::render::shader::InputRate::PerInstance;
-use crate::render::shader::InputRate::PerVertex;
-use crate::render::shader::UniformValue;
-use crate::render::shader::VertexAttribType;
-use crate::render::texture;
+use std::{collections::HashMap, mem::offset_of, ops::Range, rc::Rc};
+
 use glam::{Mat4, Vec3};
-use glow::Context as GlowContext;
-use glow::HasContext;
-use std::collections::HashMap;
-use std::mem::offset_of;
-use std::ops::Range;
-use std::rc::Rc;
+use glow::{Context as GlowContext, HasContext};
+
+use crate::{
+    handles::{MaterialHandle, MeshHandle, ShaderHandle},
+    mesh::{Mesh, Vertex},
+    render::{
+        frustum::Frustum,
+        render_instance::RenderInstance,
+        render_resource_manager::RenderResourceManager,
+        shader::{
+            InputRate::{PerInstance, PerVertex},
+            UniformValue, VertexAttribType,
+        },
+        texture,
+    },
+};
 
 pub struct Renderer {
     gl: Rc<GlowContext>,

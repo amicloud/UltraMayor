@@ -84,8 +84,9 @@ impl TimeResource {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use bevy_ecs::schedule::Schedule;
+
+    use super::*;
 
     fn assert_f32_close(left: f32, right: f32, epsilon: f32) {
         assert!(

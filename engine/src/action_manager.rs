@@ -40,8 +40,9 @@ impl ActionManager {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use std::sync::{Arc, Mutex};
+
+    use super::*;
 
     /// A mock implementation of the Action trait for testing purposes.
     struct MockAction {
