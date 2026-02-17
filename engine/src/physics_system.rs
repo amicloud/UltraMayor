@@ -1,6 +1,4 @@
-use std::collections::HashMap;
-
-use crate::WorldBasis;
+use crate::gravity_resource::Gravity;
 use crate::movement_system::MovementSystem;
 use crate::physics_resource::{CollisionFrameData, ContactManifold, PhysicsFrameData};
 use crate::time_resource::TimeResource;
@@ -11,6 +9,7 @@ use crate::{
 };
 use bevy_ecs::prelude::*;
 use glam::{Mat3, Vec3};
+use std::collections::HashMap;
 pub struct PhysicsSystem {}
 
 pub struct ContactConstraint {
@@ -35,10 +34,10 @@ impl PhysicsSystem {
             Option<&mut SleepComponent>,
         )>,
         time: Res<TimeResource>,
-        world: Res<WorldBasis>,
+        gravity: Res<Gravity>,
     ) {
         let delta_time = time.simulation_fixed_dt().as_secs_f32();
-        let g = world.gravity_vector();
+        let g = gravity.gravity_vector();
         for (mut transform, mut velocity, physics, mut sleep) in query.iter_mut() {
             if !matches!(
                 physics.physics_type,
@@ -422,7 +421,7 @@ impl PhysicsSystem {
         )>,
         collision_frame_data: Res<CollisionFrameData>,
         mut physics_frame_data: ResMut<PhysicsFrameData>,
-        world: Res<WorldBasis>,
+        gravity: Res<Gravity>,
     ) {
         for manifold in collision_frame_data.manifolds.values() {
             physics_frame_data
@@ -441,7 +440,7 @@ impl PhysicsSystem {
             Self::stabilize_resting_contacts(
                 &collision_frame_data,
                 &mut query,
-                world.gravity_vector(),
+                gravity.gravity_vector(),
             );
         }
         physics_frame_data.clear();

@@ -1,28 +1,53 @@
 use bevy_ecs::prelude::*;
 use engine::input::InputStateResource;
-use engine::
-    WorldBasis
-;
+use engine::{Gravity, TimeResource, WorldBasis};
+use glam::Quat;
 use sdl2::keyboard::Keycode;
 
 pub fn do_gameplay(
-    mut world: ResMut<WorldBasis>,
+    world: Res<WorldBasis>,
+    mut gravity: ResMut<Gravity>,
     input_state: Res<InputStateResource>,
+    time: Res<TimeResource>,
 ) {
-    let g = world.gravity_vector();
     let right = world.right();
-    let up = world.up();
-    let ratio = 100.0;
+    let forward = world.forward();
+    let ratio = time.frame_delta_time();
+    let mut did_input = false;
     if input_state.key_held(Keycode::I) {
-        world.set_gravity_vector(g + (up / ratio));
+        gravity.rotate_gravity_around_axis(right, ratio);
+        did_input = true;
     }
     if input_state.key_held(Keycode::J) {
-        world.set_gravity_vector(g + (-right / ratio));
+        gravity.rotate_gravity_around_axis(forward, ratio);
+        did_input = true;
     }
     if input_state.key_held(Keycode::K) {
-        world.set_gravity_vector(g + (-up / ratio));
+        gravity.rotate_gravity_around_axis(right, -ratio);
+        did_input = true;
     }
     if input_state.key_held(Keycode::L) {
-        world.set_gravity_vector(g + (right / ratio));
+        gravity.rotate_gravity_around_axis(forward, -ratio);
+        did_input = true;
+    }
+
+    if did_input {
+        // Clamp the angle to 20 degrees from the canonical gravity direction
+        let canonical_gravity = Gravity::default().gravity_vector();
+        let current_gravity = gravity.gravity_vector();
+        let angle = current_gravity.angle_between(canonical_gravity);
+        let max_angle = 20.0_f32.to_radians();
+        if angle > max_angle {
+            let axis = current_gravity.cross(canonical_gravity).normalize_or_zero();
+            let rotation = Quat::from_axis_angle(axis, angle - max_angle);
+            gravity.rotate_gravity(rotation);
+        }
+    } else {
+        // Spring gravity back to normal over time
+        let canonical_gravity = Gravity::default().gravity_vector();
+        let gravity_diff = canonical_gravity - gravity.gravity_vector();
+        let spring_strength = 5.0; // Adjust this for faster/slower springing
+        let spring_force = gravity_diff * spring_strength * ratio;
+        gravity.gravity_normal += spring_force.normalize_or_zero() * ratio;
     }
 }

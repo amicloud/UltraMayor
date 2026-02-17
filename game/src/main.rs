@@ -159,8 +159,8 @@ fn main() {
         PlayerComponent { speed: 1.0 },
     ));
 
-    (1..=10).for_each(|i| {
-        let p = (player_local_size / 2.0) * Vec3::new(0.0, 0.0, i as f32);
+    (1..=6).for_each(|i| {
+        let p = player_local_size * Vec3::new(0.0, 0.0, i as f32);
         engine.world.spawn((
             TransformComponent {
                 position: p,
@@ -217,7 +217,7 @@ fn main() {
 
     let t_range = 2.0;
 
-    (0..300).for_each(|_| {
+    (0..5).for_each(|_| {
         use rand::random_range;
         // Random position
         let pos = Vec3::new(
@@ -258,7 +258,7 @@ fn main() {
             },
             ConvexCollider::sphere(scale, CollisionLayer::Default),
             PhysicsComponent {
-                mass: 3.0,
+                mass: 300.0,
                 physics_type: PhysicsType::Dynamic,
                 friction: 0.2,
                 drag_coefficient: 0.1,

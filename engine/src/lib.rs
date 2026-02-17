@@ -40,6 +40,7 @@ mod time_resource;
 mod transform_component;
 mod velocity_component;
 pub mod world_basis;
+mod gravity_resource;
 use bevy_ecs::prelude::*;
 use glam::Mat4;
 use glam::Vec3;
@@ -51,6 +52,7 @@ use std::time::Duration;
 use std::time::Instant;
 
 pub use crate::collision_system::CollisionSystem;
+pub use crate::gravity_resource::Gravity;
 use crate::input::InputStateResource;
 use crate::mesh::AABB;
 use crate::mesh_resource::MeshResource;
@@ -104,6 +106,7 @@ impl Engine {
         world.insert_resource(CollisionFrameData::default());
         world.insert_resource(PhysicsFrameData::default());
         world.insert_resource(TimeResource::new(60, 120));
+        world.insert_resource(Gravity::default());
 
         let mut physics_schedule = Schedule::default();
 

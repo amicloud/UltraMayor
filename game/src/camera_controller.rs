@@ -1,7 +1,8 @@
 use bevy_ecs::prelude::*;
 use engine::input::InputStateResource;
 use engine::{
-    ActiveCamera, CameraComponent, MouseButton, TransformComponent, VelocityComponent, WorldBasis,
+    ActiveCamera, CameraComponent, Gravity, MouseButton, TransformComponent, VelocityComponent,
+    WorldBasis,
 };
 use glam::{Mat3, Quat, Vec3};
 use sdl2::keyboard::Keycode;
@@ -19,24 +20,38 @@ pub struct OrbitCameraComponent {
 
 impl OrbitCameraComponent {
     /// Updates a transform to match this orbit camera state.
-    pub fn apply_to_transform(&mut self, transform: &mut TransformComponent, world: &WorldBasis) {
+    pub fn apply_to_transform(
+        &mut self,
+        transform: &mut TransformComponent,
+        world: &WorldBasis,
+        gravity_dir: Vec3,
+    ) {
+        let up = -gravity_dir.normalize();
+
         let yaw_rad = self.yaw.to_radians();
         let pitch_rad = self.pitch.to_radians();
 
-        let direction = Vec3::new(
-            yaw_rad.cos() * pitch_rad.cos(),
-            yaw_rad.sin() * pitch_rad.cos(),
-            pitch_rad.sin(),
-        )
-        .normalize();
+        // Choose a stable horizontal reference.
+        let reference = world.forward();
 
-        // self.target.z = 0.0; // Keep the target on the ground plane.
+        // Project reference onto gravity plane
+        let mut forward = (reference - reference.dot(up) * up).normalize();
+        let mut right = forward.cross(up).normalize();
 
-        transform.position = self.target - (direction * self.distance);
+        // Apply yaw around gravity axis
+        let yaw_rotation = Quat::from_axis_angle(up, yaw_rad);
+        forward = yaw_rotation * forward;
+        right = yaw_rotation * right;
 
+        // Apply pitch around camera right axis
+        let pitch_rotation = Quat::from_axis_angle(right, pitch_rad);
+        forward = pitch_rotation * forward;
+
+        // Final camera position
+        transform.position = self.target - forward * self.distance;
+        
         let forward = (self.target - transform.position).normalize();
-        let world_up = world.up();
-        let right = forward.cross(world_up).normalize();
+        let right = forward.cross(up).normalize();
         let up = right.cross(forward).normalize();
 
         let rotation_matrix = Mat3::from_cols(right, up, -forward);
@@ -145,6 +160,7 @@ pub fn apply_orbit_camera_input(
     input_state: Res<InputStateResource>,
     world_basis: Res<WorldBasis>,
     mut query: Query<(&mut TransformComponent, &mut OrbitCameraComponent)>,
+    gravity: Res<Gravity>,
 ) {
     let Some(camera_entity) = active_camera.0 else {
         return;
@@ -167,7 +183,7 @@ pub fn apply_orbit_camera_input(
         orbit.zoom(input_state.scroll_delta);
     }
 
-    orbit.apply_to_transform(&mut transform, &world_basis);
+    orbit.apply_to_transform(&mut transform, &world_basis, gravity.gravity_normal);
 }
 
 /// Applies first-person mouse look to the active camera entity.
@@ -357,6 +373,7 @@ pub fn update_orbit_camera_target(
         (&mut TransformComponent, &mut OrbitCameraComponent),
         Without<PlayerComponent>,
     >,
+    gravity: Res<Gravity>,
 ) {
     let Ok(player_transform) = player_query.single() else {
         return;
@@ -364,6 +381,6 @@ pub fn update_orbit_camera_target(
 
     for (mut transform, mut orbit) in &mut orbit_query {
         orbit.target = player_transform.position;
-        orbit.apply_to_transform(&mut transform, &world_basis);
+        orbit.apply_to_transform(&mut transform, &world_basis, gravity.gravity_normal);
     }
 }
