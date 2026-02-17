@@ -2,7 +2,7 @@ use bevy_ecs::prelude::*;
 
 use crate::{handles::MaterialHandle, render::material::Material};
 
-#[derive(Default, Resource)]
+#[derive(Resource, Default)]
 pub struct MaterialResource {
     pub materials: std::collections::HashMap<MaterialHandle, Material>,
 }
