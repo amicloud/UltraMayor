@@ -49,13 +49,12 @@ impl PhysicsSystem {
                 continue;
             }
 
-            if let Some(sleep) = sleep.as_deref_mut() {
-                if sleep.is_sleeping {
+            if let Some(sleep) = sleep.as_deref_mut()
+                && sleep.is_sleeping {
                     velocity.translational = Vec3::ZERO;
                     velocity.angular = Vec3::ZERO;
                     continue;
                 }
-            }
 
             Self::update_body(&mut transform, &mut velocity, physics, delta_time, g);
 

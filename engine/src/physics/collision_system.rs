@@ -7,22 +7,22 @@ use rayon::prelude::*;
 use std::{collections::HashMap, time::Duration};
 
 use crate::{
+    TransformComponent,
     components::collider_component::{
         BVHNode, Collider, ConvexCollider, ConvexShape, MeshCollider, Triangle,
         closest_point_on_triangle,
     },
     components::velocity_component::VelocityComponent,
-    render::render_resource_manager::RenderResourceManager,
-    time_resource::TimeResource,
     mesh::Aabb,
     physics,
-    TransformComponent,
+    render::render_resource_manager::RenderResourceManager,
+    time_resource::TimeResource,
 };
 
 use physics::{
-    physics_resource::{CollisionFrameData, Contact, ContactManifold, PhysicsResource},
     epa::epa,
     gjk::{GjkResult, gjk_intersect},
+    physics_resource::{CollisionFrameData, Contact, ContactManifold, PhysicsResource},
 };
 
 #[derive(Default)]
@@ -103,14 +103,13 @@ impl CollisionSystem {
         mut phys: ResMut<PhysicsResource>,
     ) {
         for (entity, transform, convex_collider, mesh_collider) in &query {
-            if let Some(mesh_collider) = mesh_collider {
-                if let Some(local_aabb) =
+            if let Some(mesh_collider) = mesh_collider
+                && let Some(local_aabb) =
                     render_body_local_aabb(mesh_collider.render_body_id, &render_resources)
-                {
-                    let world_aabb = transform_aabb(local_aabb, transform);
-                    phys.world_aabbs.insert(entity, world_aabb);
-                    continue;
-                }
+            {
+                let world_aabb = transform_aabb(local_aabb, transform);
+                phys.world_aabbs.insert(entity, world_aabb);
+                continue;
             }
 
             if let Some(convex_collider) = convex_collider {
@@ -202,12 +201,12 @@ impl CollisionSystem {
                 if let (Some(convex_a), Some(convex_b)) = (convex_a, convex_b) {
                     return convex_convex_pair_manifold(
                         *entity_a,
-                        &convex_a,
-                        &transform_a,
+                        convex_a,
+                        transform_a,
                         velocity_a,
                         *entity_b,
-                        &convex_b,
-                        &transform_b,
+                        convex_b,
+                        transform_b,
                         velocity_b,
                         &physics_world.world_aabbs,
                         previous_manifold,
@@ -219,12 +218,12 @@ impl CollisionSystem {
                 if let (Some(convex_a), Some(mesh_b)) = (convex_a, mesh_b) {
                     return convex_mesh_pair_manifold(
                         *entity_a,
-                        &convex_a,
-                        &transform_a,
+                        convex_a,
+                        transform_a,
                         velocity_a,
                         *entity_b,
-                        &mesh_b,
-                        &transform_b,
+                        mesh_b,
+                        transform_b,
                         &render_resources,
                         &physics_world.world_aabbs,
                         previous_manifold,
@@ -236,12 +235,12 @@ impl CollisionSystem {
                 if let (Some(mesh_a), Some(convex_b)) = (mesh_a, convex_b) {
                     return convex_mesh_pair_manifold(
                         *entity_b,
-                        &convex_b,
-                        &transform_b,
+                        convex_b,
+                        transform_b,
                         velocity_b,
                         *entity_a,
-                        &mesh_a,
-                        &transform_a,
+                        mesh_a,
+                        transform_a,
                         &render_resources,
                         &physics_world.world_aabbs,
                         previous_manifold,
@@ -259,10 +258,10 @@ impl CollisionSystem {
                 .manifolds
                 .entry(pair)
                 .and_modify(|existing| {
-                    if manifold.contacts.len() > existing.contacts.len() {
-                        *existing = manifold.clone();
-                    } else if manifold.contacts.len() == existing.contacts.len()
-                        && manifold_max_penetration(&manifold) > manifold_max_penetration(existing)
+                    if manifold.contacts.len() > existing.contacts.len()
+                        || (manifold.contacts.len() == existing.contacts.len()
+                            && manifold_max_penetration(&manifold)
+                                > manifold_max_penetration(existing))
                     {
                         *existing = manifold.clone();
                     }
@@ -404,9 +403,7 @@ fn orient_contact_to_pair(mut contact: Contact, pair: (Entity, Entity)) -> Conta
     }
 
     contact.normal = -contact.normal;
-    let old_a = contact.entity_a;
-    contact.entity_a = contact.entity_b;
-    contact.entity_b = old_a;
+    std::mem::swap(&mut contact.entity_a, &mut contact.entity_b);
     contact
 }
 

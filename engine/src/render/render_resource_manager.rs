@@ -15,6 +15,12 @@ pub struct RenderResourceManager {
     pub shader_manager: ShaderResource,
 }
 
+impl Default for RenderResourceManager {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl RenderResourceManager {
     pub fn new() -> Self {
         Self {

@@ -105,7 +105,7 @@ impl Aabb {
         tmax >= tmin.max(0.0)
     }
 
-    pub(crate) fn from_vertices(vertices: &Vec<crate::mesh::Vertex>) -> Self {
+    pub(crate) fn from_vertices(vertices: &[crate::mesh::Vertex]) -> Self {
         // Initialize min and max with the first vertex
         let mut min = vertices[0];
         let mut max = vertices[0];

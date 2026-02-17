@@ -258,7 +258,7 @@ impl Renderer {
                     render_data_manager
                         .mesh_manager
                         .get_mesh(mesh_id)
-                        .expect(&format!("Couldn't find mesh: {:?}", mesh_id))
+                        .unwrap_or_else(|| panic!("Couldn't find mesh: {:?}", mesh_id))
                         .indices
                         .len() as i32
                 };
@@ -312,7 +312,7 @@ impl Renderer {
     /// that are `.clear()`-ed here and reused across frames, so after the
     /// first few frames there are zero allocations.
     fn material_batcher(
-        instances: &mut Vec<RenderInstance>,
+        instances: &mut [RenderInstance],
         material_ranges: &mut Vec<MaterialBatchRange>,
         mesh_ranges: &mut Vec<MeshBatchRange>,
         matrices: &mut Vec<[f32; 16]>,
@@ -378,7 +378,7 @@ impl Renderer {
             let scale = Self::max_scale(inst.transform);
             let world_center = inst
                 .transform
-                .transform_point3(Vec3::from(mesh.sphere_center));
+                .transform_point3(mesh.sphere_center);
             let world_radius = mesh.sphere_radius * scale;
 
             if frustum.intersects_sphere(world_center, world_radius) {
@@ -392,14 +392,14 @@ impl Renderer {
             gl.enable(glow::DEPTH_TEST);
             gl.depth_func(glow::LESS);
 
-            let renderer = Self {
+            
+            Self {
                 gl,
                 frames_rendered: 0,
                 vao_cache: HashMap::new(),
                 frame_data: FrameData::default(),
                 mesh_render_data: HashMap::new(),
-            };
-            renderer
+            }
         }
     }
 
@@ -517,13 +517,11 @@ impl Renderer {
             gl.bind_buffer(glow::ELEMENT_ARRAY_BUFFER, Some(mesh_data.ebo.unwrap()));
 
             let instance_offset_for = |name: &str| -> Option<i32> {
-                if let Some(suffix) = name.strip_prefix("instance_model_col") {
-                    if let Ok(index) = suffix.parse::<i32>() {
-                        if (0..4).contains(&index) {
+                if let Some(suffix) = name.strip_prefix("instance_model_col")
+                    && let Ok(index) = suffix.parse::<i32>()
+                        && (0..4).contains(&index) {
                             return Some(index * 16);
                         }
-                    }
-                }
                 None
             };
 
@@ -632,19 +630,19 @@ impl Renderer {
             match value {
                 UniformValue::Float(v) => {
                     gl.uniform_1_f32(Some(loc), *v);
-                    return 0;
+                    0
                 }
                 UniformValue::Vec3(v) => {
                     gl.uniform_3_f32(Some(loc), v.x, v.y, v.z);
-                    return 0;
+                    0
                 }
                 UniformValue::Mat4(m) => {
                     gl.uniform_matrix_4_f32_slice(Some(loc), false, &m.to_cols_array());
-                    return 0;
+                    0
                 }
                 UniformValue::Int(i) => {
                     gl.uniform_1_i32(Some(loc), *i);
-                    return 0;
+                    0
                 }
                 UniformValue::Texture { handle, unit } => {
                     let tex = render_data_manager
@@ -655,7 +653,7 @@ impl Renderer {
                     gl.active_texture(glow::TEXTURE0 + *unit);
                     gl.bind_texture(glow::TEXTURE_2D, tex.gl_tex);
                     gl.uniform_1_i32(Some(loc), *unit as i32);
-                    return 1;
+                    1
                 }
             }
         }

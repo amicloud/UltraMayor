@@ -104,7 +104,9 @@ impl Engine {
         )
         .expect("Failed to load OBJ file");
 
-        let render_body_handle = {
+        
+
+        {
             let mut render_resource_manager = self
                 .world
                 .get_resource_mut::<RenderResourceManager>()
@@ -231,7 +233,7 @@ impl Engine {
                     uvs.resize(vertex_count, [0.0, 0.0]);
                 }
 
-                let indices: Vec<u32> = mesh.indices.iter().copied().collect();
+                let indices: Vec<u32> = mesh.indices.to_vec();
 
                 let tangents = if has_uvs && has_normals {
                     Mesh::compute_tangents(&positions, &normals, &uvs, &indices)
@@ -285,9 +287,7 @@ impl Engine {
             render_resource_manager
                 .render_body_manager
                 .add_render_body(render_body)
-        };
-
-        render_body_handle
+        }
     }
 
     /// Loads an FBX model from the specified file path and returns a `RenderBodyHandle`.
@@ -299,7 +299,9 @@ impl Engine {
     fn load_gltf(&mut self, gltf_path: &str) -> RenderBodyHandle {
         let gl = &self.gl;
         let os_path = OsStr::new(gltf_path);
-        let render_body_handle = {
+        
+
+        {
             let mut render_resource_manager = self
                 .world
                 .get_resource_mut::<RenderResourceManager>()
@@ -346,9 +348,7 @@ impl Engine {
             render_resource_manager
                 .render_body_manager
                 .add_render_body(render_body)
-        };
-
-        render_body_handle
+        }
     }
 
     fn load_materials_from_gltf(

@@ -228,7 +228,7 @@ fn main() {
                 angular,
             },
             RenderBodyComponent {
-                render_body_id: *&sphere,
+                render_body_id: sphere,
             },
             ConvexCollider::sphere(scale, CollisionLayer::Default),
             PhysicsComponent {

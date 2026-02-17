@@ -36,8 +36,8 @@ impl ShaderResource {
         }
 
         let shader = Shader::new(gl, vertex_src, fragment_src);
-        let handle = self.add_shader(shader, &key);
-        handle
+        
+        self.add_shader(shader, &key)
     }
 
     pub fn get_shader(&self, shader_id: ShaderHandle) -> Option<&Shader> {

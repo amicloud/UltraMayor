@@ -208,13 +208,13 @@ pub fn apply_flying_camera_input(
     let arrow_sensitivity = 10.0;
 
     if input_state.key_held(Keycode::Up) {
-        camera.look(0.0, -1.0 * arrow_sensitivity, &mut transform, &world_basis);
+        camera.look(0.0, -arrow_sensitivity, &mut transform, &world_basis);
     }
     if input_state.key_held(Keycode::Down) {
         camera.look(0.0, 1.0 * arrow_sensitivity, &mut transform, &world_basis);
     }
     if input_state.key_held(Keycode::Left) {
-        camera.look(-1.0 * arrow_sensitivity, 0.0, &mut transform, &world_basis);
+        camera.look(-arrow_sensitivity, 0.0, &mut transform, &world_basis);
     }
     if input_state.key_held(Keycode::Right) {
         camera.look(1.0 * arrow_sensitivity, 0.0, &mut transform, &world_basis);

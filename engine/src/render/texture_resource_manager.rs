@@ -33,7 +33,7 @@ impl TextureResource {
 
     pub fn load_from_file(&mut self, gl: &Context, path: &OsStr) -> TextureHandle {
         // Load image with the `image` crate
-        let img = image::open(path).expect(&format!("Failed to open texture image: {:?}", path));
+        let img = image::open(path).unwrap_or_else(|_| panic!("Failed to open texture image: {:?}", path));
         let rgba = img.to_rgba8();
         let (width, height) = img.dimensions();
         let id = self.make_hashed_id(&path);

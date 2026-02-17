@@ -276,7 +276,7 @@ impl Engine {
                     .expect("RenderDataManager resource not found");
 
                 // 4. Render
-                renderer.render(render_params, &mut *render_data_manager, camera_data);
+                renderer.render(render_params, &mut render_data_manager, camera_data);
             }
             self.window.gl_swap_window();
             let frame_time = frame_start.elapsed();
@@ -334,7 +334,7 @@ impl Engine {
         let view = transform
             .to_mat4()
             .try_inverse()
-            .unwrap_or_else(|| Mat4::IDENTITY);
+            .unwrap_or(Mat4::IDENTITY);
 
         let fallback_aspect = width as f32 / height as f32;
         let aspect_ratio = if camera.aspect_ratio > 0.0 {
