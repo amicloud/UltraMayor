@@ -79,7 +79,7 @@ fn main() {
             OrbitCameraComponent {
                 target: Vec3::new(0.0, 0.0, 0.0),
                 distance: 100.0,
-                yaw: -135.0,
+                yaw: 0.0,
                 pitch: -30.0,
                 sensitivity: 0.2,
             },

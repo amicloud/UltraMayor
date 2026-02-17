@@ -46,8 +46,13 @@ pub fn do_gameplay(
         // Spring gravity back to normal over time
         let canonical_gravity = Gravity::default().gravity_vector();
         let gravity_diff = canonical_gravity - gravity.gravity_vector();
-        let spring_strength = 5.0; // Adjust this for faster/slower springing
+        let spring_strength = 5.0;
         let spring_force = gravity_diff * spring_strength * ratio;
-        gravity.gravity_normal += spring_force.normalize_or_zero() * ratio;
+        // If the spring force is very small, just snap back to default to avoid jitter.
+        if spring_force.length() < 0.01 {
+            gravity.reset();
+        } else {
+            gravity.gravity_normal += spring_force.normalize_or_zero() * ratio;
+        }
     }
 }
