@@ -1,8 +1,8 @@
 use crate::time_resource::TimeResource;
 use crate::components::velocity_component::VelocityComponent;
 use crate::{
-    components::{physics_component::PhysicsComponent, transform_component::TransformComponent},
-    physics, sleep_component::SleepComponent,
+    components::{physics_component::PhysicsComponent, transform_component::TransformComponent, sleep_component::SleepComponent},
+    physics,
 };
 use physics::{
     gravity_resource::Gravity,

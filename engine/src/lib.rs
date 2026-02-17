@@ -8,11 +8,10 @@ mod handles;
 pub mod input;
 mod mesh;
 mod model_loader;
+pub mod physics;
 pub mod render;
-mod sleep_component;
 mod time_resource;
 pub mod world_basis;
-pub mod physics;
 use bevy_ecs::prelude::*;
 use glam::Mat4;
 use glam::Vec3;
@@ -23,34 +22,34 @@ use std::thread::sleep;
 use std::time::Duration;
 use std::time::Instant;
 
-pub use physics::collision_system::CollisionSystem;
-pub use physics::gravity_resource::Gravity;
+use crate::components::physics_component::PhysicsComponent;
 use crate::input::InputStateResource;
 use crate::mesh::Aabb;
-use crate::components::physics_component::PhysicsComponent;
 use crate::render::mesh_resource::MeshResource;
+use crate::render::render_queue::RenderQueue;
+pub use crate::render::render_resource_manager::RenderResourceManager;
+use crate::render::render_system::RenderSystem;
+use crate::render::renderer::{CameraRenderData, RenderParams};
+pub use physics::collision_system::CollisionSystem;
+pub use physics::gravity_resource::Gravity;
 use physics::movement_system::MovementSystem;
 use physics::physics_resource::CollisionFrameData;
 use physics::physics_resource::PhysicsFrameData;
 use physics::physics_resource::PhysicsResource;
 use physics::physics_system::PhysicsSystem;
-use crate::render::render_queue::RenderQueue;
-pub use crate::render::render_resource_manager::RenderResourceManager;
-use crate::render::render_system::RenderSystem;
-use crate::render::renderer::{CameraRenderData, RenderParams};
 
 pub use crate::components::camera_component::{ActiveCamera, CameraComponent};
 pub use crate::components::collider_component::{
     CollisionLayer, ConvexCollider, ConvexShape, MeshCollider,
 };
-pub use crate::handles::{MaterialHandle, MeshHandle, RenderBodyHandle};
-pub use crate::input::MouseButton;
 pub use crate::components::material_component::MaterialComponent;
 pub use crate::components::render_body_component::RenderBodyComponent;
-pub use crate::sleep_component::SleepComponent;
-pub use crate::time_resource::TimeResource;
+pub use crate::components::sleep_component::SleepComponent;
 pub use crate::components::transform_component::TransformComponent;
 pub use crate::components::velocity_component::VelocityComponent;
+pub use crate::handles::{MaterialHandle, MeshHandle, RenderBodyHandle};
+pub use crate::input::MouseButton;
+pub use crate::time_resource::TimeResource;
 pub use crate::world_basis::WorldBasis;
 pub struct Engine {
     pub world: World,
@@ -331,10 +330,7 @@ impl Engine {
             return None;
         };
 
-        let view = transform
-            .to_mat4()
-            .try_inverse()
-            .unwrap_or(Mat4::IDENTITY);
+        let view = transform.to_mat4().try_inverse().unwrap_or(Mat4::IDENTITY);
 
         let fallback_aspect = width as f32 / height as f32;
         let aspect_ratio = if camera.aspect_ratio > 0.0 {
