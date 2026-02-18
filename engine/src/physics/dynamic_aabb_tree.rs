@@ -1,9 +1,15 @@
+use std::num::NonZeroUsize;
+
 use bevy_ecs::entity::Entity;
 use glam::Vec3;
 
 use crate::mesh::Aabb;
 
-pub type NodeId = usize;
+// Using NonZeroUsize allows for some nice memory layout optimization
+// since Option<NodeId> can be represented as usize with 0 reserved for None.
+// Option<NodeId> uses the same amount of memory as NodeId, and we can directly index into the nodes 
+// vector with id.get() with no overhead as this is compiled down to the same code as usize indexing.
+pub type NodeId = NonZeroUsize;
 
 #[derive(Debug, Default)]
 struct Node {
@@ -15,18 +21,30 @@ struct Node {
     entity: Option<Entity>, // Some => leaf
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct DynamicAabbTree {
     nodes: Vec<Node>,
     root: Option<NodeId>,
     free_list: Vec<NodeId>,
 }
 
+impl Default for DynamicAabbTree {
+    fn default() -> Self {
+        Self {
+            // Reserve index 0 so NodeId can use NonZeroUsize while still
+            // indexing directly into `nodes` via `id.get()`.
+            nodes: vec![Node::default()],
+            root: None,
+            free_list: Vec::new(),
+        }
+    }
+}
+
 impl DynamicAabbTree {
     pub fn update(&mut self, node_id: NodeId, new_aabb: Aabb) {
         let fat = Self::expand_aabb(new_aabb, 0.1);
 
-        if self.nodes[node_id].aabb.contains(&fat) {
+        if self.nodes[node_id.get()].aabb.contains(&fat) {
             return; // still inside fat AABB, no reinsertion needed
         }
 
@@ -35,7 +53,7 @@ impl DynamicAabbTree {
     }
 
     fn is_leaf(&self, id: NodeId) -> bool {
-        self.nodes[id].left.is_none()
+        self.nodes[id.get()].left.is_none()
     }
 
     fn expand_aabb(aabb: Aabb, margin: f32) -> Aabb {
@@ -50,11 +68,11 @@ impl DynamicAabbTree {
 
         let fat = Self::expand_aabb(aabb, 0.1);
 
-        self.nodes[leaf].aabb = fat;
-        self.nodes[leaf].entity = Some(entity);
-        self.nodes[leaf].height = 0;
-        self.nodes[leaf].left = None;
-        self.nodes[leaf].right = None;
+        self.nodes[leaf.get()].aabb = fat;
+        self.nodes[leaf.get()].entity = Some(entity);
+        self.nodes[leaf.get()].height = 0;
+        self.nodes[leaf.get()].left = None;
+        self.nodes[leaf.get()].right = None;
 
         self.insert_leaf(leaf, fat);
 
@@ -67,50 +85,50 @@ impl DynamicAabbTree {
             return;
         }
 
-        let parent = self.nodes[leaf].parent.unwrap();
-        let grand_parent = self.nodes[parent].parent;
+        let parent = self.nodes[leaf.get()].parent.unwrap();
+        let grand_parent = self.nodes[parent.get()].parent;
 
         // Determine sibling
-        let sibling = if self.nodes[parent].left == Some(leaf) {
-            self.nodes[parent].right.unwrap()
+        let sibling = if self.nodes[parent.get()].left == Some(leaf) {
+            self.nodes[parent.get()].right.unwrap()
         } else {
-            self.nodes[parent].left.unwrap()
+            self.nodes[parent.get()].left.unwrap()
         };
 
         if let Some(gp) = grand_parent {
             // Replace parent with sibling in grandparent
-            if self.nodes[gp].left == Some(parent) {
-                self.nodes[gp].left = Some(sibling);
+            if self.nodes[gp.get()].left == Some(parent) {
+                self.nodes[gp.get()].left = Some(sibling);
             } else {
-                self.nodes[gp].right = Some(sibling);
+                self.nodes[gp.get()].right = Some(sibling);
             }
 
-            self.nodes[sibling].parent = Some(gp);
+            self.nodes[sibling.get()].parent = Some(gp);
 
             // Fix tree upward
             self.fix_upwards(gp);
         } else {
             // Parent was root
             self.root = Some(sibling);
-            self.nodes[sibling].parent = None;
+            self.nodes[sibling.get()].parent = None;
         }
 
         // Clear parent link on removed leaf
-        self.nodes[leaf].parent = None;
+        self.nodes[leaf.get()].parent = None;
 
         // Recycle parent node via free list
         self.recycle_node(parent);
     }
 
     pub fn insert_leaf(&mut self, leaf: NodeId, aabb: Aabb) {
-        self.nodes[leaf].aabb = aabb;
-        self.nodes[leaf].left = None;
-        self.nodes[leaf].right = None;
-        self.nodes[leaf].height = 0;
+        self.nodes[leaf.get()].aabb = aabb;
+        self.nodes[leaf.get()].left = None;
+        self.nodes[leaf.get()].right = None;
+        self.nodes[leaf.get()].height = 0;
 
         if self.root.is_none() {
             self.root = Some(leaf);
-            self.nodes[leaf].parent = None;
+            self.nodes[leaf.get()].parent = None;
             return;
         }
 
@@ -118,12 +136,12 @@ impl DynamicAabbTree {
         let mut index = self.root.unwrap();
 
         while !self.is_leaf(index) {
-            let left = self.nodes[index].left.unwrap();
-            let right = self.nodes[index].right.unwrap();
+            let left = self.nodes[index.get()].left.unwrap();
+            let right = self.nodes[index.get()].right.unwrap();
 
-            let area = self.nodes[index].aabb.area();
+            let area = self.nodes[index.get()].aabb.area();
 
-            let combined = self.nodes[index].aabb.union(&aabb);
+            let combined = self.nodes[index.get()].aabb.union(&aabb);
             let combined_area = combined.area();
 
             // Cost of creating new parent here
@@ -133,20 +151,20 @@ impl DynamicAabbTree {
             let inheritance_cost = 2.0 * (combined_area - area);
 
             let cost_left = {
-                let union = self.nodes[left].aabb.union(&aabb);
+                let union = self.nodes[left.get()].aabb.union(&aabb);
                 if self.is_leaf(left) {
                     union.area() + inheritance_cost
                 } else {
-                    union.area() - self.nodes[left].aabb.area() + inheritance_cost
+                    union.area() - self.nodes[left.get()].aabb.area() + inheritance_cost
                 }
             };
 
             let cost_right = {
-                let union = self.nodes[right].aabb.union(&aabb);
+                let union = self.nodes[right.get()].aabb.union(&aabb);
                 if self.is_leaf(right) {
                     union.area() + inheritance_cost
                 } else {
-                    union.area() - self.nodes[right].aabb.area() + inheritance_cost
+                    union.area() - self.nodes[right.get()].aabb.area() + inheritance_cost
                 }
             };
 
@@ -161,26 +179,26 @@ impl DynamicAabbTree {
         }
 
         let sibling = index;
-        let old_parent = self.nodes[sibling].parent;
+        let old_parent = self.nodes[sibling.get()].parent;
 
         // 2. Create new parent
         let new_parent = self.allocate_node();
 
-        self.nodes[new_parent].parent = old_parent;
-        self.nodes[new_parent].aabb = self.nodes[sibling].aabb.union(&aabb);
-        self.nodes[new_parent].height = self.nodes[sibling].height + 1;
-        self.nodes[new_parent].left = Some(sibling);
-        self.nodes[new_parent].right = Some(leaf);
-        self.nodes[new_parent].entity = None;
+        self.nodes[new_parent.get()].parent = old_parent;
+        self.nodes[new_parent.get()].aabb = self.nodes[sibling.get()].aabb.union(&aabb);
+        self.nodes[new_parent.get()].height = self.nodes[sibling.get()].height + 1;
+        self.nodes[new_parent.get()].left = Some(sibling);
+        self.nodes[new_parent.get()].right = Some(leaf);
+        self.nodes[new_parent.get()].entity = None;
 
-        self.nodes[sibling].parent = Some(new_parent);
-        self.nodes[leaf].parent = Some(new_parent);
+        self.nodes[sibling.get()].parent = Some(new_parent);
+        self.nodes[leaf.get()].parent = Some(new_parent);
 
         if let Some(parent) = old_parent {
-            if self.nodes[parent].left == Some(sibling) {
-                self.nodes[parent].left = Some(new_parent);
+            if self.nodes[parent.get()].left == Some(sibling) {
+                self.nodes[parent.get()].left = Some(new_parent);
             } else {
-                self.nodes[parent].right = Some(new_parent);
+                self.nodes[parent.get()].right = Some(new_parent);
             }
         } else {
             self.root = Some(new_parent);
@@ -191,11 +209,11 @@ impl DynamicAabbTree {
     }
 
     fn update_node(&mut self, node: NodeId) {
-        let left = self.nodes[node].left.unwrap();
-        let right = self.nodes[node].right.unwrap();
+        let left = self.nodes[node.get()].left.unwrap();
+        let right = self.nodes[node.get()].right.unwrap();
 
-        self.nodes[node].height = 1 + self.nodes[left].height.max(self.nodes[right].height);
-        self.nodes[node].aabb = self.nodes[left].aabb.union(&self.nodes[right].aabb);
+        self.nodes[node.get()].height = 1 + self.nodes[left.get()].height.max(self.nodes[right.get()].height);
+        self.nodes[node.get()].aabb = self.nodes[left.get()].aabb.union(&self.nodes[right.get()].aabb);
     }
 
     fn fix_upwards(&mut self, mut index: NodeId) {
@@ -204,9 +222,9 @@ impl DynamicAabbTree {
             self.update_node(index);
 
             // Check balance
-            let left = self.nodes[index].left.unwrap();
-            let right = self.nodes[index].right.unwrap();
-            let balance = self.nodes[left].height as isize - self.nodes[right].height as isize;
+            let left = self.nodes[index.get()].left.unwrap();
+            let right = self.nodes[index.get()].right.unwrap();
+            let balance = self.nodes[left.get()].height as isize - self.nodes[right.get()].height as isize;
 
             // Perform rotation if needed, get new root of this subtree
             index = if balance > 1 {
@@ -218,7 +236,7 @@ impl DynamicAabbTree {
             };
 
             // Move up to parent of the current subtree root
-            if let Some(parent) = self.nodes[index].parent {
+            if let Some(parent) = self.nodes[index.get()].parent {
                 index = parent;
             } else {
                 break;
@@ -227,27 +245,27 @@ impl DynamicAabbTree {
     }
 
     fn rotate_right(&mut self, node: NodeId) -> NodeId {
-        let left = self.nodes[node].left.unwrap();
-        let left_right = self.nodes[left].right;
+        let left = self.nodes[node.get()].left.unwrap();
+        let left_right = self.nodes[left.get()].right;
 
         // Left becomes new parent
-        self.nodes[left].parent = self.nodes[node].parent;
-        self.nodes[node].parent = Some(left);
+        self.nodes[left.get()].parent = self.nodes[node.get()].parent;
+        self.nodes[node.get()].parent = Some(left);
 
         // Update children
-        self.nodes[left].right = Some(node);
-        self.nodes[node].left = left_right;
+        self.nodes[left.get()].right = Some(node);
+        self.nodes[node.get()].left = left_right;
 
         if let Some(lr) = left_right {
-            self.nodes[lr].parent = Some(node);
+            self.nodes[lr.get()].parent = Some(node);
         }
 
         // Update parent pointer
-        if let Some(parent) = self.nodes[left].parent {
-            if self.nodes[parent].left == Some(node) {
-                self.nodes[parent].left = Some(left);
+        if let Some(parent) = self.nodes[left.get()].parent {
+            if self.nodes[parent.get()].left == Some(node) {
+                self.nodes[parent.get()].left = Some(left);
             } else {
-                self.nodes[parent].right = Some(left);
+                self.nodes[parent.get()].right = Some(left);
             }
         } else {
             self.root = Some(left);
@@ -260,27 +278,27 @@ impl DynamicAabbTree {
     }
 
     fn rotate_left(&mut self, node: NodeId) -> NodeId {
-        let right = self.nodes[node].right.unwrap();
-        let right_left = self.nodes[right].left;
+        let right = self.nodes[node.get()].right.unwrap();
+        let right_left = self.nodes[right.get()].left;
 
         // Right becomes new parent
-        self.nodes[right].parent = self.nodes[node].parent;
-        self.nodes[node].parent = Some(right);
+        self.nodes[right.get()].parent = self.nodes[node.get()].parent;
+        self.nodes[node.get()].parent = Some(right);
 
         // Update children
-        self.nodes[right].left = Some(node);
-        self.nodes[node].right = right_left;
+        self.nodes[right.get()].left = Some(node);
+        self.nodes[node.get()].right = right_left;
 
         if let Some(rl) = right_left {
-            self.nodes[rl].parent = Some(node);
+            self.nodes[rl.get()].parent = Some(node);
         }
 
         // Update parent pointer
-        if let Some(parent) = self.nodes[right].parent {
-            if self.nodes[parent].left == Some(node) {
-                self.nodes[parent].left = Some(right);
+        if let Some(parent) = self.nodes[right.get()].parent {
+            if self.nodes[parent.get()].left == Some(node) {
+                self.nodes[parent.get()].left = Some(right);
             } else {
-                self.nodes[parent].right = Some(right);
+                self.nodes[parent.get()].right = Some(right);
             }
         } else {
             self.root = Some(right);
@@ -305,17 +323,17 @@ impl DynamicAabbTree {
                 height: 0,
                 entity: None,
             });
-            id
+            NodeId::new(id).expect("NodeId overflow")
         }
     }
 
     fn recycle_node(&mut self, id: NodeId) {
-        self.nodes[id].aabb = Aabb::default();
-        self.nodes[id].parent = None;
-        self.nodes[id].left = None;
-        self.nodes[id].right = None;
-        self.nodes[id].height = 0;
-        self.nodes[id].entity = None;
+        self.nodes[id.get()].aabb = Aabb::default();
+        self.nodes[id.get()].parent = None;
+        self.nodes[id.get()].left = None;
+        self.nodes[id.get()].right = None;
+        self.nodes[id.get()].height = 0;
+        self.nodes[id.get()].entity = None;
         self.free_list.push(id);
     }
     pub fn query<F>(&self, aabb: Aabb, mut callback: F)
@@ -331,7 +349,7 @@ impl DynamicAabbTree {
     where
         F: FnMut(Entity),
     {
-        let node = &self.nodes[node_id];
+        let node = &self.nodes[node_id.get()];
 
         if !node.aabb.intersects(aabb) {
             return;
@@ -378,7 +396,7 @@ mod tests {
     ) -> (i32, Aabb) {
         assert!(visited.insert(node_id), "cycle detected at node {node_id}");
 
-        let node = &tree.nodes[node_id];
+        let node = &tree.nodes[node_id.get()];
         assert_eq!(node.parent, expected_parent, "parent pointer mismatch");
 
         if tree.is_leaf(node_id) {
@@ -422,7 +440,7 @@ mod tests {
 
     fn assert_tree_invariants(tree: &DynamicAabbTree, check_balance: bool) -> (i32, Vec<NodeId>) {
         if let Some(root) = tree.root {
-            assert_eq!(tree.nodes[root].parent, None, "root parent must be None");
+            assert_eq!(tree.nodes[root.get()].parent, None, "root parent must be None");
             let mut visited = HashSet::new();
             let mut leaves = Vec::new();
             let (height, _) =
@@ -435,25 +453,25 @@ mod tests {
 
     fn add_leaf_node(tree: &mut DynamicAabbTree, entity: Entity, aabb: Aabb) -> NodeId {
         let id = tree.allocate_node();
-        tree.nodes[id].aabb = aabb;
-        tree.nodes[id].entity = Some(entity);
-        tree.nodes[id].height = 0;
-        tree.nodes[id].left = None;
-        tree.nodes[id].right = None;
-        tree.nodes[id].parent = None;
+        tree.nodes[id.get()].aabb = aabb;
+        tree.nodes[id.get()].entity = Some(entity);
+        tree.nodes[id.get()].height = 0;
+        tree.nodes[id.get()].left = None;
+        tree.nodes[id.get()].right = None;
+        tree.nodes[id.get()].parent = None;
         id
     }
 
     fn add_internal_node(tree: &mut DynamicAabbTree, left: NodeId, right: NodeId) -> NodeId {
         let id = tree.allocate_node();
-        tree.nodes[id].entity = None;
-        tree.nodes[id].left = Some(left);
-        tree.nodes[id].right = Some(right);
-        tree.nodes[id].parent = None;
-        tree.nodes[left].parent = Some(id);
-        tree.nodes[right].parent = Some(id);
-        tree.nodes[id].height = 1 + tree.nodes[left].height.max(tree.nodes[right].height);
-        tree.nodes[id].aabb = tree.nodes[left].aabb.union(&tree.nodes[right].aabb);
+        tree.nodes[id.get()].entity = None;
+        tree.nodes[id.get()].left = Some(left);
+        tree.nodes[id.get()].right = Some(right);
+        tree.nodes[id.get()].parent = None;
+        tree.nodes[left.get()].parent = Some(id);
+        tree.nodes[right.get()].parent = Some(id);
+        tree.nodes[id.get()].height = 1 + tree.nodes[left.get()].height.max(tree.nodes[right.get()].height);
+        tree.nodes[id.get()].aabb = tree.nodes[left.get()].aabb.union(&tree.nodes[right.get()].aabb);
         id
     }
 
@@ -472,7 +490,7 @@ mod tests {
         let root = tree.root.expect("root should exist after two inserts");
         assert_ne!(root, leaf1);
         assert_ne!(root, leaf2);
-        let root_node = &tree.nodes[root];
+        let root_node = &tree.nodes[root.get()];
         assert!(root_node.entity.is_none());
         assert!(root_node.left.is_some());
         assert!(root_node.right.is_some());
@@ -491,17 +509,17 @@ mod tests {
         let base = make_aabb(Vec3::ZERO, 1.0);
         let leaf = tree.allocate_leaf(Entity::from_bits(100), base);
 
-        let original_parent = tree.nodes[leaf].parent;
+        let original_parent = tree.nodes[leaf.get()].parent;
         let original_root = tree.root;
-        let original_fat = tree.nodes[leaf].aabb;
+        let original_fat = tree.nodes[leaf.get()].aabb;
 
         let inside_move = make_aabb(Vec3::new(0.05, 0.0, 0.0), 0.9);
         tree.update(leaf, inside_move);
 
         assert_eq!(tree.root, original_root);
-        assert_eq!(tree.nodes[leaf].parent, original_parent);
+        assert_eq!(tree.nodes[leaf.get()].parent, original_parent);
         assert_aabb_eq(
-            tree.nodes[leaf].aabb,
+            tree.nodes[leaf.get()].aabb,
             original_fat,
             "AABB should remain unchanged",
         );
@@ -511,7 +529,7 @@ mod tests {
         tree.update(leaf, outside_move);
         let expected_fat = DynamicAabbTree::expand_aabb(outside_move, 0.1);
         assert_aabb_eq(
-            tree.nodes[leaf].aabb,
+            tree.nodes[leaf.get()].aabb,
             expected_fat,
             "AABB should update after reinsert",
         );
@@ -528,7 +546,7 @@ mod tests {
         );
 
         let internal_root = tree.root.expect("root should exist");
-        assert!(tree.nodes[internal_root].entity.is_none());
+        assert!(tree.nodes[internal_root.get()].entity.is_none());
 
         tree.remove(leaf1);
         assert!(tree.free_list.contains(&internal_root));
@@ -600,7 +618,7 @@ mod tests {
 
         let new_root = tree.root.expect("root should exist after rotation");
         assert_eq!(new_root, left);
-        assert_eq!(tree.nodes[new_root].parent, None);
+        assert_eq!(tree.nodes[new_root.get()].parent, None);
     }
 
     #[test]
@@ -610,7 +628,7 @@ mod tests {
         let leaf = tree.allocate_leaf(Entity::from_bits(10), make_aabb(Vec3::ZERO, 1.0));
         tree.remove(leaf);
         assert!(tree.root.is_none());
-        assert_eq!(tree.nodes[leaf].parent, None);
+        assert_eq!(tree.nodes[leaf.get()].parent, None);
 
         // Remove middle leaf in a larger tree
         let mut tree = DynamicAabbTree::default();
@@ -624,29 +642,29 @@ mod tests {
             make_aabb(Vec3::new(-5.0, 0.0, 0.0), 1.0),
         );
 
-        let parent = tree.nodes[leaf2].parent.expect("leaf2 parent missing");
-        let sibling = if tree.nodes[parent].left == Some(leaf2) {
-            tree.nodes[parent].right.expect("sibling missing")
+        let parent = tree.nodes[leaf2.get()].parent.expect("leaf2 parent missing");
+        let sibling = if tree.nodes[parent.get()].left == Some(leaf2) {
+            tree.nodes[parent.get()].right.expect("sibling missing")
         } else {
-            tree.nodes[parent].left.expect("sibling missing")
+            tree.nodes[parent.get()].left.expect("sibling missing")
         };
-        let grand_parent = tree.nodes[parent].parent;
+        let grand_parent = tree.nodes[parent.get()].parent;
 
         tree.remove(leaf2);
-        assert_eq!(tree.nodes[leaf2].parent, None);
+        assert_eq!(tree.nodes[leaf2.get()].parent, None);
         if let Some(gp) = grand_parent {
-            assert_eq!(tree.nodes[sibling].parent, Some(gp));
+            assert_eq!(tree.nodes[sibling.get()].parent, Some(gp));
         } else {
             assert_eq!(tree.root, Some(sibling));
-            assert_eq!(tree.nodes[sibling].parent, None);
+            assert_eq!(tree.nodes[sibling.get()].parent, None);
         }
         assert_tree_invariants(&tree, false);
 
         // Remove another leaf and validate structure
         tree.remove(leaf3);
-        assert_eq!(tree.nodes[leaf3].parent, None);
+        assert_eq!(tree.nodes[leaf3.get()].parent, None);
         assert_tree_invariants(&tree, false);
-        assert!(tree.root.is_some() || tree.nodes[leaf1].parent.is_none());
+        assert!(tree.root.is_some() || tree.nodes[leaf1.get()].parent.is_none());
     }
 
     #[test]
@@ -904,15 +922,15 @@ mod tests {
 
         // Helper to compute max imbalance recursively
         fn max_imbalance(tree: &DynamicAabbTree, node_id: NodeId) -> i32 {
-            let node = &tree.nodes[node_id];
+            let node = &tree.nodes[node_id.get()];
             if tree.is_leaf(node_id) {
                 return 0;
             }
 
             let left = node.left.unwrap();
             let right = node.right.unwrap();
-            let left_height = tree.nodes[left].height;
-            let right_height = tree.nodes[right].height;
+            let left_height = tree.nodes[left.get()].height;
+            let right_height = tree.nodes[right.get()].height;
 
             let balance = (left_height - right_height).abs();
             let left_max = max_imbalance(tree, left);
