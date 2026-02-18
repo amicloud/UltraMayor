@@ -189,7 +189,7 @@ fn main() {
 
     let t_range = 2.0;
 
-    (0..5).for_each(|_| {
+    (0..20).for_each(|_| {
         use rand::random_range;
         // Random position
         let pos = Vec3::new(
@@ -238,7 +238,7 @@ fn main() {
                 restitution: 0.5,
                 local_inertia: glam::Mat3::IDENTITY,
             },
-            // SleepComponent::default(),
+            SleepComponent::default(),
         ));
     });
 

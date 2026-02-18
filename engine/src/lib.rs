@@ -170,7 +170,7 @@ impl Engine {
         let max_physics_steps: usize = 6;
 
         let mut _frame_count: u64 = 0;
-        'render: loop {
+        'game: loop {
             // dbg!(frame_count);
             _frame_count += 1;
             let frame_start = Instant::now();
@@ -180,56 +180,13 @@ impl Engine {
                     .get_resource_mut::<InputStateResource>()
                     .expect("InputStateResource resource not found");
 
-                input_state.previous_keys = input_state.current_keys.clone();
-                input_state.previous_mouse_buttons = input_state.current_mouse_buttons.clone();
-                input_state.mouse_delta = (0.0, 0.0);
-                input_state.scroll_delta = 0.0;
-
-                for event in self.events_loop.poll_iter() {
-                    match event {
-                        sdl2::event::Event::Quit { .. } => {
-                            break 'render;
-                        }
-                        sdl2::event::Event::MouseMotion { xrel, yrel, .. } => {
-                            input_state.mouse_delta = (xrel as f32, yrel as f32);
-                        }
-                        sdl2::event::Event::MouseWheel { y, direction, .. } => {
-                            let mut delta = y as f32;
-                            if direction == sdl2::mouse::MouseWheelDirection::Flipped {
-                                delta = -delta;
-                            }
-                            input_state.scroll_delta = delta;
-                        }
-                        sdl2::event::Event::MouseButtonDown { mouse_btn, .. } => {
-                            let button = MouseButton::from(mouse_btn);
-                            input_state.current_mouse_buttons.insert(button);
-                        }
-                        sdl2::event::Event::MouseButtonUp { mouse_btn, .. } => {
-                            let button = MouseButton::from(mouse_btn);
-                            input_state.current_mouse_buttons.remove(&button);
-                        }
-                        sdl2::event::Event::KeyDown {
-                            keycode: Some(keycode),
-                            ..
-                        } => {
-                            input_state.current_keys.insert(keycode);
-                        }
-                        sdl2::event::Event::KeyUp {
-                            keycode: Some(keycode),
-                            ..
-                        } => {
-                            input_state.current_keys.remove(&keycode);
-                        }
-                        _ => {}
-                    }
+                if !Self::handle_input(&mut input_state, &mut self.events_loop) {
+                    break 'game;
                 }
-
-                let width = self.window.size().0 as f32;
-                let height = self.window.size().1 as f32;
-                let render_scale = 1.0;
+                
                 let render_params = RenderParams {
-                    width: (width * render_scale) as u32,
-                    height: (height * render_scale) as u32,
+                    width: self.window.size().0,
+                    height: self.window.size().1,
                 };
 
                 let now = Instant::now();
@@ -289,6 +246,56 @@ impl Engine {
                 sleep(frame_target - frame_time);
             }
         }
+    }
+
+    fn handle_input(
+        input_state: &mut InputStateResource,
+        events_loop: &mut sdl2::EventPump,
+    ) -> bool {
+        input_state.previous_keys = input_state.current_keys.clone();
+        input_state.previous_mouse_buttons = input_state.current_mouse_buttons.clone();
+        input_state.mouse_delta = (0.0, 0.0);
+        input_state.scroll_delta = 0.0;
+
+        for event in events_loop.poll_iter() {
+            match event {
+                sdl2::event::Event::Quit { .. } => {
+                    return false;
+                }
+                sdl2::event::Event::MouseMotion { xrel, yrel, .. } => {
+                    input_state.mouse_delta = (xrel as f32, yrel as f32);
+                }
+                sdl2::event::Event::MouseWheel { y, direction, .. } => {
+                    let mut delta = y as f32;
+                    if direction == sdl2::mouse::MouseWheelDirection::Flipped {
+                        delta = -delta;
+                    }
+                    input_state.scroll_delta = delta;
+                }
+                sdl2::event::Event::MouseButtonDown { mouse_btn, .. } => {
+                    let button = MouseButton::from(mouse_btn);
+                    input_state.current_mouse_buttons.insert(button);
+                }
+                sdl2::event::Event::MouseButtonUp { mouse_btn, .. } => {
+                    let button = MouseButton::from(mouse_btn);
+                    input_state.current_mouse_buttons.remove(&button);
+                }
+                sdl2::event::Event::KeyDown {
+                    keycode: Some(keycode),
+                    ..
+                } => {
+                    input_state.current_keys.insert(keycode);
+                }
+                sdl2::event::Event::KeyUp {
+                    keycode: Some(keycode),
+                    ..
+                } => {
+                    input_state.current_keys.remove(&keycode);
+                }
+                _ => {}
+            }
+        }
+        true
     }
 
     unsafe fn create_sdl2_context() -> (
@@ -382,7 +389,7 @@ impl Engine {
 
         combined
     }
-
+    
     pub fn mesh_collider_from_render_body(
         &self,
         render_body_id: RenderBodyHandle,
