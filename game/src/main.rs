@@ -2,12 +2,14 @@ mod camera_controller;
 mod game_controller;
 mod settings;
 
+use bevy_ecs::observer::On;
 #[allow(unused_imports)]
 // use bowl_controller::{BowlFloatComponent, BowlFloatTime, update_bowl_float};
 use camera_controller::{
     FlyingCameraComponent, PlayerComponent, apply_flying_camera_input,
     apply_flying_camera_movement, apply_player_movement_impulses, update_orbit_camera_target,
 };
+use engine::physics::collision_event::CollisionEvent;
 // use input_controller::{update_input_state, InputState};
 use crate::camera_controller::{
     OrbitCameraComponent, apply_orbit_camera_input, apply_switch_camera_input,
@@ -21,7 +23,7 @@ use engine::{
     SleepComponent, TransformComponent, VelocityComponent,
 };
 
-use engine::physics::physics_component::{PhysicsComponent, PhysicsType};
+use engine::components::physics_component::{PhysicsComponent, PhysicsType};
 
 use glam::{Quat, Vec3};
 
@@ -189,7 +191,7 @@ fn main() {
 
     let t_range = 2.0;
 
-    (0..1000).for_each(|_| {
+    (0..10).for_each(|_| {
         use rand::random_range;
         // Random position
         let pos = Vec3::new(
@@ -296,5 +298,16 @@ fn main() {
     //         local_inertia: glam::Mat3::IDENTITY,
     //     },
     // ));
+    // engine.world.add_observer(|collision: On<CollisionEvent>| {
+    //     println!(
+    //         "Collision Event: Entity {:?} had a {:?} event with Entity {:?}. Info: normal={:?}, penetration={}, contact_point={:?}",
+    //         collision.entity,
+    //         collision.event_type,
+    //         collision.other_entity,
+    //         collision.collision_info.normal,
+    //         collision.collision_info.penetration,
+    //         collision.collision_info.contact_point
+    //     );
+    // });
     engine.run();
 }

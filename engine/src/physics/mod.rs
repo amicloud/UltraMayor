@@ -4,6 +4,7 @@ pub mod epa;
 pub mod gjk;
 pub mod gravity_resource;
 pub mod movement_system;
-pub use crate::components::physics_component;
+pub mod collision_event;
 pub mod physics_resource;
 pub mod physics_system;
+pub mod collision_event_dispatcher;

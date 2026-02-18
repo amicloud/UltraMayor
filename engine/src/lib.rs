@@ -22,20 +22,12 @@ use glam::{Mat4, Vec3};
 use glow::HasContext;
 
 use crate::{
-    components::physics_component::PhysicsComponent,
-    input::InputStateResource,
-    physics::{
-        movement_system::MovementSystem,
-        physics_resource::{CollisionFrameData, PhysicsFrameData, PhysicsResource},
-        physics_system::PhysicsSystem,
-    },
-    render::{
+    assets::mesh_resource::MeshResource, components::physics_component::PhysicsComponent, input::InputStateResource, physics::{
+        collision_event_dispatcher, movement_system::MovementSystem, physics_resource::{CollisionFrameData, PhysicsFrameData, PhysicsResource}, physics_system::PhysicsSystem
+    }, render::{
         render_queue::RenderQueue,
         render_system::RenderSystem,
         renderer::{CameraRenderData, RenderParams, Renderer},
-    },
-    assets:: {
-        mesh_resource::MeshResource,
     }
 };
 
@@ -99,9 +91,11 @@ impl Engine {
                 CollisionSystem::generate_contacts,
                 PhysicsSystem::physics_solver,
                 PhysicsSystem::integrate_motion,
+
             )
                 .chain(),
         );
+        physics_schedule.add_systems(collision_event_dispatcher::dispatch_collision_events);
 
         let mut frame_schedule = Schedule::default();
         frame_schedule.add_systems(
