@@ -65,11 +65,7 @@ impl CollisionSystem {
         }
     }
 
-    fn update_or_allocate_node(
-        entity: Entity,
-        new_aabb: Aabb,
-        phys: &mut PhysicsResource,
-    ) {
+    fn update_or_allocate_node(entity: Entity, new_aabb: Aabb, phys: &mut PhysicsResource) {
         match phys.entity_node.get(&entity).copied() {
             Some(node_id) => {
                 // Existing object -> update
@@ -613,7 +609,6 @@ fn sphere_sphere_contact(
         contact_point,
     }]
 }
-
 
 fn cuboid_cuboid_contact(
     entity_a: Entity,

@@ -5,6 +5,6 @@ pub mod gjk;
 pub mod gravity_resource;
 pub mod movement_system;
 pub mod physics_event;
+pub mod physics_event_dispatcher;
 pub mod physics_resource;
 pub mod physics_system;
-pub mod physics_event_dispatcher;

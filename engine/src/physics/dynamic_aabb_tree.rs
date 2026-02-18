@@ -7,7 +7,7 @@ use crate::assets::mesh::Aabb;
 
 // Using NonZeroUsize allows for some nice memory layout optimization
 // since Option<NodeId> can be represented as usize with 0 reserved for None.
-// Option<NodeId> uses the same amount of memory as NodeId, and we can directly index into the nodes 
+// Option<NodeId> uses the same amount of memory as NodeId, and we can directly index into the nodes
 // vector with id.get() with no overhead as this is compiled down to the same code as usize indexing.
 pub type NodeId = NonZeroUsize;
 
@@ -212,8 +212,12 @@ impl DynamicAabbTree {
         let left = self.nodes[node.get()].left.unwrap();
         let right = self.nodes[node.get()].right.unwrap();
 
-        self.nodes[node.get()].height = 1 + self.nodes[left.get()].height.max(self.nodes[right.get()].height);
-        self.nodes[node.get()].aabb = self.nodes[left.get()].aabb.union(&self.nodes[right.get()].aabb);
+        self.nodes[node.get()].height = 1 + self.nodes[left.get()]
+            .height
+            .max(self.nodes[right.get()].height);
+        self.nodes[node.get()].aabb = self.nodes[left.get()]
+            .aabb
+            .union(&self.nodes[right.get()].aabb);
     }
 
     fn fix_upwards(&mut self, mut index: NodeId) {
@@ -224,7 +228,8 @@ impl DynamicAabbTree {
             // Check balance
             let left = self.nodes[index.get()].left.unwrap();
             let right = self.nodes[index.get()].right.unwrap();
-            let balance = self.nodes[left.get()].height as isize - self.nodes[right.get()].height as isize;
+            let balance =
+                self.nodes[left.get()].height as isize - self.nodes[right.get()].height as isize;
 
             // Perform rotation if needed, get new root of this subtree
             index = if balance > 1 {
@@ -440,7 +445,11 @@ mod tests {
 
     fn assert_tree_invariants(tree: &DynamicAabbTree, check_balance: bool) -> (i32, Vec<NodeId>) {
         if let Some(root) = tree.root {
-            assert_eq!(tree.nodes[root.get()].parent, None, "root parent must be None");
+            assert_eq!(
+                tree.nodes[root.get()].parent,
+                None,
+                "root parent must be None"
+            );
             let mut visited = HashSet::new();
             let mut leaves = Vec::new();
             let (height, _) =
@@ -470,8 +479,12 @@ mod tests {
         tree.nodes[id.get()].parent = None;
         tree.nodes[left.get()].parent = Some(id);
         tree.nodes[right.get()].parent = Some(id);
-        tree.nodes[id.get()].height = 1 + tree.nodes[left.get()].height.max(tree.nodes[right.get()].height);
-        tree.nodes[id.get()].aabb = tree.nodes[left.get()].aabb.union(&tree.nodes[right.get()].aabb);
+        tree.nodes[id.get()].height = 1 + tree.nodes[left.get()]
+            .height
+            .max(tree.nodes[right.get()].height);
+        tree.nodes[id.get()].aabb = tree.nodes[left.get()]
+            .aabb
+            .union(&tree.nodes[right.get()].aabb);
         id
     }
 
@@ -642,7 +655,9 @@ mod tests {
             make_aabb(Vec3::new(-5.0, 0.0, 0.0), 1.0),
         );
 
-        let parent = tree.nodes[leaf2.get()].parent.expect("leaf2 parent missing");
+        let parent = tree.nodes[leaf2.get()]
+            .parent
+            .expect("leaf2 parent missing");
         let sibling = if tree.nodes[parent.get()].left == Some(leaf2) {
             tree.nodes[parent.get()].right.expect("sibling missing")
         } else {

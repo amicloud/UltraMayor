@@ -447,8 +447,8 @@ impl PhysicsSystem {
                 .constraints
                 .extend(Self::manifold_to_constraints(manifold));
         }
-        
-        // For smaller time steps, we can get away with fewer iterations. 
+
+        // For smaller time steps, we can get away with fewer iterations.
         // For larger steps, we need more iterations to maintain stability.
         let pgs_iterations = time.simulation_fixed_dt().as_millis() as u32;
         for _ in 0..pgs_iterations {

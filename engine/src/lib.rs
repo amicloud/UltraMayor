@@ -3,10 +3,10 @@
 
 mod action;
 mod action_manager;
+pub mod assets;
 pub mod components;
 mod handles;
 pub mod input;
-pub mod assets;
 pub mod physics;
 pub mod render;
 mod time_resource;
@@ -22,19 +22,27 @@ use glam::{Mat4, Vec3};
 use glow::HasContext;
 
 use crate::{
-    assets::mesh_resource::MeshResource, components::physics_component::PhysicsComponent, input::InputStateResource, physics::{
-        physics_event_dispatcher, movement_system::MovementSystem, physics_resource::{CollisionFrameData, PhysicsFrameData, PhysicsResource}, physics_system::PhysicsSystem
-    }, render::{
+    assets::mesh_resource::MeshResource,
+    components::physics_component::PhysicsComponent,
+    input::InputStateResource,
+    physics::{
+        movement_system::MovementSystem,
+        physics_event_dispatcher,
+        physics_resource::{CollisionFrameData, PhysicsFrameData, PhysicsResource},
+        physics_system::PhysicsSystem,
+    },
+    render::{
         render_queue::RenderQueue,
         render_system::RenderSystem,
         renderer::{CameraRenderData, RenderParams, Renderer},
-    }
+    },
 };
 
 pub use crate::render::render_resource_manager::RenderResourceManager;
 pub use physics::collision_system::CollisionSystem;
 pub use physics::gravity_resource::Gravity;
 
+pub use crate::assets::mesh::Aabb;
 pub use crate::components::camera_component::{ActiveCamera, CameraComponent};
 pub use crate::components::collider_component::{
     CollisionLayer, ConvexCollider, ConvexShape, MeshCollider,
@@ -46,7 +54,6 @@ pub use crate::components::transform_component::TransformComponent;
 pub use crate::components::velocity_component::VelocityComponent;
 pub use crate::handles::{MaterialHandle, MeshHandle, RenderBodyHandle};
 pub use crate::input::MouseButton;
-pub use crate::assets::mesh::Aabb;
 pub use crate::time_resource::TimeResource;
 pub use crate::world_basis::WorldBasis;
 
@@ -91,7 +98,6 @@ impl Engine {
                 CollisionSystem::generate_contacts,
                 PhysicsSystem::physics_solver,
                 PhysicsSystem::integrate_motion,
-
             )
                 .chain(),
         );
@@ -227,8 +233,10 @@ impl Engine {
                     let phys_time = phys_start.elapsed();
                     if phys_time > fixed_dt {
                         println!(
-                            "Warning: Physics step took {:?}, which is longer than the fixed dt of {:?}.",
-                            phys_time, fixed_dt
+                            "Warning: Physics step took {:?}, which is {:.2}% longer than the fixed dt of {:?}.",
+                            phys_time,
+                            phys_time.as_secs_f32() / fixed_dt.as_secs_f32() * 100.0,
+                            fixed_dt
                         );
                     }
                     self.game_simulation_schedule.run(&mut self.world);

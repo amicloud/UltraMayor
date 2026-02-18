@@ -32,7 +32,7 @@ pub fn dispatch_physics_events(
         if query.get(*entity_a).is_ok() {
             let event_a = PhysicsEvent {
                 entity: *entity_a,
-                event_type: event_type,
+                event_type,
                 collision_info: PhysicsEventInfo {
                     normal: manifold.normal,
                     contacts: manifold.contacts.clone(),
