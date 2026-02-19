@@ -418,10 +418,10 @@ impl PhysicsSystem {
                         }
 
                         // Hard lock very small residual motion so bodies fully settle.
-                        if vel.angular.length() < 0.01 {
+                        if vel.angular.length() < 0.005 {
                             vel.angular = Vec3::ZERO;
                         }
-                        if vel.translational.length() < 0.01 {
+                        if vel.translational.length() < 0.005 {
                             vel.translational = Vec3::ZERO;
                         }
                     }
