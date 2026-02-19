@@ -100,6 +100,7 @@ impl Renderer {
         self.frame_data.input_instances.extend_from_slice(instances);
     }
 
+    
     pub fn render(
         &mut self,
         render_params: RenderParams,
@@ -192,34 +193,34 @@ impl Renderer {
             }
 
             // 1. Bind frame uniforms
-            if let Some(loc) = shader.uniforms.get("u_view_proj") {
+            if let Some(loc) = shader.get_uniform("u_view_proj") {
                 Self::bind_uniform(
                     &gl,
-                    loc,
+                    &loc,
                     &UniformValue::Mat4(self.frame_data.frame_uniforms.view_proj),
                     render_data_manager,
                 );
             }
-            if let Some(loc) = shader.uniforms.get("u_camera_position") {
+            if let Some(loc) = shader.get_uniform("u_camera_position") {
                 Self::bind_uniform(
                     &gl,
-                    loc,
+                    &loc,
                     &UniformValue::Vec3(self.frame_data.frame_uniforms.camera_position),
                     render_data_manager,
                 );
             }
-            if let Some(loc) = shader.uniforms.get("u_light_direction") {
+            if let Some(loc) = shader.get_uniform("u_light_direction") {
                 Self::bind_uniform(
                     &gl,
-                    loc,
+                    &loc,
                     &UniformValue::Vec3(self.frame_data.frame_uniforms.light_direction),
                     render_data_manager,
                 );
             }
-            if let Some(loc) = shader.uniforms.get("u_light_color") {
+            if let Some(loc) = shader.get_uniform("u_light_color") {
                 Self::bind_uniform(
                     &gl,
-                    loc,
+                    &loc,
                     &UniformValue::Vec3(self.frame_data.frame_uniforms.light_color),
                     render_data_manager,
                 );
@@ -229,8 +230,8 @@ impl Renderer {
 
             // 2. Bind material uniforms
             for (name, value) in &material.desc.params {
-                if let Some(loc) = shader.uniforms.get(name) {
-                    textures_bound += Self::bind_uniform(&gl, loc, value, render_data_manager);
+                if let Some(loc) = shader.get_uniform(name) {
+                    textures_bound += Self::bind_uniform(&gl, &loc, value, render_data_manager);
                 }
             }
 

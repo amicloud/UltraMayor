@@ -1,5 +1,4 @@
-use std::hash::Hash;
-use std::{collections::HashMap, ffi::OsStr, fs};
+use std::{ffi::OsStr, fs};
 
 use crate::assets::handles::TextureHandle;
 use glow::HasContext;
@@ -39,15 +38,8 @@ pub struct ShaderAttrib {
 
 pub struct Shader {
     pub program: glow::Program,
-    pub uniforms: HashMap<String, glow::UniformLocation>,
+    pub uniforms: Vec<(String, glow::UniformLocation)>,
     pub attributes: Vec<ShaderAttrib>,
-}
-
-impl Hash for Shader {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        // Hash based on the program ID
-        self.program.hash(state);
-    }
 }
 
 impl Shader {
@@ -99,14 +91,14 @@ impl Shader {
                 );
             }
 
-            let mut uniforms = HashMap::new();
+            let mut uniforms = Vec::new();
             let count = gl.get_program_parameter_i32(program, glow::ACTIVE_UNIFORMS);
 
             for i in 0..count {
                 if let Some(info) = gl.get_active_uniform(program, i as u32)
                     && let Some(loc) = gl.get_uniform_location(program, &info.name)
                 {
-                    uniforms.insert(info.name, loc);
+                    uniforms.push((info.name, loc));
                 }
             }
 
@@ -177,5 +169,12 @@ impl Shader {
 
             shader
         }
+    }
+
+    pub fn get_uniform(&self, name: &str) -> Option<glow::UniformLocation> {
+        self.uniforms
+            .iter()
+            .find(|(n, _)| n == name)
+            .map(|(_, loc)| *loc)
     }
 }

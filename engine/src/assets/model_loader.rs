@@ -1,8 +1,7 @@
 use log::warn;
 use std::{
-    collections::{HashMap, hash_map::DefaultHasher},
+    collections::HashMap,
     ffi::OsStr,
-    hash::{Hash, Hasher},
 };
 
 use crate::{
