@@ -229,16 +229,22 @@ impl Engine {
 
                 let mut steps = 0;
                 while accumulator >= fixed_dt && steps < max_physics_steps {
+                    #[cfg(not(debug_assertions))]
                     let phys_start = Instant::now();
+
                     self.physics_schedule.run(&mut self.world);
-                    let phys_time = phys_start.elapsed();
-                    if phys_time > fixed_dt {
-                        println!(
-                            "Warning: Physics step took {:?}, which is {:.2}% longer than the fixed dt of {:?}.",
-                            phys_time,
-                            phys_time.as_secs_f32() / fixed_dt.as_secs_f32() * 100.0,
-                            fixed_dt
-                        );
+                    
+                    #[cfg(not(debug_assertions))]
+                    {
+                        let phys_time = phys_start.elapsed();
+                        if phys_time > fixed_dt {
+                            println!(
+                                "Warning: Physics step took {:?}, which is {:.2}% longer than the fixed dt of {:?}.",
+                                phys_time,
+                                phys_time.as_secs_f32() / fixed_dt.as_secs_f32() * 100.0,
+                                fixed_dt
+                            );
+                        }
                     }
                     self.game_simulation_schedule.run(&mut self.world);
                     accumulator -= fixed_dt;

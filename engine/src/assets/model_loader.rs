@@ -8,7 +8,7 @@ use std::{
 use crate::{
     Engine,
     assets::{
-        handles::{MaterialHandle, MeshHandle, RenderBodyHandle, ShaderHandle, TextureHandle},
+        handles::{MaterialHandle, RenderBodyHandle, ShaderHandle, TextureHandle},
         material::{Material, MaterialDesc},
         mesh::{Aabb, GltfPrimitiveMesh, Mesh, Vertex},
         shader::UniformValue,
@@ -199,7 +199,7 @@ impl Engine {
             };
 
             let mut parts = Vec::with_capacity(models.len());
-            for (model_index, model) in models.iter().enumerate() {
+            for (_model_index, model) in models.iter().enumerate() {
                 let mesh = &model.mesh;
                 let vertex_count = mesh.positions.len() / 3;
 
@@ -259,12 +259,6 @@ impl Engine {
                 }
                 built_mesh.indices.extend(indices.iter().copied());
 
-                built_mesh.id = {
-                    let mut hasher = DefaultHasher::new();
-                    obj_path.hash(&mut hasher);
-                    model_index.hash(&mut hasher);
-                    MeshHandle(hasher.finish() as u32)
-                };
                 built_mesh.aabb = Aabb::from_vertices(&built_mesh.vertices);
                 built_mesh.compute_bounding_sphere();
                 built_mesh.build_bvh(8);
@@ -542,15 +536,6 @@ impl Engine {
                 }
 
                 mesh.indices.extend(indices);
-
-                // Mesh ID & bounds (include mesh + primitive indices to ensure uniqueness)
-                mesh.id = {
-                    let mut hasher = std::collections::hash_map::DefaultHasher::new();
-                    path.hash(&mut hasher);
-                    gltf_mesh.index().hash(&mut hasher);
-                    primitive.index().hash(&mut hasher);
-                    MeshHandle(hasher.finish() as u32)
-                };
                 mesh.aabb = Aabb::from_vertices(&mesh.vertices);
                 mesh.compute_bounding_sphere();
                 mesh.build_bvh(8);

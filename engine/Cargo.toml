@@ -14,8 +14,9 @@ dirs-next = "2.0.0"
 rand = "0.9.2"
 approx = "0.5.1"
 bevy_ecs = "0.18.0"
+slotmap = "1.1.1"
 
-# rendering / assets
+# rendering / 3d assets
 glow = "0.16.0"
 bytemuck = "1.18.0"
 image = "0.25.9"

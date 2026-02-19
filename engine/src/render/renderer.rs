@@ -2,6 +2,7 @@ use std::{collections::HashMap, mem::offset_of, ops::Range, rc::Rc};
 
 use glam::{Mat4, Vec3};
 use glow::{Context as GlowContext, HasContext};
+use slotmap::SecondaryMap;
 
 use crate::{
     assets::{
@@ -23,7 +24,7 @@ pub struct Renderer {
     gl: Rc<GlowContext>,
     frames_rendered: u64,
     vao_cache: HashMap<VaoKey, glow::VertexArray>,
-    mesh_render_data: HashMap<MeshHandle, MeshRenderData>,
+    mesh_render_data: SecondaryMap<MeshHandle, MeshRenderData>,
     frame_data: FrameData,
 }
 
@@ -242,7 +243,7 @@ impl Renderer {
                 let vao = Self::get_or_create_vao(
                     &mut self.vao_cache,
                     &gl,
-                    &mesh_id,
+                    mesh_id,
                     &material.desc.shader,
                     render_data_manager,
                     &mut self.mesh_render_data,
@@ -395,7 +396,7 @@ impl Renderer {
                 frames_rendered: 0,
                 vao_cache: HashMap::new(),
                 frame_data: FrameData::default(),
-                mesh_render_data: HashMap::new(),
+                mesh_render_data: SecondaryMap::new(),
             }
         }
     }
@@ -403,7 +404,8 @@ impl Renderer {
     pub fn upload_mesh_to_gpu(
         gl: &glow::Context,
         mesh: &Mesh,
-        mesh_render_data: &mut HashMap<MeshHandle, MeshRenderData>,
+        handle: MeshHandle,
+        mesh_render_data: &mut SecondaryMap<MeshHandle, MeshRenderData>,
     ) {
         unsafe {
             // Unbind any active VAO so that EBO binding below does not
@@ -443,7 +445,7 @@ impl Renderer {
                 instance_vbo: Some(instance_vbo),
                 instance_count: 0,
             };
-            mesh_render_data.insert(mesh.id, mesh_data);
+            mesh_render_data.insert(handle, mesh_data);
 
             // Unbind the vertex array to avoid accidental state corruption.
             gl.bind_vertex_array(None);
@@ -453,11 +455,11 @@ impl Renderer {
     pub fn update_instance_buffer(
         gl: &glow::Context,
         mesh_handle: MeshHandle,
-        mesh_render_data: &mut HashMap<MeshHandle, MeshRenderData>,
+        mesh_render_data: &mut SecondaryMap<MeshHandle, MeshRenderData>,
         instance_matrices: &[[f32; 16]],
     ) {
         let mesh_data = mesh_render_data
-            .get_mut(&mesh_handle)
+            .get_mut(mesh_handle)
             .expect("Mesh not found");
         if instance_matrices.is_empty() {
             mesh_data.instance_count = 0;
@@ -481,13 +483,13 @@ impl Renderer {
     fn get_or_create_vao(
         vao_cache: &mut HashMap<VaoKey, glow::VertexArray>,
         gl: &glow::Context,
-        mesh: &MeshHandle,
+        mesh: MeshHandle,
         shader: &ShaderHandle,
         render_data_manager: &RenderResourceManager,
-        mesh_render_data: &mut HashMap<MeshHandle, MeshRenderData>,
+        mesh_render_data: &mut SecondaryMap<MeshHandle, MeshRenderData>,
     ) -> glow::VertexArray {
         let key = VaoKey {
-            mesh: *mesh,
+            mesh: mesh,
             shader: *shader,
         };
 
@@ -498,9 +500,9 @@ impl Renderer {
         if !mesh_render_data.contains_key(mesh) {
             let mesh_data = render_data_manager
                 .mesh_manager
-                .get_mesh(*mesh)
+                .get_mesh(mesh)
                 .expect("Mesh not found");
-            Self::upload_mesh_to_gpu(gl, mesh_data, mesh_render_data);
+            Self::upload_mesh_to_gpu(gl, mesh_data, mesh, mesh_render_data);
         }
 
         let mesh_data = mesh_render_data.get(mesh).unwrap();
@@ -600,7 +602,7 @@ impl Renderer {
     pub fn delete_mesh_gpu(&mut self, mesh_handle: MeshHandle) {
         let mesh_data = self
             .mesh_render_data
-            .get_mut(&mesh_handle)
+            .get_mut(mesh_handle)
             .expect("Mesh not found");
         unsafe {
             if let Some(vbo) = mesh_data.vbo.take() {

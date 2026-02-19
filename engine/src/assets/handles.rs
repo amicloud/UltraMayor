@@ -1,5 +1,8 @@
-#[derive(Debug, Default, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord)]
-pub struct MeshHandle(pub u32);
+
+pub type MeshHandle = slotmap::DefaultKey;
+
+// #[derive(Debug, Default, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord, Key)]
+// pub struct MeshHandle(pub u32);
 
 #[derive(Debug, Default, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct MaterialHandle(pub u32);
