@@ -30,9 +30,10 @@ pub fn epa(
     b: &ConvexCollider,
     b_transform: Mat4,
     simplex: &[Vec3],
-    _previous_manifold: Option<&ContactManifold>,
+    previous_manifold: Option<&ContactManifold>,
 ) -> Option<EpaResult> {
     let (mut vertices, mut faces) = build_initial_polytope(simplex)?;
+    let manifold_bias = manifold_bias_direction(previous_manifold);
 
     vertices.reserve(64);
     faces.reserve(128);
@@ -40,100 +41,53 @@ pub fn epa(
     let mut horizon_edges: Vec<(usize, usize)> = Vec::with_capacity(64);
     let mut new_faces: Vec<Face> = Vec::with_capacity(128);
 
-    for _ in 0..EPA_MAX_ITERATIONS {
-        horizon_edges.clear();
-        new_faces.clear();
-        {
-            let closest_index = find_closest_face(&faces)?;
-            let closest_face = &faces[closest_index];
-
-            let support = support_minkowski(a, a_transform, b, b_transform, closest_face.normal);
-            let support_distance = closest_face.normal.dot(support);
-            let distance_delta = support_distance - closest_face.distance;
-
-            if distance_delta <= EPA_TOLERANCE {
-                let (normal, penetration_depth) = orient_result(
-                    closest_face.normal,
-                    closest_face.distance,
-                    a_transform,
-                    b_transform,
-                );
-                return Some(EpaResult {
-                    normal,
-                    penetration_depth,
-                });
-            }
-
-            // If support is numerically identical to an existing vertex, the
-            // polytope cannot expand further in this direction.
-            if vertices
-                .iter()
-                .any(|v| (*v - support).length_squared() <= EPSILON * 10.0)
-            {
-                let (normal, penetration_depth) = orient_result(
-                    closest_face.normal,
-                    closest_face.distance,
-                    a_transform,
-                    b_transform,
-                );
-                return Some(EpaResult {
-                    normal,
-                    penetration_depth,
-                });
-            }
-
-            let new_index = vertices.len();
-            vertices.push(support);
-
-            // ---- Visibility pass ----
-            for face in &faces {
-                if is_face_visible(&vertices, face, support) {
-                    add_edge(&mut horizon_edges, face.indices[0], face.indices[1]);
-                    add_edge(&mut horizon_edges, face.indices[1], face.indices[2]);
-                    add_edge(&mut horizon_edges, face.indices[2], face.indices[0]);
-                } else {
-                    // Skip degenerate faces
-                    if face.normal.length_squared() > EPSILON {
-                        new_faces.push(face.clone());
-                    }
-                }
-            }
-
-            // SAFETY: if no horizon edges, break early
-            if horizon_edges.is_empty() {
-                let (normal, penetration_depth) = orient_result(
-                    closest_face.normal,
-                    closest_face.distance,
-                    a_transform,
-                    b_transform,
-                );
-                return Some(EpaResult {
-                    normal,
-                    penetration_depth,
-                });
-            }
-
-            // ---- Rebuild faces from horizon ----
-            for (a_idx, b_idx) in &horizon_edges {
-                if let Some(face) = make_face_outward(&vertices, *a_idx, *b_idx, new_index) {
-                    // Skip faces with nearly zero normal
-                    if face.normal.length_squared() > EPSILON {
-                        new_faces.push(face);
-                    }
-                }
-            }
+    if let Some(bias) = manifold_bias {
+        for dir in [bias, -bias] {
+            let support = support_minkowski(a, a_transform, b, b_transform, dir);
+            let _ = expand_polytope(
+                &mut vertices,
+                &mut faces,
+                support,
+                &mut horizon_edges,
+                &mut new_faces,
+            );
         }
-        if new_faces.is_empty() {
-            let closest_index = find_closest_face(&faces)?;
-            let face = &faces[closest_index];
+    }
+
+    for _ in 0..EPA_MAX_ITERATIONS {
+        let closest_index = find_closest_face(&faces)?;
+        let closest_face = &faces[closest_index];
+        let closest_normal = closest_face.normal;
+        let closest_distance = closest_face.distance;
+
+        let search_dir = blend_search_direction(closest_normal, manifold_bias);
+        let support = support_minkowski(a, a_transform, b, b_transform, search_dir);
+        let support_distance = closest_normal.dot(support);
+        let distance_delta = support_distance - closest_distance;
+
+        if distance_delta <= EPA_TOLERANCE {
             let (normal, penetration_depth) =
-                orient_result(face.normal, face.distance, a_transform, b_transform);
+                orient_result(closest_normal, closest_distance, a_transform, b_transform);
             return Some(EpaResult {
                 normal,
                 penetration_depth,
             });
         }
-        std::mem::swap(&mut faces, &mut new_faces);
+
+        if !expand_polytope(
+            &mut vertices,
+            &mut faces,
+            support,
+            &mut horizon_edges,
+            &mut new_faces,
+        ) {
+            let (normal, penetration_depth) =
+                orient_result(closest_normal, closest_distance, a_transform, b_transform);
+            return Some(EpaResult {
+                normal,
+                penetration_depth,
+            });
+        }
     }
     // Fallback: return closest face we have
     let closest_index = find_closest_face(&faces)?;
@@ -145,6 +99,86 @@ pub fn epa(
         normal, // Flip normal to point from A to B
         penetration_depth,
     })
+}
+
+fn manifold_bias_direction(previous_manifold: Option<&ContactManifold>) -> Option<Vec3> {
+    let normal = previous_manifold?.normal;
+    if normal.length_squared() <= EPSILON {
+        return None;
+    }
+    Some(normal.normalize())
+}
+
+fn blend_search_direction(face_normal: Vec3, manifold_bias: Option<Vec3>) -> Vec3 {
+    let Some(bias) = manifold_bias else {
+        return face_normal;
+    };
+
+    let alignment = face_normal.dot(bias);
+    if alignment <= 0.0 {
+        return face_normal;
+    }
+
+    let weight = (0.25 * alignment).clamp(0.0, 0.25);
+    let blended = face_normal * (1.0 - weight) + bias * weight;
+    if blended.length_squared() <= EPSILON {
+        face_normal
+    } else {
+        blended.normalize()
+    }
+}
+
+fn expand_polytope(
+    vertices: &mut Vec<Vec3>,
+    faces: &mut Vec<Face>,
+    support: Vec3,
+    horizon_edges: &mut Vec<(usize, usize)>,
+    new_faces: &mut Vec<Face>,
+) -> bool {
+    if vertices
+        .iter()
+        .any(|v| (*v - support).length_squared() <= EPSILON * 10.0)
+    {
+        return false;
+    }
+
+    let new_index = vertices.len();
+    vertices.push(support);
+
+    horizon_edges.clear();
+    new_faces.clear();
+
+    for face in faces.iter() {
+        if is_face_visible(vertices, face, support) {
+            add_edge(horizon_edges, face.indices[0], face.indices[1]);
+            add_edge(horizon_edges, face.indices[1], face.indices[2]);
+            add_edge(horizon_edges, face.indices[2], face.indices[0]);
+        } else if face.normal.length_squared() > EPSILON {
+            new_faces.push(face.clone());
+        }
+    }
+
+    if horizon_edges.is_empty() {
+        let _ = vertices.pop();
+        new_faces.clear();
+        return false;
+    }
+
+    for (a_idx, b_idx) in horizon_edges.iter() {
+        if let Some(face) = make_face_outward(vertices, *a_idx, *b_idx, new_index)
+            && face.normal.length_squared() > EPSILON
+        {
+            new_faces.push(face);
+        }
+    }
+
+    if new_faces.is_empty() {
+        let _ = vertices.pop();
+        return false;
+    }
+
+    std::mem::swap(faces, new_faces);
+    true
 }
 
 fn orient_result(
