@@ -1,12 +1,9 @@
 use slotmap::new_key_type;
 
-new_key_type! { pub struct MeshHandle; }
-
-// #[derive(Debug, Default, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord, Key)]
-// pub struct MeshHandle(pub u32);
-
-#[derive(Debug, Default, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord)]
-pub struct MaterialHandle(pub u32);
+new_key_type! { 
+    pub struct MeshHandle; 
+    pub struct MaterialHandle;
+}
 
 #[derive(Debug, Default, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct TextureHandle(pub u32);

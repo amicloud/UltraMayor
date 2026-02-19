@@ -46,23 +46,23 @@ impl Engine {
         normal_handle: TextureHandle,
         roughness: f32,
     ) -> MaterialHandle {
-        let mut params = HashMap::new();
-        params.insert("u_roughness".to_string(), UniformValue::Float(roughness));
-        params.insert("u_base_reflectance".to_string(), UniformValue::Float(0.04));
-        params.insert(
+        let mut params = Vec::new();
+        params.push(("u_roughness".to_string(), UniformValue::Float(roughness)));
+        params.push(("u_base_reflectance".to_string(), UniformValue::Float(0.04)));
+        params.push((
             "u_albedo".to_string(),
             UniformValue::Texture {
                 handle: albedo_handle,
                 unit: 0,
             },
-        );
-        params.insert(
+        ));
+        params.push((
             "u_normal".to_string(),
             UniformValue::Texture {
                 handle: normal_handle,
                 unit: 1,
             },
-        );
+        ));
 
         let desc = MaterialDesc::new(shader_handle, params);
         render_resource_manager
