@@ -1,6 +1,6 @@
 use glam::Mat4;
 
-use crate::assets::handles::{MaterialHandle, MeshHandle, RenderBodyHandle};
+use crate::assets::handles::{MaterialHandle, MeshHandle};
 
 #[derive(Clone)]
 pub struct RenderBodyPart {
@@ -11,12 +11,11 @@ pub struct RenderBodyPart {
 
 #[derive(Clone)]
 pub struct RenderBody {
-    pub id: RenderBodyHandle,
     pub parts: Vec<RenderBodyPart>,
 }
 
 impl RenderBody {
-    pub fn new(id: RenderBodyHandle, parts: Vec<RenderBodyPart>) -> Self {
-        Self { id, parts }
+    pub fn new(parts: Vec<RenderBodyPart>) -> Self {
+        Self { parts }
     }
 }

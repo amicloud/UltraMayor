@@ -275,14 +275,7 @@ impl Engine {
                     local_transform: glam::Mat4::IDENTITY,
                 });
             }
-
-            let render_body_id = {
-                let mut hasher = DefaultHasher::new();
-                obj_path.hash(&mut hasher);
-                RenderBodyHandle(hasher.finish() as u32)
-            };
-
-            let render_body = RenderBody::new(render_body_id, parts);
+            let render_body = RenderBody::new(parts);
             render_resource_manager
                 .render_body_manager
                 .add_render_body(render_body)
@@ -336,13 +329,7 @@ impl Engine {
                 });
             }
 
-            let render_body_id = {
-                let mut hasher = DefaultHasher::new();
-                gltf_path.hash(&mut hasher);
-                RenderBodyHandle(hasher.finish() as u32)
-            };
-
-            let render_body = RenderBody::new(render_body_id, parts);
+            let render_body = RenderBody::new(parts);
             render_resource_manager
                 .render_body_manager
                 .add_render_body(render_body)
