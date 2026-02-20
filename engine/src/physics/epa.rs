@@ -3,7 +3,7 @@
 
 use glam::{Mat4, Vec3};
 
-use crate::{components::collider_component::ConvexCollider, physics};
+use crate::{components::collider_component::ConvexCollider, physics::{self, gjk::support_minkowski}};
 use physics::physics_resource::ContactManifold;
 
 const EPA_MAX_ITERATIONS: usize = 64;
@@ -278,18 +278,6 @@ fn add_edge(edges: &mut Vec<(usize, usize)>, a: usize, b: usize) {
     } else {
         edges.push((a, b));
     }
-}
-
-fn support_minkowski(
-    a: &ConvexCollider,
-    a_transform: Mat4,
-    b: &ConvexCollider,
-    b_transform: Mat4,
-    dir: Vec3,
-) -> Vec3 {
-    let p1 = a.support(a_transform, dir);
-    let p2 = b.support(b_transform, -dir);
-    p1 - p2
 }
 
 #[cfg(test)]

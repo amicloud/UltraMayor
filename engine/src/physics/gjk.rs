@@ -239,7 +239,7 @@ fn initial_direction(a_transform: Mat4, b_transform: Mat4) -> Vec3 {
     }
 }
 
-fn support_minkowski(
+pub fn support_minkowski(
     a: &ConvexCollider,
     a_transform: Mat4,
     b: &ConvexCollider,
