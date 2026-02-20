@@ -36,7 +36,7 @@ pub fn do_gameplay(
         let canonical_gravity = Gravity::default().gravity_vector();
         let current_gravity = gravity.gravity_vector();
         let angle = current_gravity.angle_between(canonical_gravity);
-        let max_angle = 20.0_f32.to_radians();
+        let max_angle = 30.0_f32.to_radians();
         if angle > max_angle {
             let axis = current_gravity.cross(canonical_gravity).normalize_or_zero();
             let rotation = Quat::from_axis_angle(axis, angle - max_angle);

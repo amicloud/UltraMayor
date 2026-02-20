@@ -9,6 +9,7 @@ use camera_controller::{
     FlyingCameraComponent, PlayerComponent, apply_flying_camera_input,
     apply_flying_camera_movement, apply_player_movement_impulses, update_orbit_camera_target,
 };
+use engine::audio::audio_queue::{AudioInstance, AudioQueue};
 use engine::components::audio_source_component::AudioSourceComponent;
 use engine::components::physics_event_listener_component::PhysicsEventListenerComponent;
 use engine::physics::physics_event::{PhysicsEvent, PhysicsEventType};
@@ -123,10 +124,6 @@ fn main() {
         .load_model("resources/models/sphere_low/sphere.obj")
         .unwrap();
 
-    let sound = engine
-        .load_wav("resources/sounds/sea_shanty_2.wav")
-        .expect("Failed to load sound");
-
     let player_scale: Vec3 = Vec3::splat(1.0);
     let player_start = Vec3::new(0.0, 5.0, 2.2);
     let player_local_aabb = engine
@@ -139,6 +136,15 @@ fn main() {
     );
     let cuboid_collider = ConvexCollider::cuboid(player_local_size, CollisionLayer::Player);
     let _egg_collider = ConvexCollider::egg(3.0, player_scale.x, CollisionLayer::Player);
+    
+
+    let sea_shanty = engine
+        .load_wav("resources/sounds/sea_shanty_2.wav")
+        .expect("Failed to load sound");
+
+    let _sort_shanty = engine
+        .load_wav("resources/sounds/sea_shanty_2_short.wav")
+        .expect("Failed to load sound");
     engine.world.spawn((
         TransformComponent {
             position: player_start,
@@ -166,7 +172,7 @@ fn main() {
         PlayerComponent { speed: 1.0 },
         PhysicsEventListenerComponent {},
         AudioSourceComponent{
-            sound: sound,
+            sound: sea_shanty,
             volume: 0.5,
             pitch: 1.0,
             looping: true,
@@ -322,10 +328,14 @@ fn main() {
             local_inertia: glam::Mat3::IDENTITY,
         },
     ));
-    engine.world.add_observer(|collision: On<PhysicsEvent>| {
-        if collision.event_type == PhysicsEventType::Hit {
-            // Maybe we could play a sound
-        }
-    });
+    // engine.world.add_observer(|collision: On<PhysicsEvent>| {
+    //     if collision.event_type == PhysicsEventType::Hit {
+    //         engine.world.get_resource_mut::<AudioQueue>().unwrap().instances.push(AudioInstance {
+    //             sound: sound,
+    //             volume: 0.5,
+    //             looping: false,
+    //         }); 
+    //     }
+    // });
     engine.run();
 }

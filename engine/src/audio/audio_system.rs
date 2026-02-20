@@ -9,6 +9,7 @@ impl AudioSystem {
         query: Query<&AudioSourceComponent, Added<AudioSourceComponent>>,
         mut queue: ResMut<AudioQueue>,
     ) {
+        queue.instances.clear();
         for source in query.iter() {
             queue.instances.push(AudioInstance {
                 sound: source.sound.clone(),

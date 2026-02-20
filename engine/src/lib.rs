@@ -4,7 +4,7 @@
 mod action;
 mod action_manager;
 pub mod assets;
-mod audio;
+pub mod audio;
 pub mod components;
 pub mod input;
 pub mod physics;
@@ -13,15 +13,12 @@ mod time_resource;
 mod utils;
 pub mod world_basis;
 use std::{
-    rc::Rc,
-    thread::sleep,
-    time::{Duration, Instant},
+    rc::Rc, sync::Arc, thread::sleep, time::{Duration, Instant}
 };
 
 use bevy_ecs::prelude::*;
 use glam::{Mat4, Vec3};
 use glow::HasContext;
-use sdl2::audio::AudioCVT;
 
 use crate::{
     assets::{mesh_resource::MeshResource, sound_resource::SoundResource},
@@ -400,6 +397,28 @@ impl Engine {
             view_proj: projection * view,
             position: transform.position,
         })
+    }
+    
+    pub fn play_sound(&mut self, sound: SoundHandle) {
+        self.audio_mixer.add_voice(
+            Arc::from(
+                self.world
+                    .get_resource::<SoundResource>()
+                    .expect("SoundResource resource not found")
+                    .get_sound(sound)
+                    .expect("Sound handle not found in SoundResource")
+                    .data
+                    .clone(),
+            ),
+            1.0, // volume
+            false, // looping
+            self.world
+                .get_resource::<SoundResource>()
+                .expect("SoundResource resource not found")
+                .get_sound(sound)
+                .expect("Sound handle not found in SoundResource")
+                .channels,
+         );
     }
 }
 

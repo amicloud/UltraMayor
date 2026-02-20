@@ -11,8 +11,7 @@ pub struct AudioMixer {
     device: cpal::Device,
     stream: Option<cpal::Stream>,
     // producer: Option<Producer<f32>>,
-    sample_rate: cpal::SampleRate,
-    channels: usize,
+    pub sample_rate: cpal::SampleRate,
     voices: Arc<Mutex<Vec<Voice>>>,
 }
 
@@ -21,22 +20,26 @@ struct Voice {
     cursor: usize,
     volume: f32,
     looping: bool,
+    channels: usize,
 }
 
 impl Voice {
-    fn next_sample(&mut self) -> f32 {
-        if self.cursor >= self.samples.len() {
-            if self.looping {
-                self.cursor = 0;
-            } else {
-                return 0.0;
+    fn next_frame(&mut self) -> Vec<f32> {
+        let mut frame = vec![0.0; self.channels];
+        for c in 0..self.channels {
+            let idx = self.cursor * self.channels + c;
+            if idx == self.samples.len() - 1 {
+                if self.looping {
+                    self.cursor = 0;
+                } else {
+                    return frame; // zeroes
+                }
             }
+            frame[c] = self.samples[idx] * self.volume;
         }
-        let sample = self.samples[self.cursor] * self.volume;
         self.cursor += 1;
-        sample
+        frame
     }
-
     fn sine_test(&mut self, frequency: f32, sample_rate: u32) -> f32 {
         let sample = (2.0 * std::f32::consts::PI * frequency * self.cursor as f32
             / sample_rate as f32)
@@ -54,33 +57,28 @@ impl Default for AudioMixer {
             .default_output_device()
             .expect("no output device available");
         let sample_rate = device.default_output_config().unwrap().sample_rate();
-        let channels = device.default_output_config().unwrap().channels();
-        let sample = [0.0; 1024]; // Placeholder, should be actual audio data
-        let voice_1 = Voice {
-            samples: Arc::new(sample), // Placeholder, should be actual audio data
-            cursor: 0,
-            volume: 0.5,
-            looping: true,
-        };
+        dbg!(sample_rate);
         let config = device.default_output_config().unwrap();
         let channels = config.channels() as usize;
 
-        let voices = Arc::new(Mutex::new(vec![voice_1]));
+        let voices: Arc<Mutex<Vec<Voice>>> = Arc::new(Mutex::new(Vec::new()));
         let stream_voices = voices.clone();
-        let stream = 
-            device
+        let stream = device
             .build_output_stream(
                 &config.into(),
                 move |output: &mut [f32], _: &cpal::OutputCallbackInfo| {
                     let mut voices = stream_voices.lock().unwrap();
-                    for frame in output.chunks_mut(channels) {
-                        let mut mixed = 0.0;
-
+                    for frame_out in output.chunks_mut(channels) {
+                        let mut mixed = vec![0.0; channels];
                         for voice in voices.iter_mut() {
-                            mixed += voice.next_sample();
+                            let v_frame = voice.next_frame();
+                            for c in 0..channels {
+                                mixed[c] += v_frame[c];
+                            }
                         }
-                        for sample_out in frame.iter_mut() {
-                            *sample_out = mixed;
+                        // clamp to -1..1 to avoid clipping
+                        for c in 0..channels {
+                            frame_out[c] = mixed[c].clamp(-1.0, 1.0);
                         }
                     }
                 },
@@ -93,7 +91,6 @@ impl Default for AudioMixer {
             stream: Some(stream),
             // producer: None,
             sample_rate,
-            channels,
             voices,
         }
     }
@@ -119,19 +116,28 @@ impl AudioMixer {
     pub fn handle_audio_queue(&mut self, queue: &[AudioInstance], sound_resource: &SoundResource) {
         for instance in queue.iter() {
             if let Some(sound) = sound_resource.get_sound(instance.sound) {
-                self.add_voice(Arc::from(sound.data.clone()), instance.volume, instance.looping);
+                self.add_voice(
+                    Arc::from(sound.data.clone()),
+                    instance.volume,
+                    instance.looping,
+                    sound.channels,
+                );
             } else {
-                eprintln!("Sound with ID {:?} not found in SoundResource", instance.sound);
+                eprintln!(
+                    "Sound with ID {:?} not found in SoundResource",
+                    instance.sound
+                );
             }
         }
     }
 
-    pub fn add_voice(&mut self, samples: Arc<[f32]>, volume: f32, looping: bool) {
+    pub fn add_voice(&mut self, samples: Arc<[f32]>, volume: f32, looping: bool, channels: usize) {
         let voice = Voice {
             samples,
             cursor: 0,
             volume,
             looping,
+            channels, 
         };
         self.voices.lock().unwrap().push(voice);
     }
