@@ -9,6 +9,7 @@ use camera_controller::{
     FlyingCameraComponent, PlayerComponent, apply_flying_camera_input,
     apply_flying_camera_movement, apply_player_movement_impulses, update_orbit_camera_target,
 };
+use engine::components::audio_source_component::AudioSourceComponent;
 use engine::components::physics_event_listener_component::PhysicsEventListenerComponent;
 use engine::physics::physics_event::{PhysicsEvent, PhysicsEventType};
 // use input_controller::{update_input_state, InputState};
@@ -122,6 +123,10 @@ fn main() {
         .load_model("resources/models/sphere_low/sphere.obj")
         .unwrap();
 
+    let sound = engine
+        .load_wav("resources/sounds/sea_shanty_2.wav")
+        .expect("Failed to load sound");
+
     let player_scale: Vec3 = Vec3::splat(1.0);
     let player_start = Vec3::new(0.0, 5.0, 2.2);
     let player_local_aabb = engine
@@ -160,6 +165,12 @@ fn main() {
         // SleepComponent::default(),
         PlayerComponent { speed: 1.0 },
         PhysicsEventListenerComponent {},
+        AudioSourceComponent{
+            sound: sound,
+            volume: 0.5,
+            pitch: 1.0,
+            looping: true,
+        }
     ));
 
 

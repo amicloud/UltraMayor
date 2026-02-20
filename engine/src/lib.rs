@@ -21,9 +21,11 @@ use std::{
 use bevy_ecs::prelude::*;
 use glam::{Mat4, Vec3};
 use glow::HasContext;
+use sdl2::audio::AudioCVT;
 
 use crate::{
     assets::{mesh_resource::MeshResource, sound_resource::SoundResource},
+    audio::{audio_mixer::AudioMixer, audio_queue::AudioQueue, audio_system::AudioSystem},
     components::physics_component::PhysicsComponent,
     input::InputStateResource,
     physics::{
@@ -68,6 +70,8 @@ pub struct Engine {
     gl: Rc<glow::Context>,
     window: sdl2::video::Window,
     events_loop: sdl2::EventPump,
+    renderer: Renderer,
+    audio_mixer: AudioMixer,
     _gl_context: sdl2::video::GLContext,
 }
 
@@ -90,6 +94,7 @@ impl Engine {
         world.insert_resource(TimeResource::new(60, 120));
         world.insert_resource(Gravity::default());
         world.insert_resource(SoundResource::default());
+        world.insert_resource(AudioQueue::default());
 
         let mut physics_schedule = Schedule::default();
 
@@ -111,6 +116,7 @@ impl Engine {
         frame_schedule.add_systems(
             (
                 RenderSystem::build_render_queue,
+                AudioSystem::build_audio_queue,
                 TimeResource::update_time_resource,
             )
                 .chain(),
@@ -127,6 +133,9 @@ impl Engine {
             .texture_manager
             .create_default_normal_map(&gl);
 
+        let renderer = Renderer::new(gl.clone());
+        let audio_mixer = AudioMixer::default();
+
         Engine {
             world,
             game_frame_schedule,
@@ -136,6 +145,8 @@ impl Engine {
             gl,
             window,
             events_loop,
+            renderer,
+            audio_mixer,
             _gl_context: gl_context,
         }
     }
@@ -155,8 +166,6 @@ impl Engine {
             );
         }
 
-        // Initialize renderer
-        let mut renderer = Renderer::new(self.gl.clone());
         let mut last_frame = Instant::now();
         let mut accumulator = Duration::ZERO;
 
@@ -173,10 +182,10 @@ impl Engine {
             .target_frame_duration();
 
         let max_physics_steps: usize = 6;
-
         let mut frame_count: u64 = 0;
+
         'game: loop {
-            log::info!("Frame count: {}", frame_count);
+            log::trace!("Frame count: {}", frame_count);
             frame_count += 1;
             let frame_start = Instant::now();
             {
@@ -204,7 +213,7 @@ impl Engine {
                     render_params.height,
                 );
 
-                renderer.stage_instances(
+                self.renderer.stage_instances(
                     &self
                         .world
                         .get_resource::<RenderQueue>()
@@ -213,7 +222,7 @@ impl Engine {
                 );
                 {
                     let _timer = ScopeTimer::new("Render");
-                    renderer.render(
+                    self.renderer.render(
                         render_params,
                         &mut self
                             .world
@@ -222,6 +231,17 @@ impl Engine {
                         camera_data,
                     );
                 }
+
+                self.audio_mixer.handle_audio_queue(
+                    &self
+                        .world
+                        .get_resource::<audio::audio_queue::AudioQueue>()
+                        .expect("AudioQueue resource not found")
+                        .instances,
+                    self.world
+                        .get_resource::<SoundResource>()
+                        .expect("SoundResource resource not found"),
+                );
 
                 let now = Instant::now();
                 let frame_time = now - last_frame;

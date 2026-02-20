@@ -27,6 +27,7 @@ obj-rs = "0.7.4"
 # audio
 cpal = "0.17.1"
 rtrb = "0.3.2"
+hound = "3.5.1"
 
 # async / platform glue
 async-compat = "0.2.4"

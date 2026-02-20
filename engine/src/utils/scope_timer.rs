@@ -15,6 +15,6 @@ impl<'a> ScopeTimer<'a> {
 impl Drop for ScopeTimer<'_> {
     fn drop(&mut self) {
         let elapsed = self.start_time.elapsed();
-        log::info!("{} took {:.2?}", self.name, elapsed);
+        log::trace!("{} took {:.2?}", self.name, elapsed);
     }
 }

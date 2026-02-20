@@ -7,3 +7,4 @@ pub mod render_body_component;
 pub mod sleep_component;
 pub mod transform_component;
 pub mod velocity_component;
+pub mod audio_source_component;
