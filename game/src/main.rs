@@ -2,23 +2,12 @@ mod camera_controller;
 mod game_controller;
 mod settings;
 
-use bevy_ecs::observer::On;
 #[allow(unused_imports)]
-// use bowl_controller::{BowlFloatComponent, BowlFloatTime, update_bowl_float};
 use camera_controller::{
     FlyingCameraComponent, PlayerComponent, apply_flying_camera_input,
-    apply_flying_camera_movement, apply_player_movement_impulses, update_orbit_camera_target,
-};
-use engine::audio::audio_queue::{AudioInstance, AudioQueue};
-use engine::components::audio_source_component::AudioSourceComponent;
-use engine::components::physics_event_listener_component::PhysicsEventListenerComponent;
-use engine::physics::physics_event::{PhysicsEvent, PhysicsEventType};
-// use input_controller::{update_input_state, InputState};
-use crate::camera_controller::{
-    OrbitCameraComponent, apply_orbit_camera_input, apply_switch_camera_input,
-    initialize_flying_camera_rotation,
-};
-#[allow(unused_imports)]
+    apply_flying_camera_movement, apply_player_movement_impulses, update_orbit_camera_target, OrbitCameraComponent, apply_orbit_camera_input, initialize_flying_camera_rotation, apply_switch_camera_input};
+use engine::components::{physics_event_listener_component::PhysicsEventListenerComponent,audio_source_component::AudioSourceComponent};
+
 use crate::game_controller::do_gameplay;
 use bevy_ecs::schedule::IntoScheduleConfigs;
 use engine::{
@@ -114,7 +103,8 @@ fn main() {
 
     engine
         .game_frame_schedule
-        .add_systems((apply_switch_camera_input,).chain());
+        .add_systems((apply_orbit_camera_input,
+            apply_switch_camera_input));
 
     let cube = engine
         .load_model("resources/models/cube/Cube.gltf")
@@ -138,7 +128,7 @@ fn main() {
     let _egg_collider = ConvexCollider::egg(3.0, player_scale.x, CollisionLayer::Player);
     
 
-    let sea_shanty = engine
+    let _sea_shanty = engine
         .load_wav("resources/sounds/sea_shanty_2.wav")
         .expect("Failed to load sound");
 
@@ -163,7 +153,7 @@ fn main() {
             mass: 5.0,
             physics_type: PhysicsType::Dynamic,
             friction: 0.9,
-            drag_coefficient: 0.1,
+            drag_coefficient: 0.8,
             angular_drag_coefficient: 0.1,
             restitution: 0.5,
             local_inertia: glam::Mat3::IDENTITY,
@@ -172,10 +162,10 @@ fn main() {
         PlayerComponent { speed: 1.0 },
         PhysicsEventListenerComponent {},
         AudioSourceComponent{
-            sound: sea_shanty,
+            sound: _sea_shanty,
             volume: 0.5,
             pitch: 1.0,
-            looping: true,
+            looping: false,
         }
     ));
 

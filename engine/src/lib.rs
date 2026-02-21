@@ -13,7 +13,10 @@ mod time_resource;
 mod utils;
 pub mod world_basis;
 use std::{
-    rc::Rc, sync::Arc, thread::sleep, time::{Duration, Instant}
+    rc::Rc,
+    sync::Arc,
+    thread::sleep,
+    time::{Duration, Instant},
 };
 
 use bevy_ecs::prelude::*;
@@ -22,7 +25,7 @@ use glow::HasContext;
 
 use crate::{
     assets::{mesh_resource::MeshResource, sound_resource::SoundResource},
-    audio::{audio_mixer::AudioMixer, audio_queue::AudioQueue, audio_system::AudioSystem},
+    audio::{audio_mixer::AudioMixer, audio_system::AudioSystem, command_queue::AudioCommandQueue},
     components::physics_component::PhysicsComponent,
     input::InputStateResource,
     physics::{
@@ -91,7 +94,7 @@ impl Engine {
         world.insert_resource(TimeResource::new(60, 120));
         world.insert_resource(Gravity::default());
         world.insert_resource(SoundResource::default());
-        world.insert_resource(AudioQueue::default());
+        world.insert_resource(AudioCommandQueue::default());
 
         let mut physics_schedule = Schedule::default();
 
@@ -113,7 +116,7 @@ impl Engine {
         frame_schedule.add_systems(
             (
                 RenderSystem::build_render_queue,
-                AudioSystem::build_audio_queue,
+                AudioSystem::build_command_queue,
                 TimeResource::update_time_resource,
             )
                 .chain(),
@@ -229,12 +232,12 @@ impl Engine {
                     );
                 }
 
-                self.audio_mixer.handle_audio_queue(
+                self.audio_mixer.process_commands(
                     &self
                         .world
-                        .get_resource::<audio::audio_queue::AudioQueue>()
+                        .get_resource::<AudioCommandQueue>()
                         .expect("AudioQueue resource not found")
-                        .instances,
+                        .queue,
                     self.world
                         .get_resource::<SoundResource>()
                         .expect("SoundResource resource not found"),
@@ -397,28 +400,6 @@ impl Engine {
             view_proj: projection * view,
             position: transform.position,
         })
-    }
-    
-    pub fn play_sound(&mut self, sound: SoundHandle) {
-        self.audio_mixer.add_voice(
-            Arc::from(
-                self.world
-                    .get_resource::<SoundResource>()
-                    .expect("SoundResource resource not found")
-                    .get_sound(sound)
-                    .expect("Sound handle not found in SoundResource")
-                    .data
-                    .clone(),
-            ),
-            1.0, // volume
-            false, // looping
-            self.world
-                .get_resource::<SoundResource>()
-                .expect("SoundResource resource not found")
-                .get_sound(sound)
-                .expect("Sound handle not found in SoundResource")
-                .channels,
-         );
     }
 }
 
