@@ -1,9 +1,7 @@
 use glow::Context;
 use image::GenericImageView;
 use slotmap::SlotMap;
-use std::{
-    ffi::OsStr,
-};
+use std::ffi::OsStr;
 
 use crate::assets::{handles::TextureHandle, texture::Texture};
 use crate::render::renderer;
@@ -18,7 +16,6 @@ impl TextureResource {
     pub fn add_texture(&mut self, texture: Texture) -> TextureHandle {
         self.textures.insert(texture)
     }
-
 
     pub fn load_from_file(&mut self, gl: &Context, path: &OsStr) -> TextureHandle {
         // Load image with the `image` crate

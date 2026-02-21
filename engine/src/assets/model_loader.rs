@@ -1,8 +1,5 @@
 use log::warn;
-use std::{
-    collections::HashMap,
-    ffi::OsStr,
-};
+use std::{collections::HashMap, ffi::OsStr};
 
 use crate::{
     Engine,
@@ -45,24 +42,24 @@ impl Engine {
         normal_handle: TextureHandle,
         roughness: f32,
     ) -> MaterialHandle {
-        let mut params = Vec::new();
-        params.push(("u_roughness".to_string(), UniformValue::Float(roughness)));
-        params.push(("u_base_reflectance".to_string(), UniformValue::Float(0.04)));
-        params.push((
-            "u_albedo".to_string(),
-            UniformValue::Texture {
-                handle: albedo_handle,
-                unit: 0,
-            },
-        ));
-        params.push((
-            "u_normal".to_string(),
-            UniformValue::Texture {
-                handle: normal_handle,
-                unit: 1,
-            },
-        ));
-
+        let params = vec![
+            ("u_roughness".to_string(), UniformValue::Float(roughness)),
+            ("u_base_reflectance".to_string(), UniformValue::Float(0.04)),
+            (
+                "u_albedo".to_string(),
+                UniformValue::Texture {
+                    handle: albedo_handle,
+                    unit: 0,
+                },
+            ),
+            (
+                "u_normal".to_string(),
+                UniformValue::Texture {
+                    handle: normal_handle,
+                    unit: 1,
+                },
+            ),
+        ];
         let desc = MaterialDesc::new(shader_handle, params);
         render_resource_manager
             .material_manager
@@ -407,12 +404,8 @@ impl Engine {
             let rgba = Self::gltf_image_to_rgba(image)
                 .map_err(|message| std::io::Error::new(std::io::ErrorKind::InvalidData, message))?;
 
-            let handle = texture_manager.create_from_rgba_with_key(
-                gl,
-                image.width,
-                image.height,
-                &rgba,
-            );
+            let handle =
+                texture_manager.create_from_rgba_with_key(gl, image.width, image.height, &rgba);
             texture_map.insert(texture_index, handle);
         }
 

@@ -100,7 +100,6 @@ impl Renderer {
         self.frame_data.input_instances.extend_from_slice(instances);
     }
 
-    
     pub fn render(
         &mut self,
         render_params: RenderParams,
@@ -490,7 +489,7 @@ impl Renderer {
         mesh_render_data: &mut SecondaryMap<MeshHandle, MeshRenderData>,
     ) -> glow::VertexArray {
         let key = VaoKey {
-            mesh: mesh,
+            mesh,
             shader: *shader,
         };
 

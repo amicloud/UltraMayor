@@ -14,7 +14,6 @@ mod utils;
 pub mod world_basis;
 use std::{
     rc::Rc,
-    sync::Arc,
     thread::sleep,
     time::{Duration, Instant},
 };

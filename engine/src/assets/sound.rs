@@ -1,4 +1,6 @@
-use crate::{Engine, SoundHandle, assets::sound_resource};
+use std::path::Path;
+
+use crate::{Engine, SoundHandle, assets::sound_resource::SoundResource};
 
 pub struct Sound {
     pub sample_rate: u32,
@@ -19,21 +21,27 @@ impl Sound {
         let mut reader = hound::WavReader::open(path).unwrap();
         let spec = reader.spec();
         if spec.channels == 1 {
-            let samples = reader.samples::<i16>().map(|f|f.unwrap()).collect::<Vec<i16>>();
+            let samples = reader
+                .samples::<i16>()
+                .map(|f| f.unwrap())
+                .collect::<Vec<i16>>();
             let data = Self::resample_mono(&samples, spec.sample_rate, sample_rate);
-            return Self {
+            Self {
                 sample_rate,
                 channels: spec.channels as usize,
                 data,
-            };
+            }
         } else if spec.channels == 2 {
-            let samples = reader.samples::<i16>().map(|f|f.unwrap()).collect::<Vec<i16>>();
+            let samples = reader
+                .samples::<i16>()
+                .map(|f| f.unwrap())
+                .collect::<Vec<i16>>();
             let data = Self::resample_stereo(&samples, spec.sample_rate, sample_rate);
-            return Self {
+            Self {
                 sample_rate,
                 channels: spec.channels as usize,
                 data,
-            };
+            }
         } else {
             panic!("Unsupported number of channels: {}", spec.channels);
         }
@@ -67,7 +75,7 @@ impl Sound {
             return samples.iter().map(|&s| Self::i16_to_f32(s)).collect();
         }
 
-        assert!(samples.len() % 2 == 0);
+        assert!(samples.len().is_multiple_of(2));
         let len_in = samples.len() / 2;
         let len_out = (len_in as u64 * dst_rate as u64 / src_rate as u64) as usize;
 
@@ -95,12 +103,9 @@ impl Engine {
     pub fn load_wav(&mut self, path: &str) -> Result<SoundHandle, String> {
         let sample_rate = self.audio_mixer.sample_rate;
         let sound = Sound::from_wav(path, sample_rate);
-        let mut sound_resource = self
-            .world
-            .get_resource_mut::<sound_resource::SoundResource>()
-            .unwrap();
-        let name = std::path::Path::new(path)
-            .file_stem()
+        let mut sound_resource = self.world.get_resource_mut::<SoundResource>().unwrap();
+        let name = Path::new(path)
+            .file_name()
             .and_then(|s| s.to_str())
             .unwrap_or("unknown")
             .to_string();

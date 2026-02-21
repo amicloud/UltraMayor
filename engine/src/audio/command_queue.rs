@@ -2,7 +2,6 @@ use bevy_ecs::prelude::*;
 
 use crate::SoundHandle;
 
-
 pub enum AudioCommand {
     PlaySound {
         track: usize,
@@ -19,7 +18,6 @@ pub enum AudioCommand {
     PauseMix,
     ResumeMix,
 }
-
 
 #[derive(Resource, Default)]
 pub struct AudioCommandQueue {

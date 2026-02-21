@@ -1,7 +1,7 @@
 use slotmap::new_key_type;
 
-new_key_type! { 
-    pub struct MeshHandle; 
+new_key_type! {
+    pub struct MeshHandle;
     pub struct MaterialHandle;
     pub struct TextureHandle;
     pub struct ShaderHandle;

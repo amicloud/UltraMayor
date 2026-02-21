@@ -3,7 +3,10 @@
 
 use glam::{Mat4, Vec3};
 
-use crate::{components::collider_component::ConvexCollider, physics::{self, gjk::support_minkowski}};
+use crate::{
+    components::collider_component::ConvexCollider,
+    physics::{self, gjk::support_minkowski},
+};
 use physics::physics_resource::ContactManifold;
 
 const EPA_MAX_ITERATIONS: usize = 64;

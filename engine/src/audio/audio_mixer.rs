@@ -1,19 +1,18 @@
-use std::sync::{Arc, Mutex};
+use std::sync::{
+    Arc, Mutex,
+    atomic::{AtomicBool, Ordering},
+};
 
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 
-use crate::{
-    SoundHandle, assets::sound_resource::SoundResource, audio::command_queue::AudioCommand,
-};
+use crate::{assets::sound_resource::SoundResource, audio::command_queue::AudioCommand};
 
 pub struct AudioMixer {
-    device: cpal::Device,
-    stream: Option<cpal::Stream>,
+    _stream: Option<cpal::Stream>,
     // producer: Option<Producer<f32>>,
     pub sample_rate: cpal::SampleRate,
     tracks: Arc<Mutex<Vec<Track>>>,
-    mix_buffer: Vec<f32>,
-    paused: bool,
+    paused: Arc<AtomicBool>,
 }
 
 pub struct Track {
@@ -33,13 +32,13 @@ impl Track {
         if !self.playing {
             return;
         }
+        let mute_gain = if self.muted { 0.0 } else { 1.0 };
         for (i, voice) in self.voices.iter_mut().enumerate() {
             if voice.next_frame() {
                 for c in 0..self.channels {
                     // If the voice is mono, use the first channel for all output channels
                     let src_channel = if voice.channels == 1 { 0 } else { c };
-                    self.buffer[c] +=
-                        voice.buffer[src_channel] * self.volume * !self.muted as u8 as f32;
+                    self.buffer[c] += voice.buffer[src_channel] * self.volume * mute_gain;
                 }
             } else {
                 self.finished_indices_buffer.push(i);
@@ -107,18 +106,20 @@ impl Default for AudioMixer {
             muted: false,
         });
         let stream_tracks = tracks.clone();
+        let paused = Arc::new(AtomicBool::new(false));
+        let stream_paused = paused.clone();
         let stream = device
             .build_output_stream(
                 &config.into(),
                 move |output: &mut [f32], _: &cpal::OutputCallbackInfo| {
-                    // if self.paused {
-                    //     for frame_out in output.chunks_mut(channels) {
-                    //         for c in 0..channels {
-                    //             frame_out[c] = 0.0;
-                    //         }
-                    //     }
-                    //     return;
-                    // }
+                    if stream_paused.load(Ordering::Relaxed) {
+                        for frame_out in output.chunks_mut(channels) {
+                            for c in frame_out.iter_mut().take(channels) {
+                                *c = 0.0;
+                            }
+                        }
+                        return;
+                    }
                     let mut tracks = stream_tracks.lock().unwrap();
                     let mut mixed = vec![0.0; channels];
 
@@ -127,15 +128,15 @@ impl Default for AudioMixer {
 
                         for track in tracks.iter_mut() {
                             track.fill_buffer_from_voices();
-                            for c in 0..channels {
+                            for (c, channel) in mixed.iter_mut().enumerate().take(channels) {
                                 // If the track is mono, use the first channel for all output channels
-                                mixed[c] += track.buffer[if track.channels == 1 { 0 } else { c }];
+                                *channel += track.buffer[if track.channels == 1 { 0 } else { c }];
                             }
                         }
 
                         // clamp to -1..1 to avoid clipping
-                        for c in 0..channels {
-                            frame_out[c] = mixed[c].clamp(-1.0, 1.0);
+                        for (c, channel) in frame_out.iter_mut().enumerate().take(channels) {
+                            *channel = mixed[c].clamp(-1.0, 1.0);
                         }
                     }
                 },
@@ -145,34 +146,16 @@ impl Default for AudioMixer {
             .expect("failed to build output stream");
         stream.play().expect("failed to play stream");
         Self {
-            device,
-            stream: Some(stream),
+            _stream: Some(stream),
             // producer: None,
             sample_rate,
             tracks: tracks.clone(),
-            mix_buffer: vec![0.0; channels],
-            paused: false,
+            paused: paused.clone(),
         }
     }
 }
 
 impl AudioMixer {
-    fn play(&self) {
-        self.stream
-            .as_ref()
-            .expect("No stream.")
-            .play()
-            .expect("failed to play stream");
-    }
-
-    fn pause(&self) {
-        self.stream
-            .as_ref()
-            .expect("No stream.")
-            .pause()
-            .expect("failed to pause stream");
-    }
-
     pub fn add_track(&mut self, volume: f32, channels: usize) {
         self.tracks.lock().unwrap().push(Track {
             volume,
@@ -216,7 +199,7 @@ impl AudioMixer {
                             *track,
                             *volume,
                             *looping,
-                            sound.channels as usize,
+                            sound.channels,
                         );
                     } else {
                         eprintln!("Sound with ID {:?} not found in SoundResource", sound);
@@ -237,10 +220,10 @@ impl AudioMixer {
                     }
                 }
                 AudioCommand::PauseMix => {
-                    self.paused = true;
+                    self.paused.store(true, Ordering::Relaxed);
                 }
                 AudioCommand::ResumeMix => {
-                    self.paused = false;
+                    self.paused.store(false, Ordering::Relaxed);
                 }
             }
         }

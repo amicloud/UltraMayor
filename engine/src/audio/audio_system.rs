@@ -16,7 +16,7 @@ impl AudioSystem {
         for source in query.iter() {
             queue.push(AudioCommand::PlaySound {
                 track: 0,
-                sound: source.sound.clone(),
+                sound: source.sound,
                 volume: source.volume,
                 looping: source.looping,
             });

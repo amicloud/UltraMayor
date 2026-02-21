@@ -8,6 +8,7 @@ use camera_controller::{
     apply_flying_camera_movement, apply_orbit_camera_input, apply_player_movement_impulses,
     apply_switch_camera_input, initialize_flying_camera_rotation, update_orbit_camera_target,
 };
+#[allow(unused_imports)]
 use engine::components::{
     audio_source_component::AudioSourceComponent,
     physics_event_listener_component::PhysicsEventListenerComponent,
@@ -109,12 +110,11 @@ fn main() {
             .chain(),
     );
 
-    engine
-        .game_frame_schedule
-        .add_systems((apply_orbit_camera_input, 
-            apply_switch_camera_input,
-            sound_control
-        ));
+    engine.game_frame_schedule.add_systems((
+        apply_orbit_camera_input,
+        apply_switch_camera_input,
+        sound_control,
+    ));
 
     let cube = engine
         .load_model("resources/models/cube/Cube.gltf")

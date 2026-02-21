@@ -1,3 +1,4 @@
+pub mod handles;
 pub mod material;
 pub mod material_resource;
 pub mod mesh;
@@ -5,8 +6,7 @@ pub mod mesh_resource;
 pub mod model_loader;
 pub mod shader;
 pub mod shader_resource;
+pub mod sound;
+pub mod sound_resource;
 pub mod texture;
 pub mod texture_resource_manager;
-pub mod sound;
-pub mod handles;
-pub mod sound_resource;

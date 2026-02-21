@@ -21,7 +21,7 @@ pub fn dispatch_physics_events(
     mut commands: Commands,
     collision_frame_data: Res<CollisionFrameData>,
 ) {
-    for manifold_entry  in collision_frame_data.manifolds.iter() {
+    for manifold_entry in collision_frame_data.manifolds.iter() {
         let pair = ordered_pair(manifold_entry.entity_a, manifold_entry.entity_b);
         let event_type = if collision_frame_data.previous_manifolds.get(pair).is_some() {
             PhysicsEventType::Stay

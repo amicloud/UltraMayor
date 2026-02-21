@@ -29,6 +29,7 @@ use physics::{
 pub struct CollisionSystem {}
 
 impl CollisionSystem {
+    #[allow(clippy::type_complexity)]
     pub fn update_world_dynamic_tree(
         query: Query<
             (
@@ -93,6 +94,7 @@ impl CollisionSystem {
         // }
     }
 
+    #[allow(clippy::type_complexity)]
     pub fn update_world_aabb_cache(
         query: Query<
             (
@@ -134,6 +136,7 @@ impl CollisionSystem {
         pairs.dedup();
     }
 
+    #[allow(clippy::type_complexity)]
     pub fn generate_manifolds(
         moving_query: Query<
             (
@@ -260,8 +263,7 @@ impl CollisionSystem {
             if let Some(existing) = frame.manifolds.get_mut(pair) {
                 if manifold.contacts.len() > existing.contacts.len()
                     || (manifold.contacts.len() == existing.contacts.len()
-                        && manifold_max_penetration(&manifold)
-                            > manifold_max_penetration(&existing))
+                        && manifold_max_penetration(&manifold) > manifold_max_penetration(existing))
                 {
                     *existing = manifold.clone();
                 }
@@ -289,6 +291,7 @@ fn manifold_merge_distance_pair_map(
     extent * 0.01
 }
 
+#[allow(clippy::too_many_arguments)]
 /// Delta_t will be used for toi/sweep
 fn convex_convex_pair_manifold(
     entity_a: Entity,
@@ -336,6 +339,7 @@ fn convex_convex_pair_manifold(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn convex_mesh_pair_manifold(
     convex_entity: Entity,
     convex_collider: &ConvexCollider,
@@ -409,7 +413,8 @@ fn manifold_max_penetration(manifold: &ContactManifold) -> f32 {
         .contacts
         .iter()
         .map(|c| c.penetration)
-        .fold(0.0_f32, f32::max)
+        .reduce(f32::max)
+        .unwrap_or(0.0)
 }
 
 fn merge_contact_manifold(
@@ -844,6 +849,7 @@ fn cuboid_cuboid_contact(
         .collect()
 }
 
+    #[allow(clippy::too_many_arguments)]
 fn convex_convex_contact(
     entity_a: Entity,
     collider_a: &ConvexCollider,
@@ -971,6 +977,7 @@ fn gjk_epa(
     })
 }
 
+    #[allow(clippy::too_many_arguments)]
 fn convex_mesh_contact(
     convex_entity: Entity,
     convex_collider: &ConvexCollider,

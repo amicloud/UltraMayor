@@ -3,9 +3,7 @@ use std::collections::HashMap;
 use bevy_ecs::prelude::*;
 use slotmap::SlotMap;
 
-use crate::{
-    assets::{handles::SoundHandle, sound::Sound},
-};
+use crate::assets::{handles::SoundHandle, sound::Sound};
 
 #[derive(Resource, Default)]
 pub struct SoundResource {

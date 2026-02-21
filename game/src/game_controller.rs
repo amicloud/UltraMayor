@@ -64,12 +64,16 @@ pub fn sound_control(
     mut audio_command_queue: ResMut<AudioCommandQueue>,
     sound_resource: Res<SoundResource>,
 ) {
-    if input_state.key_pressed(sdl2::keyboard::Keycode::P) {
+    if input_state.key_pressed(sdl2::keyboard::Keycode::N) {
         audio_command_queue.push(AudioCommand::PlaySound {
             track: 0,
-            sound: sound_resource.get_by_name("sea_shanty_2_short").unwrap(),
+            sound: sound_resource.get_by_name("sea_shanty_2.wav").unwrap(),
             volume: 0.5,
             looping: false,
         });
+    } else if input_state.key_pressed(sdl2::keyboard::Keycode::P) {
+        audio_command_queue.push(AudioCommand::PauseMix);
+    } else if input_state.key_pressed(sdl2::keyboard::Keycode::O) {
+        audio_command_queue.push(AudioCommand::ResumeMix);
     }
 }
