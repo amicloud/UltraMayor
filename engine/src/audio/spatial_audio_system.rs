@@ -14,8 +14,8 @@ impl SpatialAudioSystem {
         mut audio_command_queue: ResMut<command_queue::AudioCommandQueue>,
     ) {
         if let Some((_, transform, _)) = query.iter().nth(0) {
-            audio_command_queue.push(AudioCommand::UpdateListenerPosition {
-                position: transform.position,
+            audio_command_queue.push(AudioCommand::UpdateListenerInfo {
+                listener_info: Some((transform.position, transform.rotation)),
             });
         }
     }
