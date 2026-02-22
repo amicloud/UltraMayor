@@ -19,6 +19,7 @@ impl AudioSystem {
                 sound: source.sound,
                 volume: source.volume,
                 looping: source.looping,
+                location: None,
             });
         }
     }

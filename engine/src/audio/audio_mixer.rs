@@ -2,6 +2,7 @@ use cpal::{
     Device, Stream, SupportedStreamConfig,
     traits::{DeviceTrait, HostTrait, StreamTrait},
 };
+use glam::Vec3;
 use rtrb::{Consumer, Producer, RingBuffer};
 use std::sync::Arc;
 
@@ -57,6 +58,7 @@ struct Voice {
     looping: bool,
     channels: usize,
     buffer: Vec<f32>,
+    location: Option<Vec3>,
 }
 
 impl Voice {
@@ -90,6 +92,7 @@ enum MixerCommand {
         volume: f32,
         looping: bool,
         channels: usize,
+        location: Option<Vec3>,
     },
     PauseMix,
     ResumeMix,
@@ -101,6 +104,9 @@ enum MixerCommand {
     UnmuteTrack {
         track: usize,
     },
+    UpdateListenerPosition {
+        position: Vec3,
+    }
 }
 
 impl Default for AudioMixer {
@@ -134,7 +140,9 @@ impl Default for AudioMixer {
             sample_rate,
         };
 
-        s.stream = Some(s.build_stream(&device, config, tracks, paused, consumer, muted));
+        let listener_position = None;
+
+        s.stream = Some(s.build_stream(&device, config, tracks, paused, consumer, muted, listener_position));
         s
     }
 }
@@ -148,6 +156,7 @@ impl AudioMixer {
         mut paused: bool,
         mut consumer: Consumer<MixerCommand>,
         mut muted: bool,
+        mut listener_position: Option<Vec3>,
     ) -> Stream {
         let channels = config.channels() as usize;
         let mut mixed = vec![0.0; channels];
@@ -160,6 +169,7 @@ impl AudioMixer {
                         &mut tracks,
                         &mut paused,
                         &mut muted,
+                        &mut listener_position,
                     );
                     if paused {
                         for frame_out in output.chunks_mut(channels) {
@@ -204,6 +214,7 @@ impl AudioMixer {
         tracks: &mut Vec<Track>,
         paused: &mut bool,
         muted: &mut bool,
+        listener_position: &mut Option<Vec3>,
     ) {
         while let Some(command) = consumer.pop().ok() {
             match command {
@@ -213,6 +224,7 @@ impl AudioMixer {
                     volume,
                     looping,
                     channels,
+                    location
                 } => {
                     if let Some(track) = tracks.get_mut(track) {
                         track.voices.push(Voice {
@@ -222,6 +234,7 @@ impl AudioMixer {
                             looping: looping,
                             channels: channels,
                             buffer: vec![0.0; channels],
+                            location
                         });
                     } else {
                         eprintln!("Track {} does not exist", track);
@@ -259,6 +272,9 @@ impl AudioMixer {
                         eprintln!("Track {} does not exist", track);
                     }
                 }
+                MixerCommand::UpdateListenerPosition { position } => {
+                    *listener_position = Some(position);
+                }
             }
         }
     }
@@ -276,6 +292,7 @@ impl AudioMixer {
                     sound,
                     volume,
                     looping,
+                    location
                 } => {
                     if let Some(sound) = sound_resource.get_sound(*sound) {
                         self.producer
@@ -285,6 +302,7 @@ impl AudioMixer {
                                 volume: *volume,
                                 looping: *looping,
                                 channels: sound.channels,
+                                location: *location,
                             })
                             .expect(MIXER_FULL_ERROR_MESSAGE);
                     } else {
@@ -319,6 +337,11 @@ impl AudioMixer {
                 AudioCommand::UnmuteMix => {
                     self.producer
                         .push(MixerCommand::UnmuteMix)
+                        .expect(MIXER_FULL_ERROR_MESSAGE);
+                }
+                AudioCommand::UpdateListenerPosition { position } => {
+                    self.producer
+                        .push(MixerCommand::UpdateListenerPosition { position: *position })
                         .expect(MIXER_FULL_ERROR_MESSAGE);
                 }
             }

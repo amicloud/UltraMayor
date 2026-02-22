@@ -8,6 +8,7 @@ use camera_controller::{
     apply_flying_camera_movement, apply_orbit_camera_input, apply_player_movement_impulses,
     apply_switch_camera_input, initialize_flying_camera_rotation, update_orbit_camera_target,
 };
+use engine::components::single_audio_listener_component::SingleAudioListenerComponent;
 #[allow(unused_imports)]
 use engine::components::{
     audio_source_component::AudioSourceComponent,
@@ -150,6 +151,7 @@ fn main() {
             rotation: Quat::IDENTITY,
             scale: player_scale,
         },
+        SingleAudioListenerComponent,
         VelocityComponent {
             translational: Vec3::ZERO,
             angular: Vec3::ZERO,
@@ -170,52 +172,64 @@ fn main() {
         // SleepComponent::default(),
         PlayerComponent { speed: 1.0 },
         PhysicsEventListenerComponent {},
-        // AudioSourceComponent {
-        //     sound: _sea_shanty,
-        //     volume: 0.5,
-        //     pitch: 1.0,
-        //     looping: false,
-        // },
     ));
 
-    #[cfg(debug_assertions)]
-    let spawn_mult = 1;
+    // Spatial audio testing
+    engine.world.spawn((
+        TransformComponent {
+            position: Vec3::new(0.0, 0.0, 5.0),
+            rotation: Quat::IDENTITY,
+            scale: player_scale,
+        },
+        VelocityComponent {
+            translational: Vec3::ZERO,
+            angular: Vec3::ZERO,
+        },
+        RenderBodyComponent {
+            render_body_id: cube,
+        },
+        cuboid_collider,
+        SleepComponent::default(),
+    ));
 
-    #[cfg(not(debug_assertions))]
-    let spawn_mult = 10;
+    // #[cfg(debug_assertions)]
+    // let spawn_mult = 1;
 
-    (1..=(5 * spawn_mult)).for_each(|i| {
-        let p = player_local_size * Vec3::new(0.0, 0.0, i as f32);
-        engine.world.spawn((
-            TransformComponent {
-                position: p,
-                rotation: Quat::IDENTITY,
-                scale: player_scale,
-            },
-            VelocityComponent {
-                translational: Vec3::ZERO,
-                angular: Vec3::ZERO,
-            },
-            RenderBodyComponent {
-                render_body_id: cube,
-            },
-            cuboid_collider,
-            PhysicsComponent {
-                mass: 5.0,
-                physics_type: if i == 1 {
-                    PhysicsType::Static
-                } else {
-                    PhysicsType::Dynamic
-                },
-                friction: 0.9,
-                drag_coefficient: 0.1,
-                angular_drag_coefficient: 0.1,
-                restitution: 0.5,
-                local_inertia: glam::Mat3::IDENTITY,
-            },
-            SleepComponent::default(),
-        ));
-    });
+    // #[cfg(not(debug_assertions))]
+    // let spawn_mult = 10;
+
+    // (1..=(5 * spawn_mult)).for_each(|i| {
+    //     let p = player_local_size * Vec3::new(0.0, 0.0, i as f32);
+    //     engine.world.spawn((
+    //         TransformComponent {
+    //             position: p,
+    //             rotation: Quat::IDENTITY,
+    //             scale: player_scale,
+    //         },
+    //         VelocityComponent {
+    //             translational: Vec3::ZERO,
+    //             angular: Vec3::ZERO,
+    //         },
+    //         RenderBodyComponent {
+    //             render_body_id: cube,
+    //         },
+    //         cuboid_collider,
+    //         PhysicsComponent {
+    //             mass: 5.0,
+    //             physics_type: if i == 1 {
+    //                 PhysicsType::Static
+    //             } else {
+    //                 PhysicsType::Dynamic
+    //             },
+    //             friction: 0.9,
+    //             drag_coefficient: 0.1,
+    //             angular_drag_coefficient: 0.1,
+    //             restitution: 0.5,
+    //             local_inertia: glam::Mat3::IDENTITY,
+    //         },
+    //         SleepComponent::default(),
+    //     ));
+    // });
 
     // let t_range = 2.0;
 

@@ -3,7 +3,7 @@ use engine::assets::sound_resource::SoundResource;
 use engine::audio::command_queue::{AudioCommand, AudioCommandQueue};
 use engine::input::InputStateResource;
 use engine::{Gravity, TimeResource, WorldBasis};
-use glam::Quat;
+use glam::{Quat, Vec3};
 use sdl2::keyboard::Keycode;
 
 pub fn do_gameplay(
@@ -70,6 +70,7 @@ pub fn sound_control(
             sound: sound_resource.get_by_name("sea_shanty_2.wav").unwrap(),
             volume: 0.5,
             looping: false,
+            location: Some(Vec3::splat(0.0))
         });
     } else if input_state.key_pressed(sdl2::keyboard::Keycode::P) {
         audio_command_queue.push(AudioCommand::PauseMix);

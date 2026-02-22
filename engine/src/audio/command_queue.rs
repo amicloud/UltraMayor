@@ -1,4 +1,5 @@
 use bevy_ecs::prelude::*;
+use glam::Vec3;
 
 use crate::SoundHandle;
 
@@ -8,6 +9,7 @@ pub enum AudioCommand {
         sound: SoundHandle,
         volume: f32,
         looping: bool,
+        location: Option<Vec3>,
     },
     PauseTrack {
         track: usize,
@@ -19,6 +21,9 @@ pub enum AudioCommand {
     ResumeMix,
     MuteMix,
     UnmuteMix,
+    UpdateListenerPosition {
+        position: Vec3,
+    },
 }
 
 #[derive(Resource, Default)]
