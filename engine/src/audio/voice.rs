@@ -65,7 +65,10 @@ impl Voice {
         let distance_attenuation =
             if let (Some(location), Some((listener_pos, _))) = (location, listener_info) {
                 let distance = location.distance(*listener_pos);
-                (1.0 / (1.0 + distance * distance)).min(0.01) 
+                // Raw inverse square attenuation feels too harsh.
+                // Perhaps this should be tweaked or made configurable, but for now
+                // we'll just use a simple formula that falls off more gently.
+                1.0 / (1.0 + (distance.powi(2)/5.0))
             } else {
                 1.0
             };
@@ -112,7 +115,13 @@ impl Voice {
                 self.buffer[frame * self.channels + ch] = 0.0;
             }
         }
-
-        return self.cursor < total_frames || self.looping;
+        if self.cursor >= total_frames {
+            if self.looping {
+                self.cursor = 0;
+            } else {
+                return false;
+            }
+        }
+        return self.looping || self.cursor < total_frames;
     }
 }
