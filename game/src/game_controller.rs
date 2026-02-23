@@ -70,7 +70,8 @@ pub fn sound_control(
             sound: sound_resource.get_by_name("sea_shanty_2.wav").unwrap(),
             volume: 0.5,
             looping: false,
-            location: Some(Vec3::splat(0.0))
+            location: Some(Vec3::splat(0.0)),
+            source: None,
         });
     } else if input_state.key_pressed(sdl2::keyboard::Keycode::P) {
         audio_command_queue.push(AudioCommand::PauseMix);

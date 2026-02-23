@@ -120,6 +120,7 @@ impl Engine {
                 TimeResource::update_time_resource,
                 AudioSystem::build_command_queue,
                 SpatialAudioSystem::update_listener_position,
+                SpatialAudioSystem::update_source_positions,
             )
                 .chain(),
         );

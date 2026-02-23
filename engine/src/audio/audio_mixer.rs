@@ -1,10 +1,11 @@
+use bevy_ecs::entity::Entity;
 use cpal::{
     Device, Stream, SupportedStreamConfig,
     traits::{DeviceTrait, HostTrait, StreamTrait},
 };
 use glam::{Quat, Vec3};
 use rtrb::{Consumer, Producer, RingBuffer};
-use std::{f32::consts::PI, sync::Arc};
+use std::{collections::HashMap, f32::consts::PI, sync::Arc};
 
 use crate::{assets::sound_resource::SoundResource, audio::command_queue::AudioCommand};
 pub struct AudioMixer {
@@ -24,7 +25,7 @@ pub struct Track {
     muted: bool,
 }
 impl Track {
-    pub fn fill_buffer_from_voices(&mut self, listener_info: ListenerInfo, required_frames: usize) {
+    pub fn fill_buffer_from_voices(&mut self, listener_info: ListenerInfo, required_frames: usize, source_map: &HashMap<Entity, Vec3>) {
         self.finished_indices_buffer.clear();
         self.buffer.fill(0.0);
         if !self.playing {
@@ -32,7 +33,7 @@ impl Track {
         }
         let mute_gain = if self.muted { 0.0 } else { 1.0 };
         for (i, voice) in self.voices.iter_mut().enumerate() {
-            if voice.next_block(listener_info, required_frames) {
+            if voice.next_block(listener_info, required_frames, source_map) {
                 for frame in 0..required_frames {
                     for ch in 0..self.channels {
                         let src_ch = if voice.channels == 1 { 0 } else { ch };
@@ -59,7 +60,8 @@ struct Voice {
     looping: bool,
     channels: usize,
     buffer: Vec<f32>,
-    location: Option<Vec3>,
+    // location: Option<Vec3>,
+    source: Option<Entity>,
     delay_buffer_left: Vec<f32>,  // for ITD
     delay_buffer_right: Vec<f32>, // for ITD
 }
@@ -67,12 +69,21 @@ struct Voice {
 pub type ListenerInfo = Option<(Vec3, Quat)>; // position, rotation
 
 impl Voice {
-    fn next_block(&mut self, listener_info: ListenerInfo, required_frames: usize) -> bool {
+    fn next_block(&mut self, listener_info: ListenerInfo, required_frames: usize, source_map: &HashMap<Entity, Vec3>) -> bool {
         let total_frames = self.samples.len() / self.channels;
         let frames_to_fill = (total_frames - self.cursor).min(required_frames);
 
+        let mut location= None;
+        // Simple pan based spatialization
+        let mut pan = 0.0;
+        if let Some(source) = self.source {
+            if let Some(_location) = source_map.get(&source) {
+                location = Some(*_location);
+            }
+        }
+
         let distance_attenuation =
-            if let (Some(location), Some((listener_pos, _))) = (self.location, listener_info) {
+            if let (Some(location), Some((listener_pos, _))) = (location, listener_info) {
                 let distance = location.distance(listener_pos);
                 // Simple linear attenuation with distance, clamped to a minimum of 0.1 to avoid complete silence
                 (1.0 - distance / 100.0).max(0.1)
@@ -80,10 +91,8 @@ impl Voice {
                 1.0
             };
 
-        // Simple pan based spatialization
-        let mut pan = 0.0;
 
-        if let Some(location) = self.location {
+        if let Some(location) = location {
             if let Some((listener_pos, listener_rot)) = listener_info {
                 let dir = (location - listener_pos).normalize_or_zero();
                 let right = listener_rot.mul_vec3(Vec3::X);
@@ -96,8 +105,8 @@ impl Voice {
             }
         }
         let pan_rad = (pan + 1.0) * 0.25 * PI; // map -1..1 -> 0..π/2
-        let left_gain = pan_rad.cos(); 
-        let right_gain = pan_rad.sin(); 
+        let left_gain = pan_rad.cos();
+        let right_gain = pan_rad.sin();
 
         for frame in 0..frames_to_fill {
             let sample_idx = self.cursor * self.channels;
@@ -138,6 +147,7 @@ enum MixerCommand {
         looping: bool,
         channels: usize,
         location: Option<Vec3>,
+        source: Option<Entity>,
     },
     PauseMix,
     ResumeMix,
@@ -152,6 +162,7 @@ enum MixerCommand {
     UpdateListenerInfo {
         listener_info: ListenerInfo,
     },
+    UpdateSourceInfo { entity: Entity, position: Vec3 },
 }
 
 impl Default for AudioMixer {
@@ -186,6 +197,7 @@ impl Default for AudioMixer {
         };
 
         let listener_info = None; // position, rotation
+        let source_map: HashMap<Entity, Vec3> = HashMap::new();
 
         s.stream = Some(s.build_stream(
             &device,
@@ -195,6 +207,7 @@ impl Default for AudioMixer {
             consumer,
             muted,
             listener_info,
+            source_map,
         ));
         s
     }
@@ -210,6 +223,7 @@ impl AudioMixer {
         mut consumer: Consumer<MixerCommand>,
         mut muted: bool,
         mut listener_info: ListenerInfo,
+        mut source_map: HashMap<Entity, Vec3>,
     ) -> Stream {
         let channels = config.channels() as usize;
         let stream = device
@@ -223,6 +237,7 @@ impl AudioMixer {
                         &mut muted,
                         &mut listener_info,
                         output.len(),
+                        &mut source_map,
                     );
                     if paused {
                         for frame_out in output.chunks_mut(channels) {
@@ -236,7 +251,7 @@ impl AudioMixer {
                     let required_frames = output.len() / channels;
 
                     for track in tracks.iter_mut() {
-                        track.fill_buffer_from_voices(listener_info, required_frames);
+                        track.fill_buffer_from_voices(listener_info, required_frames, &source_map);
                     }
 
                     for frame in 0..required_frames {
@@ -266,6 +281,7 @@ impl AudioMixer {
         muted: &mut bool,
         listener_info: &mut ListenerInfo,
         required_buffer_size_for_voices: usize,
+        source_map: &mut HashMap<Entity, Vec3>,
     ) {
         while let Some(command) = consumer.pop().ok() {
             match command {
@@ -276,6 +292,7 @@ impl AudioMixer {
                     looping,
                     channels,
                     location,
+                    source,
                 } => {
                     if let Some(track) = tracks.get_mut(track) {
                         track.voices.push(Voice {
@@ -285,10 +302,17 @@ impl AudioMixer {
                             looping: looping,
                             channels: channels,
                             buffer: vec![0.0; required_buffer_size_for_voices],
-                            location,
+                            // location,
                             delay_buffer_left: vec![0.0; required_buffer_size_for_voices],
                             delay_buffer_right: vec![0.0; required_buffer_size_for_voices],
+                            source,
                         });
+                        if let (Some(source), Some(location)) = (source, location) {
+                            eprintln!("Adding voice for source {:?} at location {:?}", source, location);
+                            source_map.insert(source, location);
+                        } else {
+                            eprintln!("Adding voice with no source or location");
+                        }
                     } else {
                         eprintln!("Track {} does not exist", track);
                     }
@@ -328,6 +352,9 @@ impl AudioMixer {
                 MixerCommand::UpdateListenerInfo { listener_info: l } => {
                     *listener_info = l;
                 }
+                MixerCommand::UpdateSourceInfo { entity, position } => {
+                    source_map.insert(entity, position);
+                }
             }
         }
     }
@@ -347,6 +374,7 @@ impl AudioMixer {
                     volume,
                     looping,
                     location,
+                    source
                 } => {
                     if let Some(sound) = sound_resource.get_sound(*sound) {
                         self.producer
@@ -357,6 +385,7 @@ impl AudioMixer {
                                 looping: *looping,
                                 channels: sound.channels,
                                 location: *location,
+                                source: *source,
                             })
                             .expect(MIXER_FULL_ERROR_MESSAGE);
                     } else {
@@ -397,6 +426,14 @@ impl AudioMixer {
                     self.producer
                         .push(MixerCommand::UpdateListenerInfo {
                             listener_info: *listener_info,
+                        })
+                        .expect(MIXER_FULL_ERROR_MESSAGE);
+                }
+                AudioCommand::UpdateSourceInfo { entity, position } => {
+                    self.producer
+                        .push(MixerCommand::UpdateSourceInfo {
+                            entity: *entity,
+                            position: *position,
                         })
                         .expect(MIXER_FULL_ERROR_MESSAGE);
                 }

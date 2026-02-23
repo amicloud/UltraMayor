@@ -11,6 +11,7 @@ pub enum AudioCommand {
         volume: f32,
         looping: bool,
         location: Option<Vec3>,
+        source: Option<Entity>,
     },
     PauseTrack {
         track: usize,
@@ -25,6 +26,7 @@ pub enum AudioCommand {
     UpdateListenerInfo {
         listener_info: ListenerInfo,
     },
+    UpdateSourceInfo { entity: Entity, position: Vec3 },
 }
 
 #[derive(Resource, Default)]
