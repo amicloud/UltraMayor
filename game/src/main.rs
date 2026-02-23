@@ -47,7 +47,7 @@ fn main() {
         .spawn((
             SingleAudioListenerComponent,
             TransformComponent {
-                position: Vec3::new(25.0, 25.0, 25.0),
+                position: Vec3::new(0.0, 0.0, 2.0),
                 rotation: Quat::IDENTITY,
                 scale: Vec3::new(1.0, 1.0, 1.0),
             },
@@ -59,7 +59,7 @@ fn main() {
             },
             FlyingCameraComponent {
                 yaw: -135.0,
-                pitch: -45.0,
+                pitch: 0.0,
                 sensitivity: 0.1,
                 speed: 100.0,
             },
@@ -98,7 +98,7 @@ fn main() {
         .world
         .get_resource_mut::<ActiveCamera>()
         .unwrap()
-        .set(orbit_camera);
+        .set(_flying_camera);
 
     engine.game_simulation_schedule.add_systems(
         (

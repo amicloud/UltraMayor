@@ -100,7 +100,7 @@ pub fn spatial_audio_orbit_demo(
         transform.position = Vec3::new(
             (angle.cos() * radius) as f32,
             (angle.sin() * radius) as f32,
-            0.0,
+            2.0,
         );
     }
 }

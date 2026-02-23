@@ -65,8 +65,7 @@ impl Voice {
         let distance_attenuation =
             if let (Some(location), Some((listener_pos, _))) = (location, listener_info) {
                 let distance = location.distance(*listener_pos);
-                // Simple linear attenuation with distance, clamped to a minimum of 0.1 to avoid complete silence
-                (1.0 - distance / 100.0).max(0.1)
+                (1.0 / (1.0 + distance * distance)).min(0.01) 
             } else {
                 1.0
             };
@@ -84,8 +83,8 @@ impl Voice {
             }
         }
         let pan_rad = (pan + 1.0) * 0.25 * PI; // map -1..1 -> 0..π/2
-        let left_gain = pan_rad.cos();
-        let right_gain = pan_rad.sin();
+        let left_gain = pan_rad.cos().max(0.1); // avoid complete silence in one ear
+        let right_gain = pan_rad.sin().max(0.1); // avoid complete silence in one ear
 
         for frame in 0..frames_to_fill {
             let sample_idx = self.cursor * self.channels;
