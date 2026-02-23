@@ -43,6 +43,7 @@ fn main() {
     let _flying_camera = engine
         .world
         .spawn((
+        SingleAudioListenerComponent,
             TransformComponent {
                 position: Vec3::new(25.0, 25.0, 25.0),
                 rotation: Quat::IDENTITY,
@@ -151,7 +152,6 @@ fn main() {
             rotation: Quat::IDENTITY,
             scale: player_scale,
         },
-        SingleAudioListenerComponent,
         VelocityComponent {
             translational: Vec3::ZERO,
             angular: Vec3::ZERO,

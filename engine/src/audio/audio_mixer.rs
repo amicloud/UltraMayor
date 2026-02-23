@@ -23,9 +23,8 @@ pub struct Track {
     finished_indices_buffer: Vec<usize>,
     muted: bool,
 }
-
 impl Track {
-    pub fn fill_buffer_from_voices(&mut self, listener_info: ListenerInfo) {
+    pub fn fill_buffer_from_voices(&mut self, listener_info: ListenerInfo, required_frames: usize) {
         self.finished_indices_buffer.clear();
         self.buffer.fill(0.0);
         if !self.playing {
@@ -33,11 +32,13 @@ impl Track {
         }
         let mute_gain = if self.muted { 0.0 } else { 1.0 };
         for (i, voice) in self.voices.iter_mut().enumerate() {
-            if voice.next_frame(listener_info) {
-                for c in 0..self.channels {
-                    // If the voice is mono, use the first channel for all output channels
-                    let src_channel = if voice.channels == 1 { 0 } else { c };
-                    self.buffer[c] += voice.buffer[src_channel] * self.volume * mute_gain;
+            if voice.next_block(listener_info, required_frames) {
+                for frame in 0..required_frames {
+                    for ch in 0..self.channels {
+                        let src_ch = if voice.channels == 1 { 0 } else { ch };
+                        self.buffer[frame * self.channels + ch] +=
+                            voice.buffer[frame * voice.channels + src_ch] * self.volume * mute_gain;
+                    }
                 }
             } else {
                 self.finished_indices_buffer.push(i);
@@ -59,81 +60,53 @@ struct Voice {
     channels: usize,
     buffer: Vec<f32>,
     location: Option<Vec3>,
+    delay_buffer_left: Vec<f32>,  // for ITD
+    delay_buffer_right: Vec<f32>, // for ITD
 }
 
 pub type ListenerInfo = Option<(Vec3, Quat)>; // position, rotation
 
 impl Voice {
-    /// Returns false when the voice is out of samples (has no next frame)
-    fn next_frame(&mut self, listener_info: ListenerInfo) -> bool {
-        let (listener_position, listener_rotation) =
-            listener_info.unwrap_or((Vec3::ZERO, Quat::IDENTITY));
-        let total_frames = self.samples.len() / self.channels;
-        let angle_to_listner =
-            if let (Some(loc), Some(listener_pos)) = (self.location, Some(listener_position)) {
-                let dir_to_listener = (listener_pos - loc).normalize_or_zero();
-                dir_to_listener.x.atan2(dir_to_listener.z)
-            } else {
-                0.0
-            };
-        let distance_to_listener =
-            if let (Some(loc), Some(listener_pos)) = (self.location, Some(listener_position)) {
-                loc.distance(listener_pos)
+    fn next_block(&mut self, listener_info: ListenerInfo, required_frames: usize) -> bool {
+        let distance_attenuation =
+            if let (Some(location), Some((listener_pos, _))) = (self.location, listener_info) {
+                let distance = location.distance(listener_pos);
+                // Simple linear attenuation with distance, clamped to a minimum of 0.1 to avoid complete silence
+                (1.0 - distance / 100.0).max(0.1)
             } else {
                 1.0
             };
-        let angle_of_incidence = if let (Some(loc), Some(listener_pos), Some(listener_rot)) = (
-            self.location,
-            Some(listener_position),
-            Some(listener_rotation),
-        ) {
-            let dir_to_listener = (listener_pos - loc).normalize_or_zero();
-            let forward = listener_rot.mul_vec3(Vec3::new(0.0, 0.0, -1.0));
-            forward.dot(dir_to_listener)
-        } else {
-            1.0
-        };
-        let angle_pan_factor = angle_of_incidence.sin() * 0.5 + 0.5; // goes from 0 (sound is to the left) to 1 (sound is to the right)
+        let total_frames = self.samples.len() / self.channels;
+        let frames_to_fill = (total_frames - self.cursor).min(required_frames);
 
-        let distance_attenuation = 1.0 / (1.0 + distance_to_listener);
-
-        if self.cursor >= total_frames {
-            if self.looping {
-                self.cursor = 0;
+        for frame in 0..frames_to_fill {
+            let sample_idx = self.cursor * self.channels;
+            if self.channels == 2 {
+                self.buffer[frame * 2] =
+                    self.samples[sample_idx] * self.volume * distance_attenuation;
+                self.buffer[frame * 2 + 1] =
+                    self.samples[sample_idx + 1] * self.volume * distance_attenuation;
+            } else if self.channels == 1 {
+                let sample = self.samples[self.cursor] * self.volume * distance_attenuation;
+                self.buffer[frame * 2] = sample;
+                self.buffer[frame * 2 + 1] = sample;
             } else {
-                self.buffer.fill(0.0);
-                return false; // finished
+                for ch in 0..self.channels {
+                    self.buffer[frame * self.channels + ch] =
+                        self.samples[sample_idx + ch] * self.volume * distance_attenuation;
+                }
             }
+            self.cursor += 1;
         }
-        // Simple panning based on angle to listener. This is really basic and not a proper spatialization algorithm but it's good enough for now.
-        if self.channels == 2 {
-            // dbg!(angle_to_listner);
-            let pan1 = angle_to_listner.sin() * 0.5 + 0.5; // pan goes from 0 (left) to 1 (right)
-            let pan = pan1 + angle_pan_factor;
-            self.buffer[0] = self.samples[self.cursor * self.channels]
-                * self.volume
-                * (1.0 - pan)
-                * distance_attenuation;
-            self.buffer[1] = self.samples[self.cursor * self.channels + 1]
-                * self.volume
-                * pan
-                * distance_attenuation;
-        } else if self.channels == 1 {
-            // For mono sounds, apply simple panning by adjusting the volume of the single channel
-            let pan1 = angle_to_listner.sin() * 0.5 + 0.5; // pan goes from 0 (left) to 1 (right)
-            let pan = pan1 + angle_pan_factor;
-            let sample = self.samples[self.cursor] * self.volume * distance_attenuation;
-            self.buffer[0] = sample * (1.0 - pan);
-            self.buffer[1] = sample * pan;
-        } else {
-            for c in 0..self.channels {
-                let idx = self.cursor * self.channels + c;
-                self.buffer[c] = self.samples[idx] * self.volume * distance_attenuation;
+
+        // Zero the rest of the block if we ran out of frames
+        for frame in frames_to_fill..required_frames {
+            for ch in 0..self.channels {
+                self.buffer[frame * self.channels + ch] = 0.0;
             }
         }
 
-        self.cursor += 1;
-        true
+        return self.cursor < total_frames || self.looping;
     }
 }
 
@@ -177,7 +150,7 @@ impl Default for AudioMixer {
             volume: 1.0,
             playing: true,
             voices: Vec::new(),
-            buffer: vec![0.0; channels],
+            buffer: vec![0.0; 5096 * 2], 
             channels,
             finished_indices_buffer: Vec::new(),
             muted: false,
@@ -219,8 +192,7 @@ impl AudioMixer {
         mut listener_info: ListenerInfo,
     ) -> Stream {
         let channels = config.channels() as usize;
-        let mut mixed = vec![0.0; channels];
-        let stream = device
+            let stream = device
             .build_output_stream(
                 &config.into(),
                 move |output: &mut [f32], _: &cpal::OutputCallbackInfo| {
@@ -230,6 +202,7 @@ impl AudioMixer {
                         &mut paused,
                         &mut muted,
                         &mut listener_info,
+                        output.len(),
                     );
                     if paused {
                         for frame_out in output.chunks_mut(channels) {
@@ -240,24 +213,21 @@ impl AudioMixer {
                         return;
                     }
 
-                    for frame_out in output.chunks_mut(channels) {
-                        mixed.fill(0.0);
+                    let required_frames = output.len() / channels;
 
-                        for track in tracks.iter_mut() {
-                            // This is ok for now but I need to move to block processing instead of
-                            // per frame... Somehow.
-                            track.fill_buffer_from_voices(listener_info);
-                            for (c, channel) in mixed.iter_mut().enumerate().take(channels) {
-                                // If the track is mono, use the first channel for all output channels
-                                *channel += track.buffer[if track.channels == 1 { 0 } else { c }];
+                    for track in tracks.iter_mut() {
+                        track.fill_buffer_from_voices(listener_info, required_frames);
+                    }
+
+                    for frame in 0..required_frames {
+                        for ch in 0..channels {
+                            let mut sample = 0.0;
+                            for track in tracks.iter() {
+                                let src_ch = if track.channels == 1 { 0 } else { ch };
+                                sample += track.buffer[frame * track.channels + src_ch];
                             }
-                        }
-
-                        // clamp to -1..1 to avoid clipping
-                        // If the mix is muted, output silence regardless of track buffers
-                        let mute_gain = if muted { 0.0 } else { 1.0 };
-                        for (c, channel) in frame_out.iter_mut().enumerate().take(channels) {
-                            *channel = mixed[c].clamp(-1.0, 1.0) * mute_gain;
+                            let mute_gain = if muted { 0.0 } else { 1.0 };
+                            output[frame * channels + ch] = sample.clamp(-1.0, 1.0) * mute_gain;
                         }
                     }
                 },
@@ -275,6 +245,7 @@ impl AudioMixer {
         paused: &mut bool,
         muted: &mut bool,
         listener_info: &mut ListenerInfo,
+        required_buffer_size_for_voices: usize,
     ) {
         while let Some(command) = consumer.pop().ok() {
             match command {
@@ -293,8 +264,10 @@ impl AudioMixer {
                             volume: volume,
                             looping: looping,
                             channels: channels,
-                            buffer: vec![0.0; channels],
+                            buffer: vec![0.0; required_buffer_size_for_voices],
                             location,
+                            delay_buffer_left: vec![0.0; required_buffer_size_for_voices],
+                            delay_buffer_right: vec![0.0; required_buffer_size_for_voices],
                         });
                     } else {
                         eprintln!("Track {} does not exist", track);

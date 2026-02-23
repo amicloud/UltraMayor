@@ -7,10 +7,14 @@ use crate::{
 
 pub struct SpatialAudioSystem;
 
+
+/// This system is responsible for updating the position and rotation of the audio listener
+/// and the position of audio source entities in the world.
 impl SpatialAudioSystem {
     /// This currently only supports having a single listener
     pub fn update_listener_position(
-        query: Query<(Entity, &TransformComponent, &SingleAudioListenerComponent)>,
+        query: Query<(Entity, &TransformComponent, &SingleAudioListenerComponent),
+            Changed<TransformComponent>>,
         mut audio_command_queue: ResMut<command_queue::AudioCommandQueue>,
     ) {
         if let Some((_, transform, _)) = query.iter().nth(0) {
