@@ -5,6 +5,9 @@ use glam::Vec3;
 
 use crate::audio::audio_mixer::ListenerInfo;
 
+const DEFAULT_SAMPLE_RATE_HZ: f32 = 44_100.0;
+const PAN_SMOOTH_TIME_SECONDS: f32 = 0.05;
+
 #[derive(Debug)]
 pub(crate) struct Voice {
     samples: Arc<[f32]>,
@@ -16,8 +19,11 @@ pub(crate) struct Voice {
     source: Option<Entity>,
     source_channels: usize,
     itd_delay: ItdDelay,
-    lpf: LowPassFilter,
+    lpf_left: LowPassFilter,
+    lpf_right: LowPassFilter,
+    pan_smoothed: f32,
 }
+
 const ITD_DELAY_BUFFER_SIZE: usize = 64; // Must be a power of two for efficient wrapping
 #[derive(Debug)]
 struct ItdDelay {
@@ -78,7 +84,9 @@ impl Voice {
                 mask: ITD_DELAY_BUFFER_SIZE - 1, // buffer.len() - 1 (power-of-two size)
                 range: itd_range,
             },
-            lpf: LowPassFilter { z: 0.0, alpha },
+            lpf_left: LowPassFilter { z: 0.0, alpha },
+            lpf_right: LowPassFilter { z: 0.0, alpha },
+            pan_smoothed: 0.0,
         }
     }
 
@@ -88,7 +96,7 @@ impl Voice {
         required_frames: usize,
         source_map: &HashMap<Entity, Vec3>,
     ) -> bool {
-        let total_frames = self.samples.len() / self.channels;
+        let total_frames = self.samples.len() / self.source_channels;
         let frames_to_fill = (total_frames - self.cursor).min(required_frames);
 
         let mut location = None;
@@ -113,29 +121,38 @@ impl Voice {
 
         if let Some(location) = location {
             if let Some((listener_pos, listener_rot)) = listener_info {
-                let dir = (location - listener_pos).normalize_or_zero();
-                let right = listener_rot.mul_vec3(Vec3::X);
+                let world_dir = (location - listener_pos).normalize_or_zero();
 
-                // project direction onto listener's horizontal plane (XY)
-                let dir_horizontal = Vec3::new(dir.x, dir.y, 0.0).normalize_or_zero();
+                // transform world direction into listener local space
+                let local_dir = listener_rot.conjugate().mul_vec3(world_dir);
 
-                // compute signed pan: dot with right vector
-                pan = right.dot(dir_horizontal).clamp(-1.0, 1.0);
+                // now pan is just local X
+                pan = local_dir.x.clamp(-1.0, 1.0);
             }
         }
-        
+
+        let pan_smooth_alpha =
+            1.0 - (-(required_frames as f32) / (DEFAULT_SAMPLE_RATE_HZ * PAN_SMOOTH_TIME_SECONDS)).exp();
+        self.pan_smoothed += pan_smooth_alpha * (pan - self.pan_smoothed);
+
         let ild_strength = 0.33;
-        let pan_scaled = pan * ild_strength;
+        let pan_scaled = self.pan_smoothed * ild_strength;
 
         let pan_rad = (pan_scaled + 1.0) * 0.25 * PI;
         let left_gain = pan_rad.cos();
         let right_gain = pan_rad.sin();
 
-        let delay_signed = pan * self.itd_delay.range as f32;
-        let delay_abs = delay_signed.abs();
+        let delay_signed = self.pan_smoothed * self.itd_delay.range as f32;
+        let left_delay = delay_signed.max(0.0);
+        let right_delay = (-delay_signed).max(0.0);
+        let itd_range_f32 = self.itd_delay.range.max(1) as f32;
+        let left_shadow_mix = (left_delay / itd_range_f32).clamp(0.0, 1.0);
+        let right_shadow_mix = (right_delay / itd_range_f32).clamp(0.0, 1.0);
+        let left_int = left_delay.floor() as usize;
+        let left_frac = left_delay - left_int as f32;
+        let right_int = right_delay.floor() as usize;
+        let right_frac = right_delay - right_int as f32;
 
-        let d_int = delay_abs.floor() as usize;
-        let frac = delay_abs - d_int as f32;
         let combined_volume = self.volume * distance_attenuation;
 
         for frame in 0..frames_to_fill {
@@ -145,26 +162,36 @@ impl Voice {
                     let mono = self.samples[sample_idx] * combined_volume;
                     self.itd_delay.buffer[self.itd_delay.write_idx] = mono;
 
-                    let read_base =
-                        self.itd_delay.write_idx.wrapping_sub(d_int + 1) & self.itd_delay.mask;
-                    let read_next = (read_base + 1) & self.itd_delay.mask;
+                    let left_read_base =
+                        self.itd_delay.write_idx.wrapping_sub(left_int + 1) & self.itd_delay.mask;
 
-                    let s0 = self.itd_delay.buffer[read_base];
-                    let s1 = self.itd_delay.buffer[read_next];
+                    let left_read_next = (left_read_base + 1) & self.itd_delay.mask;
 
-                    let delayed = s0 * frac + s1 * (1.0 - frac);
+                    let left_s0 = self.itd_delay.buffer[left_read_base];
+                    let left_s1 = self.itd_delay.buffer[left_read_next];
 
-                    let (left, right) = if delay_signed > 0.0 {
-                        // sound right → left is far ear
-                        let filtered = self.lpf.process(delayed);
-                        (filtered, mono)
-                    } else {
-                        let filtered = self.lpf.process(delayed);
-                        (mono, filtered)
-                    };
+                    let mut left_sample = left_s0 * left_frac + left_s1 * (1.0 - left_frac);
 
-                    self.buffer[frame * 2] = left * left_gain; // Left channel
-                    self.buffer[frame * 2 + 1] = right * right_gain; // Right channel
+                    let right_read_base =
+                        self.itd_delay.write_idx.wrapping_sub(right_int + 1) & self.itd_delay.mask;
+
+                    let right_read_next = (right_read_base + 1) & self.itd_delay.mask;
+
+                    let right_s0 = self.itd_delay.buffer[right_read_base];
+                    let right_s1 = self.itd_delay.buffer[right_read_next];
+
+                    let mut right_sample = right_s0 * right_frac + right_s1 * (1.0 - right_frac);
+
+                    // Simulating head shadow effect with low pass filter.
+                    // Blend continuously to avoid discontinuities when crossing center.
+                    let left_filtered = self.lpf_left.process(left_sample);
+                    let right_filtered = self.lpf_right.process(right_sample);
+                    left_sample = left_sample * (1.0 - left_shadow_mix) + left_filtered * left_shadow_mix;
+                    right_sample =
+                        right_sample * (1.0 - right_shadow_mix) + right_filtered * right_shadow_mix;
+
+                    self.buffer[frame * 2] = left_sample * left_gain;
+                    self.buffer[frame * 2 + 1] = right_sample * right_gain;
 
                     self.itd_delay.write_idx = (self.itd_delay.write_idx + 1) & self.itd_delay.mask;
                 }
