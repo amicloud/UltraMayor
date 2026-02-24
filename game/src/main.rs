@@ -149,6 +149,13 @@ fn main() {
     let _sort_shanty = engine
         .load_wav("resources/sounds/sea_shanty_2_short.wav")
         .expect("Failed to load sound");
+
+    // Mono sounds should be used for spatial audio since stereo sounds should have that baked in.
+    // Using stereo sounds with panning and distance attenuation can lead to weird results. 
+    let _mono_shanty = engine
+        .load_wav("resources/sounds/sea_shanty_2_mono.wav")
+        .expect("Failed to load sound");
+
     engine.world.spawn((
         TransformComponent {
             position: player_start,
@@ -194,10 +201,11 @@ fn main() {
         cuboid_collider,
         SleepComponent::default(),
         AudioSourceComponent {
-            sound: _sort_shanty,
+            sound: _mono_shanty,
             volume: 1.0,
             looping: true,
             pitch: 1.0,
+            spatial: true,
         },
         SpatialAudioDemoComponent,
     ));

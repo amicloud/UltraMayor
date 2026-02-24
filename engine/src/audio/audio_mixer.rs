@@ -26,7 +26,7 @@ enum MixerCommand {
         samples: Arc<[f32]>,
         volume: f32,
         looping: bool,
-        channels: usize,
+        source_channels: usize,
         source: Option<Entity>,
     },
     PauseMix,
@@ -179,7 +179,7 @@ impl AudioMixer {
                     samples,
                     volume,
                     looping,
-                    channels,
+                    source_channels,
                     source,
                 } => {
                     if let Some(track) = tracks.get_mut(track) {
@@ -187,8 +187,8 @@ impl AudioMixer {
                             samples,
                             volume,
                             looping,
-                            channels,
                             source,
+                            source_channels,
                             required_buffer_size_for_voices,
                         ));
                         if let Some(source) = source {
@@ -269,7 +269,7 @@ impl AudioMixer {
                                 samples: sound.data.clone(),
                                 volume: *volume,
                                 looping: *looping,
-                                channels: sound.channels,
+                                source_channels: sound.channels,
                                 source: *source,
                             })
                             .expect(MIXER_FULL_ERROR_MESSAGE);

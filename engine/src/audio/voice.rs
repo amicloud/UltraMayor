@@ -14,8 +14,9 @@ pub(crate) struct Voice {
     pub(crate) channels: usize,
     pub(crate) buffer: Vec<f32>,
     source: Option<Entity>,
-    delay_buffer_left: Vec<f32>,  // for ITD
-    delay_buffer_right: Vec<f32>, // for ITD
+    source_channels: usize,
+    delay_buffer_left: [f32; 64],  // for ITD
+    delay_buffer_right: [f32; 64], // for ITD
 }
 
 impl Voice {
@@ -27,8 +28,8 @@ impl Voice {
         samples: Arc<[f32]>,
         volume: f32,
         looping: bool,
-        channels: usize,
         source: Option<Entity>,
+        source_channels: usize,
         required_buffer_size: usize,
     ) -> Self {
         Self {
@@ -36,11 +37,12 @@ impl Voice {
             cursor: 0,
             volume,
             looping,
-            channels,
+            channels: 2, // We always output stereo from the voice, even if the source is mono. The mixer will handle downmixing if necessary.
             buffer: vec![0.0; required_buffer_size], // stereo output buffer
             source,
-            delay_buffer_left: vec![0.0; 128], // More than enough samples for ITD
-            delay_buffer_right: vec![0.0; 128],
+            source_channels,
+            delay_buffer_left: [0.0; 64], // More than enough samples for ITD
+            delay_buffer_right: [0.0; 64],
         }
     }
 
@@ -52,10 +54,15 @@ impl Voice {
     ) -> bool {
         let total_frames = self.samples.len() / self.channels;
         let frames_to_fill = (total_frames - self.cursor).min(required_frames);
+        let itd_scale = 1.0; // Scale factor for ITD effect, for demonstration purposes
+        let itd_max_time_seconds = 0.67 / 1000.0; //0.67 ms converted to seconds
+
+        let sample_rate = 44100.0; // This should ideally come from the audio context
+        let itd_range = (itd_max_time_seconds * sample_rate * itd_scale) as usize; // Max delay in samples
 
         let mut location = None;
         // Simple pan based spatialization
-        let mut pan = 0.0;
+        let mut pan = 0.0; // -1.0 = full left, 0.0 = center, 1.0 = full right
         if let Some(source) = self.source {
             if let Some(_location) = source_map.get(&source) {
                 location = Some(*_location);
@@ -67,8 +74,8 @@ impl Voice {
                 let distance = location.distance(*listener_pos);
                 // Raw inverse square attenuation feels too harsh.
                 // Perhaps this should be tweaked or made configurable, but for now
-                // we'll just use a simple formula that falls off more gently.
-                1.0 / (1.0 + (distance.powi(2)/5.0))
+                // we'll just use a modified inverse square that falls off more gently.
+                1.0 / (1.0 + (distance.powi(2) / 5.0))
             } else {
                 1.0
             };
@@ -86,24 +93,53 @@ impl Voice {
             }
         }
         let pan_rad = (pan + 1.0) * 0.25 * PI; // map -1..1 -> 0..π/2
-        let left_gain = pan_rad.cos().max(0.1); // avoid complete silence in one ear
-        let right_gain = pan_rad.sin().max(0.1); // avoid complete silence in one ear
+        let left_gain = pan_rad.cos().max(0.1);
+        let right_gain = pan_rad.sin().max(0.1);
+
+        let itd_signed = pan * itd_range as f32;
+        let mut left_delay = 0;
+        let mut right_delay = 0;
+        let max_allowable_delay = self.cursor.min(itd_range);
+
+        if itd_signed > 0.0 {
+            right_delay = (max_allowable_delay as f32 * pan_rad.sin() )as usize;
+        }
+        
+        if itd_signed < 0.0 {
+            left_delay = (max_allowable_delay as f32 * pan_rad.cos() )as usize;
+        }
 
         for frame in 0..frames_to_fill {
-            let sample_idx = self.cursor * self.channels;
-            if self.channels == 2 {
-                self.buffer[frame * 2] =
-                    self.samples[sample_idx] * self.volume * distance_attenuation * left_gain;
-                self.buffer[frame * 2 + 1] =
-                    self.samples[sample_idx + 1] * self.volume * distance_attenuation * right_gain;
-            } else if self.channels == 1 {
-                let sample = self.samples[self.cursor] * self.volume * distance_attenuation;
-                self.buffer[frame * 2] = sample * left_gain;
-                self.buffer[frame * 2 + 1] = sample * right_gain;
-            } else {
-                for ch in 0..self.channels {
-                    self.buffer[frame * self.channels + ch] =
-                        self.samples[sample_idx + ch] * self.volume * distance_attenuation;
+            let sample_idx = self.cursor * self.source_channels;
+            match self.source_channels {
+                1 => {
+                    // Mono source, apply same sample to both channels with panning and distance attenuation
+                    let left_sample = self.samples[sample_idx - left_delay] * self.volume * distance_attenuation;
+                    let right_sample =
+                        self.samples[sample_idx - right_delay] * self.volume * distance_attenuation;
+                    self.buffer[frame * 2] = left_sample * left_gain; // Left channel
+                    self.buffer[frame * 2 + 1] = right_sample * right_gain; // Right channel
+                }
+                2 => {
+                    // Stereo source, apply panning and distance attenuation to each channel
+                    // but not ITD since the source is already stereo and that would really mess things up
+                    let left_sample = self.samples[sample_idx ] * self.volume * distance_attenuation;
+                    let right_sample =
+                        self.samples[sample_idx + 1] * self.volume * distance_attenuation;
+                    self.buffer[frame * 2] = left_sample * left_gain; // Left channel
+                    self.buffer[frame * 2 + 1] = right_sample * right_gain; // Right channel
+                }
+                _ => {
+                    // Unsupported channel count, silence output
+                    if frame == 0 {
+                        // Log this only for the first frame to avoid spamming the console
+                        eprintln!(
+                            "Unsupported channel count: {}, expected 1 or 2",
+                            self.source_channels
+                        );
+                    }
+                    self.buffer[frame * 2] = 0.0;
+                    self.buffer[frame * 2 + 1] = 0.0;
                 }
             }
             self.cursor += 1;

@@ -8,4 +8,5 @@ pub struct AudioSourceComponent {
     pub volume: f32,
     pub pitch: f32,
     pub looping: bool,
+    pub spatial: bool,
 }
