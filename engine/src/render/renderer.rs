@@ -18,9 +18,7 @@ use crate::{
         texture,
         texture_resource::TextureResource,
     },
-    render::{
-        frustum::Frustum, render_body_resource::RenderBodyResource, render_instance::RenderInstance,
-    },
+    render::{frustum::Frustum, render_instance::RenderInstance},
 };
 
 pub struct Renderer {
@@ -503,9 +501,7 @@ impl Renderer {
         }
 
         if !mesh_render_data.contains_key(mesh) {
-            let mesh_data = mesh_resource
-                .get_mesh(mesh)
-                .expect("Mesh not found");
+            let mesh_data = mesh_resource.get_mesh(mesh).expect("Mesh not found");
             Self::upload_mesh_to_gpu(gl, mesh_data, mesh, mesh_render_data);
         }
 
@@ -529,11 +525,7 @@ impl Renderer {
                 None
             };
 
-            for attrib in &shader_resource
-                .get_shader(*shader)
-                .unwrap()
-                .attributes
-            {
+            for attrib in &shader_resource.get_shader(*shader).unwrap().attributes {
                 let location = attrib.location;
                 let divisor = match attrib.rate {
                     PerVertex => 0,

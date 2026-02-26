@@ -23,11 +23,15 @@ use glam::{Mat4, Vec3};
 use glow::HasContext;
 
 use crate::{
-    assets::{material_resource::MaterialResource, mesh_resource::MeshResource, shader_resource::ShaderResource, sound_resource::SoundResource, texture_resource::TextureResource},
+    assets::{
+        material_resource::MaterialResource, mesh_resource::MeshResource,
+        shader_resource::ShaderResource, sound_resource::SoundResource,
+        texture_resource::TextureResource,
+    },
     audio::{
         audio_command_queue::AudioCommandQueue,
         audio_command_queue_system::AudioCommandQueueSystem, audio_mixer::AudioMixer,
-        spatial_audio_system::SpatialAudioSystem,
+        simple_phys_audio_system::SimplePhysAudioSystem, spatial_audio_system::SpatialAudioSystem,
     },
     components::physics_component::PhysicsComponent,
     input::InputStateResource,
@@ -38,7 +42,10 @@ use crate::{
         physics_system::PhysicsSystem,
     },
     render::{
-        render_body_resource::RenderBodyResource, render_queue::RenderQueue, render_system::RenderSystem, renderer::{CameraRenderData, RenderParams, Renderer}
+        render_body_resource::RenderBodyResource,
+        render_queue::RenderQueue,
+        render_system::RenderSystem,
+        renderer::{CameraRenderData, RenderParams, Renderer},
     },
     utils::scope_timer::ScopeTimer,
 };
@@ -124,6 +131,7 @@ impl Engine {
                 AudioCommandQueueSystem::build_command_queue,
                 SpatialAudioSystem::update_listener_position,
                 SpatialAudioSystem::update_source_positions,
+                SimplePhysAudioSystem::on_hit_audio_system,
             )
                 .chain(),
         );
@@ -253,10 +261,10 @@ impl Engine {
 
                     self.renderer.render(
                         render_params,
-                        &mesh_resource,
-                        &material_resource,
-                        &texture_resource,
-                        &shader_resource,
+                        mesh_resource,
+                        material_resource,
+                        texture_resource,
+                        shader_resource,
                         camera_data,
                     );
                 }

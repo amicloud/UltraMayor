@@ -6,10 +6,7 @@ use engine::render::render_body_resource::RenderBodyResource;
 use std::hint::black_box;
 
 use engine::physics::physics_resource::{CollisionFrameData, PhysicsResource};
-use engine::{
-    CollisionLayer, CollisionSystem, ConvexCollider, TimeResource,
-    TransformComponent,
-};
+use engine::{CollisionLayer, CollisionSystem, ConvexCollider, TimeResource, TransformComponent};
 use glam::{Quat, Vec3};
 
 fn spawn_convex_grid(world: &mut World, count: usize, spacing: f32, radius: f32) {

@@ -1,7 +1,6 @@
 use bevy_ecs::prelude::*;
 use engine::assets::sound_resource::SoundResource;
 use engine::audio::audio_command_queue::{AudioCommand, AudioCommandQueue};
-use engine::components::audio_source_component::AudioSourceComponent;
 use engine::input::InputStateResource;
 use engine::{Gravity, TimeResource, TransformComponent, WorldBasis};
 use glam::{Quat, Vec3};
@@ -85,15 +84,10 @@ pub fn sound_control(
 }
 
 pub fn spatial_audio_orbit_demo(
-    mut query: Query<(
-        Entity,
-        &mut TransformComponent,
-        &AudioSourceComponent,
-        &SpatialAudioDemoComponent,
-    )>,
+    mut query: Query<(Entity, &mut TransformComponent, &SpatialAudioDemoComponent)>,
     time: Res<TimeResource>,
 ) {
-    for (_, mut transform, _, _) in query.iter_mut() {
+    for (_, mut transform, _) in query.iter_mut() {
         let rotation_speed = 0.5; // Radians per second
         let angle = time.total_time() * rotation_speed;
         let radius = 5.0;
@@ -114,14 +108,13 @@ pub fn spatial_audio_popping_demo(
     mut audio_command_queue: ResMut<AudioCommandQueue>,
     sound_resource: Res<SoundResource>,
 ) {
-    if time.frame_count().is_multiple_of(20) {
-        let (x, y, z) = rand::random::<(f32, f32, f32)>();
-        let random_dir = Vec3::new(x, y, z).normalize_or_zero();
-        let position = random_dir * 5.0;
+    if time.frame_count().is_multiple_of(120) {
+        eprint!("POP!");
+        let position = Vec3::new(5.0, 0.0, 2.0);
         audio_command_queue.push(AudioCommand::PlaySoundAtLocation {
             track: 0,
             sound: sound_resource.get_by_name("pop.wav").unwrap(),
-            volume: 1.0,
+            volume: 2.0,
             looping: false,
             location: position,
         });

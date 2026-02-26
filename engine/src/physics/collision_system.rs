@@ -47,9 +47,11 @@ impl CollisionSystem {
         for (entity, transform, convex_collider, mesh_collider) in &query {
             // --- 1. Compute world AABB ---
             let world_aabb = if let Some(mesh_collider) = mesh_collider {
-                if let Some(local_aabb) =
-                    render_body_local_aabb(mesh_collider.render_body_id, &render_body_resource, &mesh_resource)
-                {
+                if let Some(local_aabb) = render_body_local_aabb(
+                    mesh_collider.render_body_id,
+                    &render_body_resource,
+                    &mesh_resource,
+                ) {
                     transform_aabb(local_aabb, transform)
                 } else {
                     continue;
@@ -112,8 +114,11 @@ impl CollisionSystem {
     ) {
         for (entity, transform, convex_collider, mesh_collider) in &query {
             if let Some(mesh_collider) = mesh_collider
-                && let Some(local_aabb) =
-                    render_body_local_aabb(mesh_collider.render_body_id, &render_body_resource, &mesh_resource)
+                && let Some(local_aabb) = render_body_local_aabb(
+                    mesh_collider.render_body_id,
+                    &render_body_resource,
+                    &mesh_resource,
+                )
             {
                 let world_aabb = transform_aabb(local_aabb, transform);
                 phys.world_aabbs.insert(entity, world_aabb);

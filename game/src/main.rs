@@ -8,6 +8,7 @@ use camera_controller::{
     apply_flying_camera_movement, apply_orbit_camera_input, apply_player_movement_impulses,
     apply_switch_camera_input, initialize_flying_camera_rotation, update_orbit_camera_target,
 };
+use engine::components::simple_on_hit_audio_component::SimpleOnHitAudioComponent;
 use engine::components::single_audio_listener_component::SingleAudioListenerComponent;
 #[allow(unused_imports)]
 use engine::components::{
@@ -16,11 +17,8 @@ use engine::components::{
 };
 
 use crate::game_controller::{
-    SpatialAudioDemoComponent,
-    do_gameplay,
-    sound_control,
-    spatial_audio_orbit_demo,
-    // spatial_audio_popping_demo,
+    SpatialAudioDemoComponent, do_gameplay, sound_control, spatial_audio_orbit_demo,
+    spatial_audio_popping_demo,
 };
 use bevy_ecs::schedule::IntoScheduleConfigs;
 use engine::{
@@ -114,7 +112,6 @@ fn main() {
             apply_player_movement_impulses,
             do_gameplay,
             spatial_audio_orbit_demo,
-            // spatial_audio_popping_demo
             // update_bowl_float,
         )
             .chain(),
@@ -124,6 +121,7 @@ fn main() {
         apply_orbit_camera_input,
         apply_switch_camera_input,
         sound_control,
+        spatial_audio_popping_demo,
     ));
 
     let cube = engine
@@ -160,7 +158,7 @@ fn main() {
     let _mono_shanty = engine
         .load_wav("resources/sounds/sea_shanty_2_mono.wav")
         .expect("Failed to load sound");
-    engine
+    let pop = engine
         .load_wav("resources/sounds/pop.wav")
         .expect("Failed to load sound");
 
@@ -216,6 +214,12 @@ fn main() {
             spatial: true,
         },
         SpatialAudioDemoComponent,
+        SimpleOnHitAudioComponent {
+            sound_handle: pop,
+            volume: 1.0,
+            pitch: 1.0,
+            force_volume_scale: 1.0,
+        },
     ));
 
     // #[cfg(debug_assertions)]
@@ -296,7 +300,7 @@ fn main() {
     //             angular,
     //         },
     //         RenderBodyComponent {
-    //             render_body_id: sphere,
+    //             render_body_id: _sphere,
     //         },
     //         ConvexCollider::sphere(scale, CollisionLayer::Default),
     //         PhysicsComponent {
@@ -309,6 +313,12 @@ fn main() {
     //             local_inertia: glam::Mat3::IDENTITY,
     //         },
     //         SleepComponent::default(),
+    //         SimpleOnHitAudioComponent {
+    //             sound_handle: pop,
+    //             volume: 5.0,
+    //             pitch: 1.0,
+    //             force_volume_scale: 100.0,
+    //         },
     //     ));
     // });
 

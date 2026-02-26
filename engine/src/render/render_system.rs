@@ -5,7 +5,8 @@ use crate::{
         render_body_component::RenderBodyComponent, transform_component::TransformComponent,
     },
     render::{
-        render_body_resource::RenderBodyResource, render_instance::RenderInstance, render_queue::RenderQueue
+        render_body_resource::RenderBodyResource, render_instance::RenderInstance,
+        render_queue::RenderQueue,
     },
 };
 

@@ -5,6 +5,7 @@ pub mod material_component;
 pub mod physics_component;
 pub mod physics_event_listener_component;
 pub mod render_body_component;
+pub mod simple_on_hit_audio_component;
 pub mod single_audio_listener_component;
 pub mod sleep_component;
 pub mod transform_component;

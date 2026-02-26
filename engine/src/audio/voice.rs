@@ -5,11 +5,11 @@ use glam::Vec3;
 
 use crate::audio::audio_mixer::ListenerInfo;
 
-const ITD_DELAY_BUFFER_SIZE: usize = 64; // Must be a power of two
+const ITD_DELAY_BUFFER_SIZE: usize = 128;
 const DEFAULT_SAMPLE_RATE_HZ: f32 = 44_100.0;
 const PAN_SMOOTH_TIME_SECONDS: f32 = 0.05;
 const BACK_LPF_MIX_MULT: f32 = 0.8;
-const LPF_CUTOFF_HZ: f32 = 200.0;
+const LPF_CUTOFF_HZ: f32 = 400.0;
 
 #[derive(Debug)]
 pub(crate) struct Voice {
@@ -157,6 +157,7 @@ impl Voice {
         // Even though one side will always have a 0 sample delay let's just do the math for both sides to avoid
         // doing a ton of if statement evaluations each frame.
         let delay_signed = self.pan_smoothed * self.itd_delay.range as f32;
+        // let delay_signed:f32 = 0.0;
         let left_delay = delay_signed.max(0.0);
         let right_delay = (-delay_signed).max(0.0);
         let itd_range_f32 = self.itd_delay.range as f32;
