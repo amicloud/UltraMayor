@@ -29,9 +29,9 @@ use crate::{
         texture_resource::TextureResource,
     },
     audio::{
-        audio_command_queue::AudioCommandQueue,
-        audio_command_queue_system::AudioCommandQueueSystem, audio_mixer::AudioMixer,
-        simple_phys_audio_system::SimplePhysAudioSystem, spatial_audio_system::SpatialAudioSystem,
+        audio_command_queue_system::AudioCommandQueueSystem, audio_control::AudioControl,
+        audio_mixer::AudioMixer, simple_phys_audio_system::SimplePhysAudioSystem,
+        spatial_audio_system::SpatialAudioSystem,
     },
     components::physics_component::PhysicsComponent,
     input::InputStateResource,
@@ -105,7 +105,7 @@ impl Engine {
         world.insert_resource(TimeResource::new(60, 120));
         world.insert_resource(Gravity::default());
         world.insert_resource(SoundResource::default());
-        world.insert_resource(AudioCommandQueue::default());
+        world.insert_resource(AudioControl::default());
 
         let mut physics_schedule = Schedule::default();
 
@@ -308,11 +308,11 @@ impl Engine {
                 }
 
                 self.audio_mixer.make_mixer_commands(
-                    &self
+                    self
                         .world
-                        .get_resource::<AudioCommandQueue>()
+                        .get_resource::<AudioControl>()
                         .expect("AudioQueue resource not found")
-                        .queue,
+                        .queue(),
                     self.world
                         .get_resource::<SoundResource>()
                         .expect("SoundResource resource not found"),

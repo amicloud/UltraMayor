@@ -9,7 +9,7 @@ use std::{collections::HashMap, sync::Arc};
 
 use crate::{
     assets::sound_resource::SoundResource,
-    audio::{audio_command_queue::AudioCommand, track::Track, voice::Voice},
+    audio::{audio_control::AudioCommand, track::Track, voice::Voice},
 };
 pub struct AudioMixer {
     stream: Option<Stream>,
@@ -243,7 +243,7 @@ impl AudioMixer {
         const MIXER_FULL_ERROR_MESSAGE: &str = "Audio mixer command queue is full! Sorry.";
         for command in commands.iter() {
             match command {
-                AudioCommand::PlaySound {
+                AudioCommand::SpawnSpatialEmitter {
                     track,
                     sound,
                     volume,
@@ -258,7 +258,7 @@ impl AudioMixer {
                                 volume: *volume,
                                 looping: *looping,
                                 source_channels: sound.channels,
-                                source: *source,
+                                source: Some(*source),
                                 location: None,
                             })
                             .expect(MIXER_FULL_ERROR_MESSAGE);
@@ -266,11 +266,10 @@ impl AudioMixer {
                         eprintln!("Sound ID {:?} not found", sound);
                     }
                 }
-                AudioCommand::PlaySoundAtLocation {
+                AudioCommand::PlayOneShotAtLocation {
                     track,
                     sound,
                     volume,
-                    looping,
                     location,
                 } => {
                     if let Some(sound) = sound_resource.get_sound(*sound) {
@@ -279,10 +278,31 @@ impl AudioMixer {
                                 track: *track,
                                 samples: sound.data.clone(), // Cloning an Arc
                                 volume: *volume,
-                                looping: *looping,
+                                looping: false,
                                 source_channels: sound.channels,
                                 source: None,
                                 location: Some(*location),
+                            })
+                            .expect(MIXER_FULL_ERROR_MESSAGE);
+                    } else {
+                        eprintln!("Sound ID {:?} not found", sound);
+                    }
+                }
+                AudioCommand::PlayOneShot {
+                    track,
+                    sound,
+                    volume,
+                } => {
+                    if let Some(sound) = sound_resource.get_sound(*sound) {
+                        self.producer
+                            .push(MixerCommand::AddVoice {
+                                track: *track,
+                                samples: sound.data.clone(), // Cloning an Arc
+                                volume: *volume,
+                                looping: false,
+                                source_channels: sound.channels,
+                                source: None,
+                                location: None,
                             })
                             .expect(MIXER_FULL_ERROR_MESSAGE);
                     } else {

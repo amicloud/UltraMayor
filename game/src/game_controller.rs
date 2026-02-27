@@ -1,6 +1,6 @@
 use bevy_ecs::prelude::*;
 use engine::assets::sound_resource::SoundResource;
-use engine::audio::audio_command_queue::{AudioCommand, AudioCommandQueue};
+use engine::audio::audio_control::AudioControl;
 use engine::input::InputStateResource;
 use engine::{Gravity, TimeResource, TransformComponent, WorldBasis};
 use glam::{Quat, Vec3};
@@ -61,33 +61,31 @@ pub fn do_gameplay(
 
 pub fn sound_control(
     input_state: Res<InputStateResource>,
-    mut audio_command_queue: ResMut<AudioCommandQueue>,
     sound_resource: Res<SoundResource>,
+    mut audio: ResMut<AudioControl>,
 ) {
     if input_state.key_pressed(sdl2::keyboard::Keycode::N) {
-        audio_command_queue.push(AudioCommand::PlaySound {
-            track: 0,
-            sound: sound_resource.get_by_name("sea_shanty_2.wav").unwrap(),
-            volume: 0.5,
-            looping: false,
-            source: None,
-        });
+        audio.play_one_shot(
+            0,
+            sound_resource.get_by_name("sea_shanty_2.wav").unwrap(),
+            0.5,
+        );
     } else if input_state.key_pressed(sdl2::keyboard::Keycode::P) {
-        audio_command_queue.push(AudioCommand::PauseMix);
+        audio.pause_mix();
     } else if input_state.key_pressed(sdl2::keyboard::Keycode::O) {
-        audio_command_queue.push(AudioCommand::ResumeMix);
+        audio.resume_mix();
     } else if input_state.key_pressed(sdl2::keyboard::Keycode::M) {
-        audio_command_queue.push(AudioCommand::MuteMix);
+        audio.mute_mix();
     } else if input_state.key_pressed(sdl2::keyboard::Keycode::U) {
-        audio_command_queue.push(AudioCommand::UnmuteMix);
+        audio.unmute_mix();
     }
 }
 
 pub fn spatial_audio_orbit_demo(
-    mut query: Query<(Entity, &mut TransformComponent, &SpatialAudioDemoComponent)>,
+    mut query: Query<(&mut TransformComponent, &SpatialAudioDemoComponent)>,
     time: Res<TimeResource>,
 ) {
-    for (_, mut transform, _) in query.iter_mut() {
+    for (mut transform, _) in query.iter_mut() {
         let rotation_speed = 0.5; // Radians per second
         let angle = time.total_time() * rotation_speed;
         let radius = 5.0;
@@ -102,21 +100,21 @@ pub fn spatial_audio_orbit_demo(
 #[derive(Component)]
 pub struct SpatialAudioDemoComponent;
 
-#[allow(unused)]
-pub fn spatial_audio_popping_demo(
-    time: Res<TimeResource>,
-    mut audio_command_queue: ResMut<AudioCommandQueue>,
-    sound_resource: Res<SoundResource>,
-) {
-    if time.frame_count().is_multiple_of(120) {
-        eprint!("POP!");
-        let position = Vec3::new(5.0, 0.0, 2.0);
-        audio_command_queue.push(AudioCommand::PlaySoundAtLocation {
-            track: 0,
-            sound: sound_resource.get_by_name("pop.wav").unwrap(),
-            volume: 2.0,
-            looping: false,
-            location: position,
-        });
-    }
-}
+// #[allow(unused)]
+// pub fn spatial_audio_popping_demo(
+//     time: Res<TimeResource>,
+//     mut audio_command_queue: ResMut<AudioCommandQueue>,
+//     sound_resource: Res<SoundResource>,
+// ) {
+//     if time.frame_count().is_multiple_of(120) {
+//         eprint!("POP!");
+//         let position = Vec3::new(5.0, 0.0, 2.0);
+//         audio_command_queue.push(AudioCommand::PlaySoundAtLocation {
+//             track: 0,
+//             sound: sound_resource.get_by_name("pop.wav").unwrap(),
+//             volume: 2.0,
+//             looping: false,
+//             location: position,
+//         });
+//     }
+// }

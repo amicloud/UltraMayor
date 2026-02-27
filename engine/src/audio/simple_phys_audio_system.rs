@@ -3,7 +3,7 @@ use glam::Vec3;
 
 use crate::{
     TransformComponent,
-    audio::audio_command_queue::{AudioCommand, AudioCommandQueue},
+    audio::audio_control::{AudioControl},
     components::simple_on_hit_audio_component::SimpleOnHitAudioComponent,
     physics::{
         collision_system::ordered_pair, physics_event::PhysicsEventType,
@@ -17,7 +17,7 @@ impl SimplePhysAudioSystem {
     pub fn on_hit_audio_system(
         query: Query<(&SimpleOnHitAudioComponent, &TransformComponent)>,
         collision_frame_data: Res<CollisionFrameData>,
-        mut audio_command_queue: ResMut<AudioCommandQueue>,
+        mut audio_control: ResMut<AudioControl>,
     ) {
         for manifold_entry in collision_frame_data.manifolds.iter() {
             let pair = ordered_pair(manifold_entry.entity_a, manifold_entry.entity_b);
@@ -52,15 +52,12 @@ impl SimplePhysAudioSystem {
                             .map(|c| c.contact_point)
                             .sum::<Vec3>()
                             / manifold_entry.manifold.contacts.len() as f32;
-                        audio_command_queue
-                            .queue
-                            .push(AudioCommand::PlaySoundAtLocation {
-                                track: 0,
-                                sound: query.get(manifold_entry.entity_a).unwrap().0.sound_handle,
-                                volume: final_volume,
-                                looping: false,
-                                location: sound_position,
-                            });
+                        audio_control.play_one_shot_at_location(
+                            0,
+                            query.get(manifold_entry.entity_a).unwrap().0.sound_handle,
+                            final_volume,
+                            sound_position,
+                        );
                     }
 
                     if query.get(manifold_entry.entity_b).is_ok() {
@@ -86,15 +83,12 @@ impl SimplePhysAudioSystem {
                             .map(|c| c.contact_point)
                             .sum::<Vec3>()
                             / manifold_entry.manifold.contacts.len() as f32;
-                        audio_command_queue
-                            .queue
-                            .push(AudioCommand::PlaySoundAtLocation {
-                                track: 0,
-                                sound: query.get(manifold_entry.entity_b).unwrap().0.sound_handle,
-                                volume: final_volume,
-                                looping: false,
-                                location: sound_position,
-                            });
+                        audio_control.play_one_shot_at_location(
+                            0,
+                            query.get(manifold_entry.entity_b).unwrap().0.sound_handle,
+                            final_volume,
+                            sound_position,
+                        );
                     }
                 }
                 PhysicsEventType::Stay => continue,

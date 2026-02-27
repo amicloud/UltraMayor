@@ -1,8 +1,7 @@
 use bevy_ecs::prelude::*;
 
 use crate::{
-    TransformComponent,
-    audio::audio_command_queue::{AudioCommand, AudioCommandQueue},
+    TransformComponent, audio::audio_control::AudioControl,
     components::audio_source_component::AudioSourceComponent,
 };
 
@@ -11,23 +10,17 @@ pub struct AudioCommandQueueSystem;
 impl AudioCommandQueueSystem {
     pub fn build_command_queue(
         query: Query<
-            (Entity, &AudioSourceComponent, Option<&TransformComponent>),
+            (Entity, &AudioSourceComponent, &TransformComponent),
             Added<AudioSourceComponent>,
         >,
-        mut queue: ResMut<AudioCommandQueue>,
+        mut audio: ResMut<AudioControl>,
     ) {
         for (entity, source, _) in query.iter() {
-            queue.push(AudioCommand::PlaySound {
-                track: 0,
-                sound: source.sound,
-                volume: source.volume,
-                looping: source.looping,
-                source: Some(entity),
-            });
+            audio.spawn_spatial_emitter(0, source.sound, source.volume, source.looping, entity);
         }
     }
 
-    pub fn clear_command_queue(mut queue: ResMut<AudioCommandQueue>) {
-        queue.clear();
+    pub fn clear_command_queue(mut audio: ResMut<AudioControl>) {
+        audio.clear();
     }
 }

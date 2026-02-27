@@ -17,8 +17,11 @@ use engine::components::{
 };
 
 use crate::game_controller::{
-    SpatialAudioDemoComponent, do_gameplay, sound_control, spatial_audio_orbit_demo,
-    spatial_audio_popping_demo,
+    SpatialAudioDemoComponent,
+    do_gameplay,
+    sound_control,
+    spatial_audio_orbit_demo,
+    // spatial_audio_popping_demo,
 };
 use bevy_ecs::schedule::IntoScheduleConfigs;
 use engine::{
@@ -121,7 +124,7 @@ fn main() {
         apply_orbit_camera_input,
         apply_switch_camera_input,
         sound_control,
-        spatial_audio_popping_demo,
+        // spatial_audio_popping_demo,
     ));
 
     let cube = engine
@@ -211,7 +214,6 @@ fn main() {
             volume: 1.0,
             looping: true,
             pitch: 1.0,
-            spatial: true,
         },
         SpatialAudioDemoComponent,
         SimpleOnHitAudioComponent {
