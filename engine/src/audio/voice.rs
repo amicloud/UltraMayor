@@ -75,7 +75,6 @@ impl Voice {
 
         // Low pass filter coefficient for head shadow effect
         let alpha = 1.0 - (-2.0 * PI * LPF_CUTOFF_HZ / sample_rate).exp();
-
         Self {
             samples,
             cursor: 0,
@@ -142,9 +141,8 @@ impl Voice {
             back_strength = (front_back).max(0.0);
         }
 
-        let pan_smooth_alpha = 1.0
-            - (-(required_frames as f32) / (self.sample_rate * PAN_SMOOTH_TIME_SECONDS))
-                .exp();
+        let pan_smooth_alpha =
+            1.0 - (-(required_frames as f32) / (self.sample_rate * PAN_SMOOTH_TIME_SECONDS)).exp();
         self.pan_smoothed += pan_smooth_alpha * (pan - self.pan_smoothed);
 
         let ild_strength = 0.33;

@@ -36,6 +36,9 @@ pub fn dispatch_physics_events(
                 collision_info: PhysicsEventInfo {
                     normal: manifold_entry.manifold.normal,
                     contacts: manifold_entry.manifold.contacts.clone(),
+                    relative_normal_speed: manifold_entry.manifold.relative_normal_speed,
+                    impact_impulse: manifold_entry.manifold.impact_impulse,
+                    impact_energy: manifold_entry.manifold.impact_energy,
                 },
                 other_entity: manifold_entry.entity_b,
             };
@@ -49,6 +52,9 @@ pub fn dispatch_physics_events(
                 collision_info: PhysicsEventInfo {
                     normal: -manifold_entry.manifold.normal,
                     contacts: manifold_entry.manifold.contacts.clone(),
+                    relative_normal_speed: manifold_entry.manifold.relative_normal_speed,
+                    impact_impulse: manifold_entry.manifold.impact_impulse,
+                    impact_energy: manifold_entry.manifold.impact_energy,
                 },
                 other_entity: manifold_entry.entity_a,
             };

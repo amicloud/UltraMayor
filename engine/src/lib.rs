@@ -308,8 +308,7 @@ impl Engine {
                 }
 
                 self.audio_mixer.make_mixer_commands(
-                    self
-                        .world
+                    self.world
                         .get_resource::<AudioControl>()
                         .expect("AudioQueue resource not found")
                         .queue(),

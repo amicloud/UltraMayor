@@ -3,7 +3,7 @@ use glam::Vec3;
 
 use crate::{
     TransformComponent,
-    audio::audio_control::{AudioControl},
+    audio::audio_control::AudioControl,
     components::simple_on_hit_audio_component::SimpleOnHitAudioComponent,
     physics::{
         collision_system::ordered_pair, physics_event::PhysicsEventType,
@@ -29,22 +29,11 @@ impl SimplePhysAudioSystem {
 
             match event_type {
                 PhysicsEventType::Hit => {
-                    if query.get(manifold_entry.entity_a).is_ok() {
-                        let volume = query.get(manifold_entry.entity_a).unwrap().0.volume;
-                        let force_modifier = query
-                            .get(manifold_entry.entity_a)
-                            .unwrap()
-                            .0
-                            .force_volume_scale;
-                        let contact_force = manifold_entry
-                            .manifold
-                            .contacts
-                            .iter()
-                            .map(|c| c.penetration)
-                            .sum::<f32>();
-                        let final_volume =
-                            volume * (contact_force * force_modifier).clamp(0.0, 1.0);
-                        dbg!(final_volume);
+                    if let Ok((audio_component, _)) = query.get(manifold_entry.entity_a) {
+                        let final_volume = audio_component.volume
+                            * (manifold_entry.manifold.impact_energy
+                                * audio_component.force_volume_scale)
+                                .clamp(0.0, 1.0);
                         let sound_position = manifold_entry
                             .manifold
                             .contacts
@@ -54,28 +43,17 @@ impl SimplePhysAudioSystem {
                             / manifold_entry.manifold.contacts.len() as f32;
                         audio_control.play_one_shot_at_location(
                             0,
-                            query.get(manifold_entry.entity_a).unwrap().0.sound_handle,
+                            audio_component.sound_handle,
                             final_volume,
                             sound_position,
                         );
                     }
 
-                    if query.get(manifold_entry.entity_b).is_ok() {
-                        let volume = query.get(manifold_entry.entity_b).unwrap().0.volume;
-                        let force_modifier = query
-                            .get(manifold_entry.entity_b)
-                            .unwrap()
-                            .0
-                            .force_volume_scale;
-                        let contact_force = manifold_entry
-                            .manifold
-                            .contacts
-                            .iter()
-                            .map(|c| c.penetration)
-                            .sum::<f32>();
-                        let final_volume =
-                            volume * (contact_force * force_modifier).clamp(0.0, 1.0);
-                        dbg!(final_volume);
+                    if let Ok((audio_component, _)) = query.get(manifold_entry.entity_b) {
+                        let final_volume = audio_component.volume
+                            * (manifold_entry.manifold.impact_energy
+                                * audio_component.force_volume_scale)
+                                .clamp(0.0, 1.0);
                         let sound_position = manifold_entry
                             .manifold
                             .contacts
@@ -85,7 +63,7 @@ impl SimplePhysAudioSystem {
                             / manifold_entry.manifold.contacts.len() as f32;
                         audio_control.play_one_shot_at_location(
                             0,
-                            query.get(manifold_entry.entity_b).unwrap().0.sound_handle,
+                            audio_component.sound_handle,
                             final_volume,
                             sound_position,
                         );

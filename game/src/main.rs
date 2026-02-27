@@ -17,7 +17,7 @@ use engine::components::{
 };
 
 use crate::game_controller::{
-    SpatialAudioDemoComponent,
+    // SpatialAudioDemoComponent,
     do_gameplay,
     sound_control,
     spatial_audio_orbit_demo,
@@ -194,41 +194,41 @@ fn main() {
     ));
 
     // Spatial audio testing
-    engine.world.spawn((
-        TransformComponent {
-            position: Vec3::new(0.0, 0.0, 5.0),
-            rotation: Quat::IDENTITY,
-            scale: player_scale,
-        },
-        VelocityComponent {
-            translational: Vec3::ZERO,
-            angular: Vec3::ZERO,
-        },
-        RenderBodyComponent {
-            render_body_id: cube,
-        },
-        cuboid_collider,
-        SleepComponent::default(),
-        AudioSourceComponent {
-            sound: _mono_shanty,
-            volume: 1.0,
-            looping: true,
-            pitch: 1.0,
-        },
-        SpatialAudioDemoComponent,
-        SimpleOnHitAudioComponent {
-            sound_handle: pop,
-            volume: 1.0,
-            pitch: 1.0,
-            force_volume_scale: 1.0,
-        },
-    ));
+    // engine.world.spawn((
+    //     TransformComponent {
+    //         position: Vec3::new(0.0, 0.0, 5.0),
+    //         rotation: Quat::IDENTITY,
+    //         scale: player_scale,
+    //     },
+    //     VelocityComponent {
+    //         translational: Vec3::ZERO,
+    //         angular: Vec3::ZERO,
+    //     },
+    //     RenderBodyComponent {
+    //         render_body_id: cube,
+    //     },
+    //     cuboid_collider,
+    //     SleepComponent::default(),
+    //     AudioSourceComponent {
+    //         sound: _mono_shanty,
+    //         volume: 1.0,
+    //         looping: true,
+    //         pitch: 1.0,
+    //     },
+    //     SpatialAudioDemoComponent,
+    //     SimpleOnHitAudioComponent {
+    //         sound_handle: pop,
+    //         volume: 1.0,
+    //         pitch: 1.0,
+    //         force_volume_scale: 1.0,
+    //     },
+    // ));
 
-    // #[cfg(debug_assertions)]
-    // let spawn_mult = 1;
+    #[cfg(debug_assertions)]
+    let spawn_mult = 1;
 
-    // #[cfg(not(debug_assertions))]
-    // let spawn_mult = 10;
+    #[cfg(not(debug_assertions))]
+    let spawn_mult = 10;
 
     // (1..=(5 * spawn_mult)).for_each(|i| {
     //     let p = player_local_size * Vec3::new(0.0, 0.0, i as f32);
@@ -263,66 +263,66 @@ fn main() {
     //     ));
     // });
 
-    // let t_range = 2.0;
+    let t_range = 2.0;
 
-    // (0..(10 * spawn_mult)).for_each(|_| {
-    //     use rand::random_range;
-    //     // Random position
-    //     let pos = Vec3::new(
-    //         random_range(-20.0..20.0),
-    //         random_range(-20.0..20.0),
-    //         random_range(20.0..200.0),
-    //     );
+    (0..(10 * spawn_mult)).for_each(|_| {
+        use rand::random_range;
+        // Random position
+        let pos = Vec3::new(
+            random_range(-20.0..20.0),
+            random_range(-20.0..20.0),
+            random_range(20.0..200.0),
+        );
 
-    //     // Random translational velocity
-    //     let translational = Vec3::new(
-    //         random_range((-t_range)..t_range),
-    //         random_range((-t_range)..t_range),
-    //         random_range((-t_range)..t_range),
-    //     );
-    //     // let translational = Vec3::new(0.0, 0.0, 0.0);
+        // Random translational velocity
+        let translational = Vec3::new(
+            random_range((-t_range)..t_range),
+            random_range((-t_range)..t_range),
+            random_range((-t_range)..t_range),
+        );
+        // let translational = Vec3::new(0.0, 0.0, 0.0);
 
-    //     // Random angular velocity
-    //     let angular = Vec3::new(
-    //         random_range(-1.0..1.0),
-    //         random_range(-1.0..1.0),
-    //         random_range(-1.0..1.0),
-    //     );
+        // Random angular velocity
+        let angular = Vec3::new(
+            random_range(-1.0..1.0),
+            random_range(-1.0..1.0),
+            random_range(-1.0..1.0),
+        );
 
-    //     let scale = 1.0;
-    //     // Spawn test objects
-    //     engine.world.spawn((
-    //         TransformComponent {
-    //             position: pos,
-    //             rotation: Quat::IDENTITY,
-    //             scale: Vec3::new(scale, scale, scale),
-    //         },
-    //         VelocityComponent {
-    //             translational,
-    //             angular,
-    //         },
-    //         RenderBodyComponent {
-    //             render_body_id: _sphere,
-    //         },
-    //         ConvexCollider::sphere(scale, CollisionLayer::Default),
-    //         PhysicsComponent {
-    //             mass: 300.0,
-    //             physics_type: PhysicsType::Dynamic,
-    //             friction: 0.2,
-    //             drag_coefficient: 0.1,
-    //             angular_drag_coefficient: 0.1,
-    //             restitution: 0.5,
-    //             local_inertia: glam::Mat3::IDENTITY,
-    //         },
-    //         SleepComponent::default(),
-    //         SimpleOnHitAudioComponent {
-    //             sound_handle: pop,
-    //             volume: 5.0,
-    //             pitch: 1.0,
-    //             force_volume_scale: 100.0,
-    //         },
-    //     ));
-    // });
+        let scale = 1.0;
+        // Spawn test objects
+        engine.world.spawn((
+            TransformComponent {
+                position: pos,
+                rotation: Quat::IDENTITY,
+                scale: Vec3::new(scale, scale, scale),
+            },
+            VelocityComponent {
+                translational,
+                angular,
+            },
+            RenderBodyComponent {
+                render_body_id: _sphere,
+            },
+            ConvexCollider::sphere(scale, CollisionLayer::Default),
+            PhysicsComponent {
+                mass: 30.0,
+                physics_type: PhysicsType::Dynamic,
+                friction: 0.2,
+                drag_coefficient: 0.1,
+                angular_drag_coefficient: 0.1,
+                restitution: 0.5,
+                local_inertia: glam::Mat3::IDENTITY,
+            },
+            SleepComponent::default(),
+            SimpleOnHitAudioComponent {
+                sound_handle: pop,
+                volume: 1.0,
+                pitch: 1.0,
+                force_volume_scale: 10.0,
+            },
+        ));
+    });
 
     // let test_ground = engine
     //     .load_model("resources/models/test_ground/test_ground.obj")

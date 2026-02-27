@@ -14,6 +14,9 @@ pub struct PhysicsEvent {
 pub struct PhysicsEventInfo {
     pub normal: glam::Vec3,
     pub contacts: Vec<Contact>,
+    pub relative_normal_speed: f32,
+    pub impact_impulse: f32,
+    pub impact_energy: f32,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

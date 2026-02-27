@@ -13,6 +13,7 @@ use crate::{
         BVHNode, Collider, ConvexCollider, ConvexShape, MeshCollider, Triangle,
         closest_point_on_triangle,
     },
+    components::physics_component::{PhysicsComponent, PhysicsType},
     components::velocity_component::VelocityComponent,
     physics,
     render::render_body_resource::RenderBodyResource,
@@ -159,6 +160,7 @@ impl CollisionSystem {
             Entity,
             &TransformComponent,
             Option<&VelocityComponent>,
+            Option<&PhysicsComponent>,
             Option<&ConvexCollider>,
             Option<&MeshCollider>,
         )>,
@@ -204,9 +206,9 @@ impl CollisionSystem {
             .candidate_pairs
             .par_iter()
             .filter_map(|(entity_a, entity_b)| {
-                let (.., transform_a, velocity_a, convex_a, mesh_a) =
+                let (.., transform_a, velocity_a, physics_a, convex_a, mesh_a) =
                     all_query.get(*entity_a).ok()?;
-                let (.., transform_b, velocity_b, convex_b, mesh_b) =
+                let (.., transform_b, velocity_b, physics_b, convex_b, mesh_b) =
                     all_query.get(*entity_b).ok()?;
 
                 let pair = ordered_pair(*entity_a, *entity_b);
@@ -226,7 +228,16 @@ impl CollisionSystem {
                         previous_manifold,
                         delta_t,
                     )
-                    .map(|merged| (pair, merged));
+                    .map(|mut merged| {
+                        apply_collision_metrics(
+                            &mut merged,
+                            velocity_a,
+                            physics_a,
+                            velocity_b,
+                            physics_b,
+                        );
+                        (pair, merged)
+                    });
                 }
 
                 if let (Some(convex_a), Some(mesh_b)) = (convex_a, mesh_b) {
@@ -244,7 +255,16 @@ impl CollisionSystem {
                         previous_manifold,
                         delta_t,
                     )
-                    .map(|merged| (pair, merged));
+                    .map(|mut merged| {
+                        apply_collision_metrics(
+                            &mut merged,
+                            velocity_a,
+                            physics_a,
+                            velocity_b,
+                            physics_b,
+                        );
+                        (pair, merged)
+                    });
                 }
 
                 if let (Some(mesh_a), Some(convex_b)) = (mesh_a, convex_b) {
@@ -262,7 +282,16 @@ impl CollisionSystem {
                         previous_manifold,
                         delta_t,
                     )
-                    .map(|merged| (pair, merged));
+                    .map(|mut merged| {
+                        apply_collision_metrics(
+                            &mut merged,
+                            velocity_a,
+                            physics_a,
+                            velocity_b,
+                            physics_b,
+                        );
+                        (pair, merged)
+                    });
                 }
 
                 None
@@ -429,6 +458,53 @@ fn manifold_max_penetration(manifold: &ContactManifold) -> f32 {
         .unwrap_or(0.0)
 }
 
+fn entity_inverse_mass(physics: Option<&PhysicsComponent>) -> f32 {
+    let Some(physics) = physics else {
+        return 0.0;
+    };
+
+    if matches!(physics.physics_type, PhysicsType::Dynamic) && physics.mass > f32::EPSILON {
+        1.0 / physics.mass
+    } else {
+        0.0
+    }
+}
+
+fn apply_collision_metrics(
+    manifold: &mut ContactManifold,
+    velocity_a: Option<&VelocityComponent>,
+    physics_a: Option<&PhysicsComponent>,
+    velocity_b: Option<&VelocityComponent>,
+    physics_b: Option<&PhysicsComponent>,
+) {
+    let normal = if manifold.normal.length_squared() > f32::EPSILON {
+        manifold.normal.normalize()
+    } else {
+        manifold.relative_normal_speed = 0.0;
+        manifold.impact_impulse = 0.0;
+        manifold.impact_energy = 0.0;
+        return;
+    };
+
+    let vel_a = velocity_a.map_or(Vec3::ZERO, |v| v.translational);
+    let vel_b = velocity_b.map_or(Vec3::ZERO, |v| v.translational);
+    let rel_velocity = vel_b - vel_a;
+    let approach_speed = (-rel_velocity.dot(normal)).max(0.0);
+
+    let inv_mass_a = entity_inverse_mass(physics_a);
+    let inv_mass_b = entity_inverse_mass(physics_b);
+    let inv_mass_sum = inv_mass_a + inv_mass_b;
+    let reduced_mass = if inv_mass_sum > 0.0 {
+        1.0 / inv_mass_sum
+    } else {
+        0.0
+    };
+
+    manifold.relative_normal_speed = approach_speed;
+    manifold.impact_impulse = reduced_mass * approach_speed;
+    manifold.impact_energy = 0.5 * reduced_mass * approach_speed * approach_speed;
+}
+
 fn merge_contact_manifold(
     previous: Option<&ContactManifold>,
     new_contacts: &[Contact],
@@ -440,6 +516,9 @@ fn merge_contact_manifold(
         return ContactManifold {
             contacts: Vec::new(),
             normal: Vec3::ZERO,
+            relative_normal_speed: 0.0,
+            impact_impulse: 0.0,
+            impact_energy: 0.0,
         };
     }
 
@@ -535,6 +614,9 @@ fn merge_contact_manifold(
     ContactManifold {
         contacts: merged,
         normal,
+        relative_normal_speed: 0.0,
+        impact_impulse: 0.0,
+        impact_energy: 0.0,
     }
 }
 
@@ -1061,7 +1143,6 @@ fn convex_mesh_contact(
 }
 
 /// Continuous convex-vs-mesh candidate generation using swept support-plane TOI.
-/// This is more reliable for fast-moving bodies than pure substep sampling.
 fn convex_mesh_swept_contact_at_transform(
     convex_collider: &ConvexCollider,
     start_world: Mat4,

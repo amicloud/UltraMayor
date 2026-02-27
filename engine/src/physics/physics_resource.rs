@@ -24,6 +24,9 @@ pub struct Contact {
 pub struct ContactManifold {
     pub contacts: Vec<Contact>,
     pub normal: Vec3,
+    pub relative_normal_speed: f32,
+    pub impact_impulse: f32,
+    pub impact_energy: f32,
 }
 
 #[derive(Resource, Default)]
