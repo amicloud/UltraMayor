@@ -6,7 +6,6 @@ use glam::Vec3;
 use crate::audio::audio_mixer::ListenerInfo;
 
 const ITD_DELAY_BUFFER_SIZE: usize = 128;
-const DEFAULT_SAMPLE_RATE_HZ: f32 = 44_100.0;
 const PAN_SMOOTH_TIME_SECONDS: f32 = 0.05;
 const BACK_LPF_MIX_MULT: f32 = 0.8;
 const LPF_CUTOFF_HZ: f32 = 400.0;
@@ -14,6 +13,7 @@ const LPF_CUTOFF_HZ: f32 = 400.0;
 #[derive(Debug)]
 pub(crate) struct Voice {
     samples: Arc<[f32]>,
+    sample_rate: f32,
     cursor: usize,
     volume: f32,
     looping: bool,
@@ -57,6 +57,7 @@ impl Voice {
 
     pub(crate) fn new(
         samples: Arc<[f32]>,
+        sample_rate: f32,
         volume: f32,
         looping: bool,
         source: Option<Entity>,
@@ -67,7 +68,6 @@ impl Voice {
         let itd_scale = 1.0; // Scale factor for ITD effect, for demonstration purposes
         let itd_max_time_seconds = 0.67 / 1000.0; //0.67 ms converted to seconds
 
-        let sample_rate = 44100.0; // This should come in as an argument
         // Calculate the maximum ITD delay in samples based on the desired time and sample rate, scaled by the ITD effect strength
         // We clamp it between 1 and the buffer size to avoid division by zero and ensure we do not overrun the buffer
         let itd_max_samples = ((itd_max_time_seconds * sample_rate * itd_scale) as usize)
@@ -79,6 +79,7 @@ impl Voice {
         Self {
             samples,
             cursor: 0,
+            sample_rate,
             volume,
             looping,
             channels: 2, // We always output stereo from the voice, even if the source is mono. The mixer will handle downmixing if necessary.
@@ -142,7 +143,7 @@ impl Voice {
         }
 
         let pan_smooth_alpha = 1.0
-            - (-(required_frames as f32) / (DEFAULT_SAMPLE_RATE_HZ * PAN_SMOOTH_TIME_SECONDS))
+            - (-(required_frames as f32) / (self.sample_rate * PAN_SMOOTH_TIME_SECONDS))
                 .exp();
         self.pan_smoothed += pan_smooth_alpha * (pan - self.pan_smoothed);
 

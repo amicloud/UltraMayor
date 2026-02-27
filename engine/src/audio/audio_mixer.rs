@@ -24,6 +24,7 @@ enum MixerCommand {
     AddVoice {
         track: usize,
         samples: Arc<[f32]>,
+        sample_rate: f32,
         volume: f32,
         looping: bool,
         source_channels: usize,
@@ -179,6 +180,7 @@ impl AudioMixer {
                 MixerCommand::AddVoice {
                     track,
                     samples,
+                    sample_rate,
                     volume,
                     looping,
                     source_channels,
@@ -188,6 +190,7 @@ impl AudioMixer {
                     if let Some(track) = tracks.get_mut(track) {
                         track.voices.push(Voice::new(
                             samples,
+                            sample_rate,
                             volume,
                             looping,
                             source,
@@ -255,6 +258,7 @@ impl AudioMixer {
                             .push(MixerCommand::AddVoice {
                                 track: *track,
                                 samples: sound.data.clone(),
+                                sample_rate: sound.sample_rate as f32,
                                 volume: *volume,
                                 looping: *looping,
                                 source_channels: sound.channels,
@@ -277,6 +281,7 @@ impl AudioMixer {
                             .push(MixerCommand::AddVoice {
                                 track: *track,
                                 samples: sound.data.clone(), // Cloning an Arc
+                                sample_rate: sound.sample_rate as f32,
                                 volume: *volume,
                                 looping: false,
                                 source_channels: sound.channels,
@@ -298,6 +303,7 @@ impl AudioMixer {
                             .push(MixerCommand::AddVoice {
                                 track: *track,
                                 samples: sound.data.clone(), // Cloning an Arc
+                                sample_rate: sound.sample_rate as f32,
                                 volume: *volume,
                                 looping: false,
                                 source_channels: sound.channels,
