@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use bevy_ecs::prelude::*;
 use glam::{Mat3, Vec3};
 
@@ -26,8 +24,6 @@ pub struct ContactConstraint {
     accumulated_normal_lambda: f32,
     contact_point: Vec3, // world-space contact
 }
-
-const ENABLE_RESTING_STABILIZATION: bool = true;
 
 impl PhysicsSystem {
     pub fn integrate_motion(
@@ -264,7 +260,7 @@ impl PhysicsSystem {
     }
 
     fn positional_correction(
-        contacts: &[ContactConstraint],
+        physics_frame_data: &mut PhysicsFrameData,
         query: &mut Query<(
             &mut TransformComponent,
             Option<&mut VelocityComponent>,
@@ -277,9 +273,8 @@ impl PhysicsSystem {
         let max_correction = 2.0;
 
         // Track accumulated corrections per entity
-        let mut corrections: HashMap<Entity, Vec3> = HashMap::new();
 
-        for constraint in contacts {
+        for constraint in &physics_frame_data.constraints {
             let Ok([mut a, mut b]) = query.get_many_mut([constraint.entity_a, constraint.entity_b])
             else {
                 continue;
@@ -305,19 +300,21 @@ impl PhysicsSystem {
             let correction = normal * correction_mag;
 
             // Accumulate corrections
-            corrections
+            physics_frame_data
+                .corrections
                 .entry(constraint.entity_a)
                 .and_modify(|v| *v += -correction * props_a.inv_mass)
                 .or_insert(-correction * props_a.inv_mass);
 
-            corrections
+            physics_frame_data
+                .corrections
                 .entry(constraint.entity_b)
                 .and_modify(|v| *v += correction * props_b.inv_mass)
                 .or_insert(correction * props_b.inv_mass);
         }
 
         // Apply clamped corrections
-        for (entity, delta) in corrections {
+        for (entity, delta) in physics_frame_data.corrections.drain() {
             let Ok(mut entry) = query.get_mut(entity) else {
                 continue;
             };
@@ -457,14 +454,13 @@ impl PhysicsSystem {
             }
         }
 
-        Self::positional_correction(&physics_frame_data.constraints, &mut query);
-        if ENABLE_RESTING_STABILIZATION {
-            Self::stabilize_resting_contacts(
-                &collision_frame_data,
-                &mut query,
-                gravity.gravity_vector(),
-            );
-        }
+        Self::positional_correction(&mut physics_frame_data, &mut query);
+        Self::stabilize_resting_contacts(
+            &collision_frame_data,
+            &mut query,
+            gravity.gravity_vector(),
+        );
+
         physics_frame_data.clear();
     }
 }

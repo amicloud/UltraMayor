@@ -1,7 +1,7 @@
 use bevy_ecs::prelude::*;
 
 use crate::{
-    TransformComponent, audio::audio_control::{AudioControl},
+    TransformComponent, audio::audio_control::AudioControl,
     components::audio_source_component::AudioSourceComponent,
 };
 

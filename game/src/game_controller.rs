@@ -1,6 +1,6 @@
 use bevy_ecs::prelude::*;
 use engine::assets::sound_resource::SoundResource;
-use engine::audio::audio_control::{AudioControl};
+use engine::audio::audio_control::AudioControl;
 use engine::input::InputStateResource;
 use engine::{Gravity, TimeResource, TransformComponent, WorldBasis};
 use glam::{Quat, Vec3};

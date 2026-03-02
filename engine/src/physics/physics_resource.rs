@@ -39,6 +39,7 @@ pub struct PhysicsResource {
 #[derive(Resource, Default)]
 pub struct PhysicsFrameData {
     pub constraints: Vec<ContactConstraint>,
+    pub corrections: HashMap<Entity, Vec3>,
 }
 
 #[derive(Resource, Default)]

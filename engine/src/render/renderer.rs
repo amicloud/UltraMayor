@@ -99,7 +99,6 @@ pub struct CameraRenderData {
 }
 
 impl Renderer {
-
     pub fn new(gl: Rc<GlowContext>) -> Self {
         unsafe {
             gl.enable(glow::DEPTH_TEST);
@@ -114,7 +113,7 @@ impl Renderer {
             }
         }
     }
-    
+
     fn max_scale(mat: Mat4) -> f32 {
         let x = mat.x_axis.truncate().length();
         let y = mat.y_axis.truncate().length();

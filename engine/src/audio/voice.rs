@@ -258,7 +258,7 @@ impl Voice {
         // Zero the rest of the block if we ran out of frames
         for frame in frames_to_fill..required_frames {
             for ch in 0..self.channels {
-                self.buffer[frame * ch as usize ] = 0.0;
+                self.buffer[frame * ch as usize] = 0.0;
             }
         }
         if self.cursor >= total_frames {

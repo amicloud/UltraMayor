@@ -3,7 +3,7 @@ use glam::Vec3;
 
 use crate::{
     TransformComponent,
-    audio::audio_control::{AudioControl},
+    audio::audio_control::AudioControl,
     components::simple_on_hit_audio_component::SimpleOnHitAudioComponent,
     physics::{
         collision_system::ordered_pair, physics_event::PhysicsEventType,

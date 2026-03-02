@@ -91,8 +91,8 @@ impl Shader {
                 );
             }
 
-            let mut uniforms = Vec::new();
             let count = gl.get_program_parameter_i32(program, glow::ACTIVE_UNIFORMS);
+            let mut uniforms = Vec::with_capacity(count as usize);
 
             for i in 0..count {
                 if let Some(info) = gl.get_active_uniform(program, i as u32)
@@ -102,8 +102,8 @@ impl Shader {
                 }
             }
 
-            let mut attributes = Vec::new();
             let attrib_count = gl.get_active_attributes(program) as i32;
+            let mut attributes = Vec::with_capacity(attrib_count as usize);
             for i in 0..attrib_count {
                 if let Some(info) = gl.get_active_attribute(program, i as u32) {
                     let raw_name = info.name;

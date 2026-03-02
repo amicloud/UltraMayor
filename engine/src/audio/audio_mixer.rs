@@ -64,8 +64,7 @@ impl Default for AudioMixer {
         let config = device.default_output_config().unwrap();
         let channels = config.channels() as u16;
 
-
-        let tracks: [Track; 32] = core::array::from_fn(|_|Track {
+        let tracks: [Track; 32] = core::array::from_fn(|_| Track {
             volume: 1.0,
             playing: true,
             voices: Vec::with_capacity(256),

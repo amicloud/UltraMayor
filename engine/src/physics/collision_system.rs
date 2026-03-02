@@ -523,7 +523,7 @@ fn merge_contact_manifold(
     }
 
     let merge_distance_sq = merge_distance * merge_distance;
-    let mut merged: Vec<Contact> = Vec::new();
+    let mut merged: Vec<Contact> = Vec::with_capacity(new_contacts.len());
     let mut used_new = vec![false; new_contacts.len()];
 
     if let Some(prev) = previous {
@@ -893,7 +893,7 @@ fn cuboid_cuboid_contact(
     let a_vertices = cuboid_world_vertices(a_center, a_axes, a_extents);
     let b_vertices = cuboid_world_vertices(b_center, b_axes, b_extents);
 
-    let mut candidate_points: Vec<Vec3> = Vec::new();
+    let mut candidate_points: Vec<Vec3> = Vec::with_capacity(16);
     for point in a_vertices {
         if point_inside_obb(point, b_center, b_axes, b_extents, 1e-4) {
             candidate_points.push(point);
@@ -917,7 +917,7 @@ fn cuboid_cuboid_contact(
             .then_with(|| a.z.total_cmp(&b.z))
     });
 
-    let mut unique_points: Vec<Vec3> = Vec::new();
+    let mut unique_points: Vec<Vec3> = Vec::with_capacity(candidate_points.len());
     for point in candidate_points {
         let already_present = unique_points
             .iter()
@@ -1104,7 +1104,7 @@ fn convex_mesh_contact(
     let mesh_entity_world = mesh_transform.to_mat4();
 
     let convex_aabb_world = convex_collider.aabb(&convex_world);
-    let mut candidates: Vec<ContactCandidate> = Vec::new();
+    let mut candidates: Vec<ContactCandidate> = Vec::with_capacity(32);
 
     for part in &render_body.parts {
         let Some(mesh) = mesh_resource.get_mesh(part.mesh_id) else {
@@ -1157,13 +1157,16 @@ fn convex_mesh_swept_contact_at_transform(
     let end_aabb_mesh = convex_collider.aabb(&collider_end_mesh);
     let swept_aabb_mesh = union_aabb(start_aabb_mesh, end_aabb_mesh);
 
-    let mut triangles = Vec::new();
+    let mut triangles = Vec::with_capacity(32);
     collect_triangles_in_aabb(bvh, &swept_aabb_mesh, &mut triangles);
     if triangles.is_empty() {
         return Vec::new();
     }
 
-    let mut candidates = Vec::new();
+    // Most triangles in the swept AABB will not yield valid contacts; reserve for ~half of them,
+    // but still ensure at least capacity 1 (via len().max(2) / 2) to avoid a zero-capacity Vec.
+    let estimated_candidate_capacity = triangles.len().max(2) / 2;
+    let mut candidates = Vec::with_capacity(estimated_candidate_capacity);
     for tri in triangles {
         let tri_world = Triangle {
             v0: mesh_world.transform_point3(tri.v0),
@@ -1238,15 +1241,14 @@ fn convex_mesh_contact_at_transform(
     let _convex_center_mesh = collider_in_mesh_space.transform_point3(Vec3::ZERO);
     let convex_aabb_mesh = convex_collider.aabb(&collider_in_mesh_space);
 
-    let mut triangles = Vec::new();
+    let mut triangles = Vec::with_capacity(32);
     collect_triangles_in_aabb(bvh, &convex_aabb_mesh, &mut triangles);
     if triangles.is_empty() {
         return Vec::new();
     }
-
     let convex_center_world = convex_world.transform_point3(Vec3::ZERO);
 
-    let mut candidates = Vec::new();
+    let mut candidates = Vec::with_capacity((triangles.len() / 2).max(1));
     for tri in triangles {
         let tri_world = Triangle {
             v0: mesh_world.transform_point3(tri.v0),
@@ -1414,7 +1416,7 @@ fn reduce_contact_candidates(
     let normal_epsilon = 0.01;
 
     // Select contacts
-    let mut selected: Vec<ContactCandidate> = Vec::new();
+    let mut selected: Vec<ContactCandidate> = Vec::with_capacity(4);
     for candidate in candidates {
         let mut skip = false;
         for c in &selected {
@@ -1554,7 +1556,7 @@ mod tests {
         )
         .expect("Failed to load OBJ");
 
-        let mut triangles = Vec::new();
+        let mut triangles = Vec::with_capacity(models.len() * 3);
         for model in models {
             let mesh = model.mesh;
             for tri_idx in (0..mesh.indices.len()).step_by(3) {

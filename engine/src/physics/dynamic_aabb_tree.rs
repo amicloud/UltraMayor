@@ -30,12 +30,14 @@ pub struct DynamicAabbTree {
 
 impl Default for DynamicAabbTree {
     fn default() -> Self {
+        let mut nodes = Vec::with_capacity(2048);
+        nodes.push(Node::default()); // reserve index 0
         Self {
             // Reserve index 0 so NodeId can use NonZeroUsize while still
             // indexing directly into `nodes` via `id.get()`.
-            nodes: vec![Node::default()],
+            nodes,
             root: None,
-            free_list: Vec::new(),
+            free_list: Vec::with_capacity(512),
         }
     }
 }

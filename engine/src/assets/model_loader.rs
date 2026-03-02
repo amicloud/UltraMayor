@@ -19,6 +19,7 @@ use crate::{
     },
 };
 
+const DEFAULT_MATERIAL_CAPACITY: usize = 32;
 impl Engine {
     fn rgba_from_rgb(rgb: [f32; 3]) -> [u8; 4] {
         [
@@ -120,7 +121,8 @@ impl Engine {
             )
         };
 
-        let mut material_inputs: Vec<(TextureHandle, TextureHandle, f32)> = Vec::new();
+        let mut material_inputs: Vec<(TextureHandle, TextureHandle, f32)> =
+            Vec::with_capacity(DEFAULT_MATERIAL_CAPACITY);
         {
             let mut texture_resource = self
                 .world
@@ -371,7 +373,8 @@ impl Engine {
             Self::load_textures_from_gltf_data(&mut texture_resource, gl, &gltf, &images)?
         };
 
-        let mut material_inputs: Vec<(TextureHandle, TextureHandle, f32)> = Vec::new();
+        let mut material_inputs: Vec<(TextureHandle, TextureHandle, f32)> =
+            Vec::with_capacity(DEFAULT_MATERIAL_CAPACITY);
 
         let mut texture_resource = self
             .world
@@ -475,7 +478,7 @@ impl Engine {
         path: &OsStr,
     ) -> Result<Vec<GltfPrimitiveMesh>, Box<dyn std::error::Error>> {
         let (gltf, buffers, _) = gltf::import(path.to_str().unwrap())?;
-        let mut meshes = Vec::new();
+        let mut meshes = Vec::with_capacity(gltf.meshes().len());
 
         for gltf_mesh in gltf.meshes() {
             println!("Mesh #{}", gltf_mesh.index());
@@ -526,6 +529,7 @@ impl Engine {
                 assert_eq!(positions.len(), tangents.len());
 
                 let mut mesh = Mesh::default();
+                mesh.vertices.reserve(positions.len());
 
                 // Build vertices
                 for i in 0..positions.len() {
