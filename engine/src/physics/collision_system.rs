@@ -85,17 +85,16 @@ impl CollisionSystem {
     }
 
     pub fn cleanup_removed_entities(
-        _phys: ResMut<PhysicsResource>,
-        _removed: RemovedComponents<TransformComponent>,
+        mut phys: ResMut<PhysicsResource>,
+        mut removed: RemovedComponents<TransformComponent>,
     ) {
-        todo!("Handle removed entities in collision system");
-        // for entity in removed.iter() {
-        //     if let Some(node_id) = phys.entity_node.remove(&entity) {
-        //         phys.broadphase.remove(node_id);
-        //     }
+        for entity in removed.read().into_iter() {
+            if let Some(node_id) = phys.entity_node.remove(&entity) {
+                phys.broadphase.remove(node_id);
+            }
 
-        //     phys.world_aabbs.remove(&entity);
-        // }
+            phys.world_aabbs.remove(&entity);
+        }
     }
 
     #[allow(clippy::type_complexity)]
@@ -1241,7 +1240,7 @@ fn convex_mesh_contact_at_transform(
     let _convex_center_mesh = collider_in_mesh_space.transform_point3(Vec3::ZERO);
     let convex_aabb_mesh = convex_collider.aabb(&collider_in_mesh_space);
 
-    let mut triangles = Vec::with_capacity(32);
+    let mut triangles = Vec::with_capacity(8);
     collect_triangles_in_aabb(bvh, &convex_aabb_mesh, &mut triangles);
     if triangles.is_empty() {
         return Vec::new();
