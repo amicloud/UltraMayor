@@ -144,6 +144,7 @@ impl Engine {
             (
                 // RenderSystem::cleanup_render_queue,
                 AudioCommandQueueSystem::clear_command_queue,
+                CollisionSystem::cleanup_removed_entities,
             )
                 .chain(),
         );
@@ -186,29 +187,21 @@ impl Engine {
                 major_version, minor_version
             );
         }
-
+        
+        let max_physics_steps: usize = 6;
         let mut last_frame = Instant::now();
         let mut accumulator = Duration::ZERO;
-
-        let fixed_dt: Duration = self
-            .world
-            .get_resource::<TimeResource>()
-            .expect("TimeResource resource not found")
-            .simulation_fixed_dt();
-
-        let frame_target: Duration = self
-            .world
-            .get_resource::<TimeResource>()
-            .expect("TimeResource resource not found")
-            .target_frame_duration();
-
-        let max_physics_steps: usize = 6;
         let mut frame_count: u64 = 0;
 
         'game: loop {
-            log::trace!("Frame count: {}", frame_count);
-            frame_count += 1;
             let frame_start = Instant::now();
+            let time_resource = self
+                .world
+                .get_resource::<TimeResource>()
+                .expect("TimeResource resource not found");
+            let fixed_dt: Duration = time_resource.simulation_fixed_dt();
+            let frame_target: Duration = time_resource.target_frame_duration();
+            
             {
                 let mut input_state = self
                     .world
@@ -326,6 +319,8 @@ impl Engine {
                 sleep(frame_target - frame_time);
             }
             self.window.gl_swap_window();
+            log::trace!("Frame count: {}", frame_count);
+            frame_count += 1;
         }
     }
 
