@@ -10,7 +10,6 @@ use crate::render::renderer;
 #[derive(Resource, Default)]
 pub struct TextureResource {
     pub textures: SlotMap<TextureHandle, Texture>,
-    pub default_normal_map: TextureHandle,
 }
 
 impl TextureResource {
@@ -46,17 +45,6 @@ impl TextureResource {
         let mut tex = Texture::new(width, height);
         renderer::Renderer::upload_texture_to_gpu(&mut tex, gl, rgba);
         self.add_texture(tex)
-    }
-
-    pub fn create_default_normal_map(&mut self, gl: &Context) -> TextureHandle {
-        // 1x1 RGBA8 (128, 128, 255, 255)
-        let pixels: [u8; 4] = [128, 128, 255, 255];
-        let mut tex = Texture::new(1, 1);
-
-        renderer::Renderer::upload_texture_to_gpu(&mut tex, gl, &pixels);
-        let id = self.add_texture(tex);
-        self.default_normal_map = id;
-        id
     }
 
     pub fn get_texture(&self, id: TextureHandle) -> Option<&Texture> {

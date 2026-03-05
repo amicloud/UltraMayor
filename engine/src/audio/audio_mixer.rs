@@ -177,7 +177,6 @@ impl AudioMixer {
                     for sample in output.iter_mut() {
                         *sample = (*sample * mute_gain).clamp(-1.0, 1.0);
                     }
-
                 },
                 move |err| eprintln!("Stream error: {}", err),
                 None, // None=blocking, Some(Duration)=timeout

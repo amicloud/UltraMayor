@@ -26,7 +26,7 @@ pub struct Renderer {
     frames_rendered: u64,
     vao_cache: HashMap<VaoKey, glow::VertexArray>,
     mesh_render_data: SecondaryMap<MeshHandle, MeshRenderData>,
-    frame_data: FrameData,
+    frame_data: PersistentFrameData,
 }
 
 pub struct MeshRenderData {
@@ -37,7 +37,7 @@ pub struct MeshRenderData {
     pub instance_count: usize,
 }
 
-struct FrameData {
+struct PersistentFrameData {
     /// Instances copied from the render queue at the start of each frame.
     input_instances: Vec<RenderInstance>,
     visible_instances: Vec<RenderInstance>,
@@ -50,7 +50,7 @@ struct FrameData {
     material_batch_ranges: Vec<MaterialBatchRange>,
 }
 
-impl Default for FrameData {
+impl Default for PersistentFrameData {
     fn default() -> Self {
         Self {
             input_instances: Vec::with_capacity(1024),
@@ -108,7 +108,7 @@ impl Renderer {
                 gl,
                 frames_rendered: 0,
                 vao_cache: HashMap::with_capacity(256),
-                frame_data: FrameData::default(),
+                frame_data: PersistentFrameData::default(),
                 mesh_render_data: SecondaryMap::with_capacity(256),
             }
         }

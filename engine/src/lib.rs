@@ -9,11 +9,13 @@ pub mod components;
 pub mod input;
 pub mod physics;
 pub mod render;
+pub mod scene;
 mod time_resource;
 mod utils;
 pub mod world_basis;
 use std::{
     rc::Rc,
+    sync::Arc,
     thread::sleep,
     time::{Duration, Instant},
 };
@@ -36,10 +38,7 @@ use crate::{
     components::physics_component::PhysicsComponent,
     input::InputStateResource,
     physics::{
-        movement_system::MovementSystem,
-        physics_event_dispatcher,
-        physics_resource::{CollisionFrameData, PhysicsFrameData, PhysicsResource},
-        physics_system::PhysicsSystem,
+        movement_system::MovementSystem, physics_event_dispatcher, physics_system::PhysicsSystem,
     },
     render::{
         render_body_resource::RenderBodyResource,
@@ -47,6 +46,7 @@ use crate::{
         render_system::RenderSystem,
         renderer::{CameraRenderData, RenderParams, Renderer},
     },
+    scene::{scene::Scene, scene_services::SceneServices},
     utils::scope_timer::ScopeTimer,
 };
 
@@ -69,12 +69,10 @@ pub use crate::time_resource::TimeResource;
 pub use crate::world_basis::WorldBasis;
 
 pub struct Engine {
-    pub world: World,
-    pub game_frame_schedule: Schedule,
-    pub game_simulation_schedule: Schedule,
-    cleanup_schedule: Schedule,
-    frame_schedule: Schedule,
+    pub scene: Scene,
     physics_schedule: Schedule,
+    frame_schedule: Schedule,
+    cleanup_schedule: Schedule,
     gl: Rc<glow::Context>,
     window: sdl2::video::Window,
     events_loop: sdl2::EventPump,
@@ -89,23 +87,17 @@ impl Engine {
         let (gl, window, events_loop, gl_context) = unsafe { Self::create_sdl2_context() };
         let gl = Rc::new(gl);
 
-        let mut world = World::new();
-        world.insert_resource(RenderQueue::default());
-        world.insert_resource(MeshResource::default());
-        world.insert_resource(RenderBodyResource::default());
-        world.insert_resource(MaterialResource::default());
-        world.insert_resource(TextureResource::default());
-        world.insert_resource(ShaderResource::default());
-        world.insert_resource(ActiveCamera::default());
-        world.insert_resource(InputStateResource::default());
-        world.insert_resource(WorldBasis::canonical());
-        world.insert_resource(PhysicsResource::default());
-        world.insert_resource(CollisionFrameData::default());
-        world.insert_resource(PhysicsFrameData::default());
-        world.insert_resource(TimeResource::new(60, 120));
-        world.insert_resource(Gravity::default());
-        world.insert_resource(SoundResource::default());
-        world.insert_resource(AudioControl::default());
+        let renderer = Renderer::new(gl.clone());
+        let audio_mixer = AudioMixer::default();
+
+        let scene_services = SceneServices {
+            meshes: Arc::new(MeshResource::default()),
+            textures: Arc::new(TextureResource::default()),
+            shaders: Arc::new(ShaderResource::default()),
+            sounds: Arc::new(SoundResource::default()),
+        };
+
+        let scene = Scene::new(&scene_services);
 
         let mut physics_schedule = Schedule::default();
 
@@ -136,9 +128,6 @@ impl Engine {
             )
                 .chain(),
         );
-
-        let game_frame_schedule = Schedule::default();
-        let game_simulation_schedule = Schedule::default();
         let mut cleanup_schedule = Schedule::default();
         cleanup_schedule.add_systems(
             (
@@ -148,21 +137,10 @@ impl Engine {
             )
                 .chain(),
         );
-
-        world
-            .get_resource_mut::<TextureResource>()
-            .expect("TextureResource resource not found")
-            .create_default_normal_map(&gl);
-
-        let renderer = Renderer::new(gl.clone());
-        let audio_mixer = AudioMixer::default();
-
         Engine {
-            world,
-            game_frame_schedule,
-            game_simulation_schedule,
-            frame_schedule,
+            scene,
             physics_schedule,
+            frame_schedule,
             cleanup_schedule,
             gl,
             window,
@@ -187,7 +165,7 @@ impl Engine {
                 major_version, minor_version
             );
         }
-        
+
         let max_physics_steps: usize = 6;
         let mut last_frame = Instant::now();
         let mut accumulator = Duration::ZERO;
@@ -196,14 +174,16 @@ impl Engine {
         'game: loop {
             let frame_start = Instant::now();
             let time_resource = self
+                .scene
                 .world
                 .get_resource::<TimeResource>()
                 .expect("TimeResource resource not found");
             let fixed_dt: Duration = time_resource.simulation_fixed_dt();
             let frame_target: Duration = time_resource.target_frame_duration();
-            
+
             {
                 let mut input_state = self
+                    .scene
                     .world
                     .get_resource_mut::<InputStateResource>()
                     .expect("InputStateResource resource not found");
@@ -213,8 +193,8 @@ impl Engine {
                 }
 
                 // Update things that should run only once per frame
-                self.frame_schedule.run(&mut self.world);
-                self.game_frame_schedule.run(&mut self.world);
+                self.frame_schedule.run(&mut self.scene.world);
+                self.scene.game_frame_schedule.run(&mut self.scene.world);
 
                 // Render before doing any simulation steps, so that the game feels more responsive.
                 let render_params = RenderParams {
@@ -222,13 +202,14 @@ impl Engine {
                     height: self.window.size().1,
                 };
                 let camera_data = Self::build_camera_render_data(
-                    &mut self.world,
+                    &mut self.scene.world,
                     render_params.width,
                     render_params.height,
                 );
 
                 self.renderer.stage_instances(
                     &self
+                        .scene
                         .world
                         .get_resource::<RenderQueue>()
                         .expect("RenderQueue resource not found")
@@ -237,18 +218,22 @@ impl Engine {
                 {
                     let _timer = ScopeTimer::new("Render");
                     let mesh_resource = self
+                        .scene
                         .world
                         .get_resource::<MeshResource>()
                         .expect("MeshResource resource not found");
                     let material_resource = self
+                        .scene
                         .world
                         .get_resource::<MaterialResource>()
                         .expect("MaterialResource resource not found");
                     let texture_resource = self
+                        .scene
                         .world
                         .get_resource::<TextureResource>()
                         .expect("TextureResource resource not found");
                     let shader_resource = self
+                        .scene
                         .world
                         .get_resource::<ShaderResource>()
                         .expect("ShaderResource resource not found");
@@ -278,7 +263,7 @@ impl Engine {
                     let phys_start = Instant::now();
                     {
                         let _timer = ScopeTimer::new("Physics Schedule");
-                        self.physics_schedule.run(&mut self.world);
+                        self.physics_schedule.run(&mut self.scene.world);
                     }
                     #[cfg(not(debug_assertions))]
                     {
@@ -292,7 +277,9 @@ impl Engine {
                             );
                         }
                     }
-                    self.game_simulation_schedule.run(&mut self.world);
+                    self.scene
+                        .game_simulation_schedule
+                        .run(&mut self.scene.world);
                     accumulator -= fixed_dt;
                     steps += 1;
                 }
@@ -302,18 +289,20 @@ impl Engine {
                 }
 
                 self.audio_mixer.make_mixer_commands(
-                    self.world
+                    self.scene
+                        .world
                         .get_resource::<AudioControl>()
                         .expect("AudioQueue resource not found")
                         .queue(),
-                    self.world
+                    self.scene
+                        .world
                         .get_resource::<SoundResource>()
                         .expect("SoundResource resource not found"),
                 );
             }
-            self.cleanup_schedule.run(&mut self.world);
+            self.cleanup_schedule.run(&mut self.scene.world);
             // Reset bevy_ecs change detection (Added/Changed/Removed) so the next frame starts with a fresh diff.
-            self.world.clear_trackers();
+            self.scene.world.clear_trackers();
             let frame_time = frame_start.elapsed();
             if frame_time < frame_target {
                 sleep(frame_target - frame_time);
@@ -446,8 +435,8 @@ impl Default for Engine {
 
 impl Engine {
     pub fn aabb_from_render_body(&self, render_body_id: RenderBodyHandle) -> Option<Aabb> {
-        let render_body_resource = self.world.get_resource::<RenderBodyResource>()?;
-        let mesh_resource = self.world.get_resource::<MeshResource>()?;
+        let render_body_resource = self.scene.world.get_resource::<RenderBodyResource>()?;
+        let mesh_resource = self.scene.world.get_resource::<MeshResource>()?;
         let render_body = render_body_resource.get_render_body(render_body_id)?;
 
         let mut combined: Option<Aabb> = None;
@@ -468,7 +457,8 @@ impl Engine {
         render_body_id: RenderBodyHandle,
         layer: CollisionLayer,
     ) -> Option<MeshCollider> {
-        self.world
+        self.scene
+            .world
             .get_resource::<RenderBodyResource>()?
             .get_render_body(render_body_id)?;
 

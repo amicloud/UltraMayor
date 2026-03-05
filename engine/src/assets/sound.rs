@@ -103,7 +103,11 @@ impl Engine {
     pub fn load_wav(&mut self, path: &str) -> Result<SoundHandle, String> {
         let sample_rate = self.audio_mixer.sample_rate;
         let sound = Sound::from_wav(path, sample_rate);
-        let mut sound_resource = self.world.get_resource_mut::<SoundResource>().unwrap();
+        let mut sound_resource = self
+            .scene
+            .world
+            .get_resource_mut::<SoundResource>()
+            .unwrap();
         let name = Path::new(path)
             .file_name()
             .and_then(|s| s.to_str())

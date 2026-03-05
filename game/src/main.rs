@@ -48,6 +48,7 @@ fn main() {
     let aspect_ratio = 1024.0 / 769.0;
 
     let _flying_camera = engine
+        .scene
         .world
         .spawn((
             SingleAudioListenerComponent,
@@ -76,6 +77,7 @@ fn main() {
         .id();
 
     let _orbit_camera = engine
+        .scene
         .world
         .spawn((
             TransformComponent {
@@ -100,12 +102,13 @@ fn main() {
         .id();
 
     engine
+        .scene
         .world
         .get_resource_mut::<ActiveCamera>()
         .unwrap()
         .set(_flying_camera);
 
-    engine.game_simulation_schedule.add_systems(
+    engine.scene.game_simulation_schedule.add_systems(
         (
             initialize_flying_camera_rotation,
             apply_orbit_camera_input,
@@ -120,7 +123,7 @@ fn main() {
             .chain(),
     );
 
-    engine.game_frame_schedule.add_systems((
+    engine.scene.game_frame_schedule.add_systems((
         apply_orbit_camera_input,
         apply_switch_camera_input,
         sound_control,
@@ -165,7 +168,7 @@ fn main() {
         .load_wav("resources/sounds/pop.wav")
         .expect("Failed to load sound");
 
-    engine.world.spawn((
+    engine.scene.world.spawn((
         TransformComponent {
             position: player_start,
             rotation: Quat::IDENTITY,
@@ -194,7 +197,7 @@ fn main() {
     ));
 
     // Spatial audio testing
-    // engine.world.spawn((
+    // engine.scene.world.spawn((
     //     TransformComponent {
     //         position: Vec3::new(0.0, 0.0, 5.0),
     //         rotation: Quat::IDENTITY,
@@ -232,7 +235,7 @@ fn main() {
 
     // (1..=(5 * spawn_mult)).for_each(|i| {
     //     let p = player_local_size * Vec3::new(0.0, 0.0, i as f32);
-    //     engine.world.spawn((
+    //     engine.scene.world.spawn((
     //         TransformComponent {
     //             position: p,
     //             rotation: Quat::IDENTITY,
@@ -291,7 +294,7 @@ fn main() {
 
         let scale = 1.0;
         // Spawn test objects
-        engine.world.spawn((
+        engine.scene.world.spawn((
             TransformComponent {
                 position: pos,
                 rotation: Quat::IDENTITY,
@@ -331,7 +334,7 @@ fn main() {
         .mesh_collider_from_render_body(platform, CollisionLayer::Default)
         .expect("Render body AABB not found");
 
-    engine.world.spawn((
+    engine.scene.world.spawn((
         TransformComponent {
             position: Vec3::new(0.0, 0.0, 0.0),
             rotation: Quat::IDENTITY,

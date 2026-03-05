@@ -111,6 +111,7 @@ impl Engine {
 
         let shader_handle = {
             let mut shader_resource = self
+                .scene
                 .world
                 .get_resource_mut::<ShaderResource>()
                 .expect("ShaderResource not found");
@@ -125,6 +126,7 @@ impl Engine {
             Vec::with_capacity(DEFAULT_MATERIAL_CAPACITY);
         {
             let mut texture_resource = self
+                .scene
                 .world
                 .get_resource_mut::<TextureResource>()
                 .expect("TextureResource not found");
@@ -151,10 +153,10 @@ impl Engine {
                             let tex_path = base_dir.join(tex);
                             texture_resource.load_from_file(gl, tex_path.as_os_str())
                         } else {
-                            texture_resource.default_normal_map
+                            texture_resource.create_solid_rgba(gl, [128, 128, 255, 255])
                         }
                     } else {
-                        texture_resource.default_normal_map
+                        texture_resource.create_solid_rgba(gl, [128, 128, 255, 255])
                     };
 
                     let roughness = if let Some(shininess) = material.shininess {
@@ -173,7 +175,7 @@ impl Engine {
 
             if material_inputs.is_empty() {
                 let albedo = texture_resource.create_solid_rgba(gl, [255, 255, 255, 255]);
-                let default_normal = texture_resource.default_normal_map;
+                let default_normal = texture_resource.create_solid_rgba(gl, [128, 128, 255, 255]);
                 material_inputs.push((albedo, default_normal, 1.0));
             }
         }
@@ -181,6 +183,7 @@ impl Engine {
         let mut material_handles: Vec<MaterialHandle> = Vec::with_capacity(material_inputs.len());
         {
             let mut material_resource = self
+                .scene
                 .world
                 .get_resource_mut::<MaterialResource>()
                 .expect("MaterialResource not found");
@@ -274,6 +277,7 @@ impl Engine {
         let mut parts = Vec::with_capacity(built_parts.len());
         {
             let mut mesh_resource = self
+                .scene
                 .world
                 .get_resource_mut::<MeshResource>()
                 .expect("MeshResource not found");
@@ -288,7 +292,8 @@ impl Engine {
         }
 
         let render_body = RenderBody::new(parts);
-        self.world
+        self.scene
+            .world
             .get_resource_mut::<RenderBodyResource>()
             .expect("RenderBodyResource not found")
             .add_render_body(render_body)
@@ -320,6 +325,7 @@ impl Engine {
         let mut parts = Vec::with_capacity(mesh_primitives.len());
         {
             let mut mesh_resource = self
+                .scene
                 .world
                 .get_resource_mut::<MeshResource>()
                 .expect("MeshResource not found");
@@ -341,7 +347,8 @@ impl Engine {
         }
 
         let render_body = RenderBody::new(parts);
-        self.world
+        self.scene
+            .world
             .get_resource_mut::<RenderBodyResource>()
             .expect("RenderBodyResource not found")
             .add_render_body(render_body)
@@ -359,6 +366,7 @@ impl Engine {
 
         let shader_handle = {
             let mut shader_resource = self
+                .scene
                 .world
                 .get_resource_mut::<ShaderResource>()
                 .expect("ShaderResource not found");
@@ -367,6 +375,7 @@ impl Engine {
 
         let texture_map = {
             let mut texture_resource = self
+                .scene
                 .world
                 .get_resource_mut::<TextureResource>()
                 .expect("TextureResource not found");
@@ -377,10 +386,11 @@ impl Engine {
             Vec::with_capacity(DEFAULT_MATERIAL_CAPACITY);
 
         let mut texture_resource = self
+            .scene
             .world
             .get_resource_mut::<TextureResource>()
             .expect("TextureResource not found");
-        let default_normal = texture_resource.default_normal_map;
+        let default_normal = texture_resource.create_solid_rgba(gl, [128, 128, 255, 255]);
 
         for material in gltf.materials() {
             let pbr = material.pbr_metallic_roughness();
@@ -405,6 +415,7 @@ impl Engine {
 
         let mut material_handles = Vec::with_capacity(material_inputs.len());
         let mut material_resource = self
+            .scene
             .world
             .get_resource_mut::<MaterialResource>()
             .expect("MaterialResource not found");
