@@ -19,6 +19,7 @@ use engine::components::{
 use crate::game_controller::{
     // SpatialAudioDemoComponent,
     do_gameplay,
+    scene_switcher,
     sound_control,
     spatial_audio_orbit_demo,
     // spatial_audio_popping_demo,
@@ -127,6 +128,7 @@ fn main() {
         apply_orbit_camera_input,
         apply_switch_camera_input,
         sound_control,
+        scene_switcher,
         // spatial_audio_popping_demo,
     ));
 

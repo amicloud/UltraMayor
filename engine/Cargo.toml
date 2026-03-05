@@ -13,7 +13,7 @@ toml = "0.8.19"
 dirs-next = "2.0.0"
 rand = "0.9.2"
 approx = "0.5.1"
-bevy_ecs = "0.18.0"
+bevy_ecs = {version = "0.18.0", features = ["debug"]}
 slotmap = "1.1.1"
 env_logger = "0.11.9"
 

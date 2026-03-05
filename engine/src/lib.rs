@@ -45,7 +45,9 @@ use crate::{
         render_system::RenderSystem,
         renderer::{CameraRenderData, RenderParams, Renderer},
     },
-    scene::{scene::Scene, scene_services::SceneServices},
+    scene::{
+        scene::Scene, scene_changer_resource::SceneChangerResource, scene_services::SceneServices,
+    },
     utils::scope_timer::ScopeTimer,
 };
 
@@ -66,7 +68,6 @@ pub use crate::components::velocity_component::VelocityComponent;
 pub use crate::input::MouseButton;
 pub use crate::time_resource::TimeResource;
 pub use crate::world_basis::WorldBasis;
-
 pub struct Engine {
     pub scene: Scene,
     _scene_services: SceneServices,
@@ -82,6 +83,57 @@ pub struct Engine {
 }
 
 impl Engine {
+    pub fn new_scene(&mut self) -> Scene {
+        Scene::new(&self._scene_services)
+    }
+
+    fn add_frame_schedule(&mut self) {
+        self.frame_schedule.add_systems(
+            (
+                RenderSystem::build_render_queue,
+                TimeResource::update_time_resource,
+                AudioCommandQueueSystem::build_command_queue,
+                SpatialAudioSystem::update_listener_position,
+                SpatialAudioSystem::update_moved_sources,
+                SpatialAudioSystem::remove_deleted_sources,
+                SimplePhysAudioSystem::on_hit_audio_system,
+            )
+                .chain(),
+        );
+    }
+
+    fn add_physics_schedule(&mut self) {
+        self.physics_schedule.add_systems(
+            (
+                MovementSystem::update,
+                CollisionSystem::update_world_aabb_cache,
+                CollisionSystem::update_world_dynamic_tree,
+                CollisionSystem::generate_manifolds,
+                PhysicsSystem::physics_solver,
+                PhysicsSystem::integrate_motion,
+                physics_event_dispatcher::dispatch_physics_events,
+            )
+                .chain(),
+        );
+    }
+
+    fn add_cleanup_schedule(&mut self) {
+        self.cleanup_schedule.add_systems(
+            (
+                // RenderSystem::cleanup_render_queue,
+                AudioCommandQueueSystem::clear_command_queue,
+                CollisionSystem::cleanup_removed_entities,
+            )
+                .chain(),
+        );
+    }
+
+    fn add_schedules(&mut self) {
+        self.add_frame_schedule();
+        self.add_physics_schedule();
+        self.add_cleanup_schedule();
+    }
+
     pub fn new() -> Self {
         env_logger::init();
         let (gl, window, events_loop, gl_context) = unsafe { Self::create_sdl2_context() };
@@ -99,45 +151,10 @@ impl Engine {
             materials: MaterialResource::default(),
         };
         let scene = Scene::new(&scene_services);
+        let physics_schedule = Schedule::default();
+        let frame_schedule = Schedule::default();
+        let cleanup_schedule = Schedule::default();
 
-        let mut physics_schedule = Schedule::default();
-
-        // Engine-only systems. Game code adds its own systems to the game schedule.
-        physics_schedule.add_systems(
-            (
-                MovementSystem::update,
-                CollisionSystem::update_world_aabb_cache,
-                CollisionSystem::update_world_dynamic_tree,
-                CollisionSystem::generate_manifolds,
-                PhysicsSystem::physics_solver,
-                PhysicsSystem::integrate_motion,
-            )
-                .chain(),
-        );
-        physics_schedule.add_systems(physics_event_dispatcher::dispatch_physics_events);
-
-        let mut frame_schedule = Schedule::default();
-        frame_schedule.add_systems(
-            (
-                RenderSystem::build_render_queue,
-                TimeResource::update_time_resource,
-                AudioCommandQueueSystem::build_command_queue,
-                SpatialAudioSystem::update_listener_position,
-                SpatialAudioSystem::update_moved_sources,
-                SpatialAudioSystem::remove_deleted_sources,
-                SimplePhysAudioSystem::on_hit_audio_system,
-            )
-                .chain(),
-        );
-        let mut cleanup_schedule = Schedule::default();
-        cleanup_schedule.add_systems(
-            (
-                // RenderSystem::cleanup_render_queue,
-                AudioCommandQueueSystem::clear_command_queue,
-                CollisionSystem::cleanup_removed_entities,
-            )
-                .chain(),
-        );
         Engine {
             scene,
             _scene_services: scene_services,
@@ -172,6 +189,7 @@ impl Engine {
         let mut last_frame = Instant::now();
         let mut accumulator = Duration::ZERO;
         let mut frame_count: u64 = 0;
+        self.add_schedules();
 
         'game: loop {
             let frame_start = Instant::now();
@@ -316,6 +334,22 @@ impl Engine {
                 sleep(frame_target - frame_time);
             }
             self.window.gl_swap_window();
+            // Scene swapping
+            if let Some(pending_scene) = self
+                .scene
+                .world
+                .get_resource_mut::<SceneChangerResource>()
+                .expect("SceneChangerResource resource not found")
+                .take_pending()
+            {
+                self.scene = pending_scene;
+                // Rebuild schedules since bevy_ecs binds systems to the world they were used on
+                self.frame_schedule = Schedule::default();
+                self.physics_schedule = Schedule::default();
+                self.cleanup_schedule = Schedule::default();
+                self.add_schedules();
+                log::info!("Scene switched!");
+            }
             log::trace!("Frame count: {}", frame_count);
             frame_count += 1;
         }

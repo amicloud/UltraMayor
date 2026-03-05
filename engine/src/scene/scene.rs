@@ -6,7 +6,7 @@ use crate::{
     input::InputStateResource,
     physics::physics_resource::{CollisionFrameData, PhysicsFrameData, PhysicsResource},
     render::render_queue::RenderQueue,
-    scene::scene_services::SceneServices,
+    scene::{scene_changer_resource::SceneChangerResource, scene_services::SceneServices},
 };
 
 pub struct Scene {
@@ -18,6 +18,8 @@ pub struct Scene {
 impl Scene {
     pub fn new(services: &SceneServices) -> Self {
         let mut world = World::new();
+
+        world.insert_resource(services.clone());
 
         // Insert services
         world.insert_resource(services.meshes.clone());
@@ -37,6 +39,7 @@ impl Scene {
         world.insert_resource(TimeResource::new(60, 120));
         world.insert_resource(Gravity::default());
         world.insert_resource(AudioControl::default());
+        world.insert_resource(SceneChangerResource::default());
 
         let game_frame_schedule = Schedule::default();
         let game_simulation_schedule = Schedule::default();

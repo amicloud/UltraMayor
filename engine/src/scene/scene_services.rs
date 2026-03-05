@@ -1,3 +1,5 @@
+use bevy_ecs::prelude::*;
+
 use crate::{
     assets::{
         material_resource::MaterialResource, mesh_resource::MeshResource,
@@ -7,6 +9,7 @@ use crate::{
     render::render_body_resource::RenderBodyResource,
 };
 
+#[derive(Resource, Clone)]
 pub struct SceneServices {
     pub meshes: MeshResource,
     pub textures: TextureResource,
