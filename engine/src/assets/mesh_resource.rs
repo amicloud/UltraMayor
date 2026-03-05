@@ -1,3 +1,5 @@
+use std::sync::{Arc, RwLock};
+
 use slotmap::SlotMap;
 
 use bevy_ecs::prelude::*;
@@ -7,12 +9,23 @@ use crate::{
     render::renderer::Renderer,
 };
 
-#[derive(Resource, Default)]
-pub struct MeshResource {
+#[derive(Default)]
+pub struct MeshStorage {
     pub meshes: SlotMap<MeshHandle, Mesh>,
 }
 
+#[derive(Resource, Default, Clone)]
+pub struct MeshResource(pub Arc<RwLock<MeshStorage>>);
 impl MeshResource {
+    pub fn read(&self) -> std::sync::RwLockReadGuard<'_, MeshStorage> {
+        self.0.read().unwrap()
+    }
+
+    pub fn write(&self) -> std::sync::RwLockWriteGuard<'_, MeshStorage> {
+        self.0.write().unwrap()
+    }
+}
+impl MeshStorage {
     pub fn add_mesh(&mut self, mesh: Mesh) -> MeshHandle {
         self.meshes.insert(mesh)
     }

@@ -8,13 +8,11 @@ use std::{collections::HashMap, time::Duration};
 
 use crate::{
     TransformComponent,
-    assets::{mesh::Aabb, mesh_resource::MeshResource},
-    components::collider_component::{
+    assets::{mesh::Aabb, mesh_resource::{MeshStorage, MeshResource}},
+    components::{collider_component::{
         BVHNode, Collider, ConvexCollider, ConvexShape, MeshCollider, Triangle,
         closest_point_on_triangle,
-    },
-    components::physics_component::{PhysicsComponent, PhysicsType},
-    components::velocity_component::VelocityComponent,
+    }, physics_component::{PhysicsComponent, PhysicsType}, velocity_component::VelocityComponent},
     physics,
     render::render_body_resource::RenderBodyResource,
     time_resource::TimeResource,
@@ -51,7 +49,7 @@ impl CollisionSystem {
                 if let Some(local_aabb) = render_body_local_aabb(
                     mesh_collider.render_body_id,
                     &render_body_resource,
-                    &mesh_resource,
+                    &mesh_resource.read(),
                 ) {
                     transform_aabb(local_aabb, transform)
                 } else {
@@ -88,7 +86,7 @@ impl CollisionSystem {
         mut phys: ResMut<PhysicsResource>,
         mut removed: RemovedComponents<TransformComponent>,
     ) {
-        for entity in removed.read().into_iter() {
+        for entity in removed.read() {
             if let Some(node_id) = phys.entity_node.remove(&entity) {
                 phys.broadphase.remove(node_id);
             }
@@ -117,7 +115,7 @@ impl CollisionSystem {
                 && let Some(local_aabb) = render_body_local_aabb(
                     mesh_collider.render_body_id,
                     &render_body_resource,
-                    &mesh_resource,
+                    &mesh_resource.read(),
                 )
             {
                 let world_aabb = transform_aabb(local_aabb, transform);
@@ -249,7 +247,7 @@ impl CollisionSystem {
                         mesh_b,
                         transform_b,
                         &render_body_resource,
-                        &mesh_resource,
+                        &mesh_resource.read(),
                         &physics_world.world_aabbs,
                         previous_manifold,
                         delta_t,
@@ -276,7 +274,7 @@ impl CollisionSystem {
                         mesh_a,
                         transform_a,
                         &render_body_resource,
-                        &mesh_resource,
+                        &mesh_resource.read(),
                         &physics_world.world_aabbs,
                         previous_manifold,
                         delta_t,
@@ -387,7 +385,7 @@ fn convex_mesh_pair_manifold(
     mesh_collider: &MeshCollider,
     mesh_transform: &TransformComponent,
     render_body_resource: &RenderBodyResource,
-    mesh_resource: &MeshResource,
+    mesh_resource: &MeshStorage,
     world_aabbs: &HashMap<Entity, Aabb>,
     previous_manifold: Option<&ContactManifold>,
     delta_t: Duration,
@@ -1080,7 +1078,7 @@ fn convex_mesh_contact(
     mesh_collider: &MeshCollider,
     mesh_transform: &TransformComponent,
     render_body_resource: &RenderBodyResource,
-    mesh_resource: &MeshResource,
+    mesh_resource: &MeshStorage,
     previous_manifold: Option<&ContactManifold>,
     delta_t: Duration,
 ) -> Vec<Contact> {
@@ -1493,7 +1491,7 @@ fn swept_aabb(aabb: &Aabb, delta: Vec3) -> Aabb {
 fn render_body_local_aabb(
     render_body_id: crate::assets::handles::RenderBodyHandle,
     render_body_resource: &RenderBodyResource,
-    mesh_resource: &MeshResource,
+    mesh_resource: &MeshStorage,
 ) -> Option<Aabb> {
     let render_body = render_body_resource.get_render_body(render_body_id)?;
 

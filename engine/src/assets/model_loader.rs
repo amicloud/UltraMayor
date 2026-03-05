@@ -276,13 +276,13 @@ impl Engine {
 
         let mut parts = Vec::with_capacity(built_parts.len());
         {
-            let mut mesh_resource = self
+            let mesh_resource = self
                 .scene
                 .world
                 .get_resource_mut::<MeshResource>()
                 .expect("MeshResource not found");
             for (built_mesh, material_handle) in built_parts {
-                let mesh_handle = mesh_resource.add_mesh(built_mesh);
+                let mesh_handle = mesh_resource.write().add_mesh(built_mesh);
                 parts.push(RenderBodyPart {
                     mesh_id: mesh_handle,
                     material_id: material_handle,
@@ -324,14 +324,14 @@ impl Engine {
 
         let mut parts = Vec::with_capacity(mesh_primitives.len());
         {
-            let mut mesh_resource = self
+            let mesh_resource = self
                 .scene
                 .world
                 .get_resource_mut::<MeshResource>()
                 .expect("MeshResource not found");
 
             for prim in mesh_primitives {
-                let mesh_handle = mesh_resource.add_mesh(prim.mesh);
+                let mesh_handle = mesh_resource.write().add_mesh(prim.mesh);
 
                 let material_handle = prim
                     .material_index

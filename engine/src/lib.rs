@@ -91,10 +91,12 @@ impl Engine {
         let audio_mixer = AudioMixer::default();
 
         let scene_services = SceneServices {
-            meshes: Arc::new(MeshResource::default()),
+            meshes: MeshResource::default(),
             textures: Arc::new(TextureResource::default()),
             shaders: Arc::new(ShaderResource::default()),
             sounds: Arc::new(SoundResource::default()),
+            bodies: Arc::new(RenderBodyResource::default()),
+            materials: Arc::new(MaterialResource::default()),
         };
 
         let scene = Scene::new(&scene_services);
@@ -217,11 +219,11 @@ impl Engine {
                 );
                 {
                     let _timer = ScopeTimer::new("Render");
-                    let mesh_resource = self
+                    let mesh_resource = &self
                         .scene
                         .world
                         .get_resource::<MeshResource>()
-                        .expect("MeshResource resource not found");
+                        .expect("MeshResource resource not found").read();
                     let material_resource = self
                         .scene
                         .world
@@ -441,7 +443,8 @@ impl Engine {
 
         let mut combined: Option<Aabb> = None;
         for part in &render_body.parts {
-            let mesh = mesh_resource.get_mesh(part.mesh_id)?;
+            let mesh_guard = mesh_resource.read();
+            let mesh = mesh_guard.get_mesh(part.mesh_id)?;
             let part_aabb = transform_aabb_with_mat4(mesh.aabb, &part.local_transform);
             combined = Some(match combined {
                 Some(existing) => union_aabb(existing, part_aabb),

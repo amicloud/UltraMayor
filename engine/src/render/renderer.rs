@@ -9,7 +9,7 @@ use crate::{
         handles::{MaterialHandle, MeshHandle, ShaderHandle},
         material_resource::MaterialResource,
         mesh::{Mesh, Vertex},
-        mesh_resource::MeshResource,
+        mesh_resource::MeshStorage,
         shader::{
             InputRate::{PerInstance, PerVertex},
             UniformValue, VertexAttribType,
@@ -132,7 +132,7 @@ impl Renderer {
     pub fn render(
         &mut self,
         render_params: RenderParams,
-        mesh_resource: &MeshResource,
+        mesh_resource: &MeshStorage,
         material_resource: &MaterialResource,
         texture_resource: &TextureResource,
         shader_resource: &ShaderResource,
@@ -394,7 +394,7 @@ impl Renderer {
     pub fn frustum_culling(
         visible_instances: &mut Vec<RenderInstance>,
         instances: &[RenderInstance],
-        mesh_resource: &MeshResource,
+        mesh_resource: &MeshStorage,
         view_proj: &Mat4,
     ) {
         visible_instances.clear();
@@ -500,7 +500,7 @@ impl Renderer {
         mesh: MeshHandle,
         shader: &ShaderHandle,
         shader_resource: &ShaderResource,
-        mesh_resource: &MeshResource,
+        mesh_resource: &MeshStorage,
         mesh_render_data: &mut SecondaryMap<MeshHandle, MeshRenderData>,
     ) -> glow::VertexArray {
         let key = VaoKey {

@@ -1,7 +1,7 @@
 use bevy_ecs::prelude::*;
 use bevy_ecs::schedule::{IntoScheduleConfigs, Schedule};
 use criterion::{Criterion, criterion_group, criterion_main};
-use engine::assets::mesh_resource::MeshResource;
+use engine::assets::mesh_resource::{MeshStorage, MeshResource};
 use engine::render::render_body_resource::RenderBodyResource;
 use std::hint::black_box;
 
